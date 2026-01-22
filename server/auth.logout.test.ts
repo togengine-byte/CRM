@@ -1,7 +1,19 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, beforeAll, afterAll } from "vitest";
 import { appRouter } from "./routers";
 import { COOKIE_NAME } from "../shared/const";
 import type { TrpcContext } from "./_core/context";
+import { initializeTestDb, cleanupTestDb, isUsingPostgres } from "./test-db";
+
+// Initialize test database before running tests
+beforeAll(async () => {
+  await initializeTestDb();
+  console.log(`[Test] Using ${isUsingPostgres() ? 'PostgreSQL' : 'SQLite'} database`);
+});
+
+// Clean up after tests
+afterAll(() => {
+  cleanupTestDb();
+});
 
 type CookieCall = {
   name: string;
@@ -19,7 +31,13 @@ function createAuthContext(): { ctx: TrpcContext; clearedCookies: CookieCall[] }
     email: "sample@example.com",
     name: "Sample User",
     loginMethod: "manus",
-    role: "user",
+    role: "admin",
+    status: "active",
+    phone: "050-1234567",
+    companyName: "Sample Company",
+    address: "Sample Address",
+    totalRatingPoints: 0,
+    ratedDealsCount: 0,
     createdAt: new Date(),
     updatedAt: new Date(),
     lastSignedIn: new Date(),

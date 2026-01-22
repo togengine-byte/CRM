@@ -1,6 +1,18 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, beforeAll, afterAll } from "vitest";
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
+import { initializeTestDb, cleanupTestDb, isUsingPostgres } from "./test-db";
+
+// Initialize test database before running tests
+beforeAll(async () => {
+  await initializeTestDb();
+  console.log(`[Test] Using ${isUsingPostgres() ? 'PostgreSQL' : 'SQLite'} database`);
+});
+
+// Clean up after tests
+afterAll(() => {
+  cleanupTestDb();
+});
 
 type AuthenticatedUser = NonNullable<TrpcContext["user"]>;
 
@@ -12,6 +24,12 @@ function createAuthContext(): { ctx: TrpcContext } {
     name: "Test User",
     loginMethod: "manus",
     role: "admin",
+    status: "active",
+    phone: "050-1234567",
+    companyName: "Test Company",
+    address: "Test Address",
+    totalRatingPoints: 0,
+    ratedDealsCount: 0,
     createdAt: new Date(),
     updatedAt: new Date(),
     lastSignedIn: new Date(),
@@ -154,6 +172,12 @@ describe("auth.logout", () => {
       name: "Test User",
       loginMethod: "manus",
       role: "admin",
+      status: "active",
+      phone: "050-1234567",
+      companyName: "Test Company",
+      address: "Test Address",
+      totalRatingPoints: 0,
+      ratedDealsCount: 0,
       createdAt: new Date(),
       updatedAt: new Date(),
       lastSignedIn: new Date(),

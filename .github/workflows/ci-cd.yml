@@ -10,16 +10,41 @@ on:
 
 jobs:
   test:
-    name: Run Tests
+    name: Run Tests with PostgreSQL
     runs-on: ubuntu-latest
+    
+    # PostgreSQL service container
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: crm_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
     
     strategy:
       matrix:
         node-version: [22.x]
     
+    env:
+      DATABASE_URL: postgresql://test_user:test_password@localhost:5432/crm_test
+      NODE_ENV: test
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential python3 git
       
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -51,11 +76,17 @@ jobs:
       - name: Run TypeScript check
         run: pnpm run check
       
-      - name: Run tests with Mock Database
+      - name: Setup test database schema
+        run: pnpm run db:push
+        env:
+          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/crm_test
+      
+      - name: Run tests with Real PostgreSQL
         run: pnpm run test
         env:
+          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/crm_test
           NODE_ENV: test
-          DATABASE_URL: "sqlite::memory:"
+          USE_REAL_DB: "true"
       
       - name: Build project
         run: pnpm run build

@@ -15,5 +15,8 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["server/**/*.test.ts", "server/**/*.spec.ts"],
+    setupFiles: ["./vitest.setup.ts"],
+    testTimeout: 30000, // 30 seconds timeout for database operations
+    hookTimeout: 30000, // 30 seconds timeout for hooks (beforeAll, afterAll)
   },
 });

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, beforeAll, afterAll } from "vitest";
 import {
   getSuppliers,
   getSupplierById,
@@ -7,6 +7,18 @@ import {
   getSupplierRecommendations,
   getSupplierStats,
 } from "./db";
+import { initializeTestDb, cleanupTestDb, isUsingPostgres } from "./test-db";
+
+// Initialize test database before running tests
+beforeAll(async () => {
+  await initializeTestDb();
+  console.log(`[Test] Using ${isUsingPostgres() ? 'PostgreSQL' : 'SQLite'} database`);
+});
+
+// Clean up after tests
+afterAll(() => {
+  cleanupTestDb();
+});
 
 describe("Suppliers API", () => {
   describe("getSuppliers", () => {
