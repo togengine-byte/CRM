@@ -1990,7 +1990,12 @@ export async function getValidationProfiles() {
   const db = await getDb();
   if (!db) return [];
   
-  return db.select().from(validationProfiles).orderBy(desc(validationProfiles.createdAt));
+  const profiles = await db.select().from(validationProfiles).orderBy(desc(validationProfiles.createdAt));
+  return profiles.map(p => ({
+    ...p,
+    allowedColorspaces: typeof p.allowedColorspaces === 'string' ? JSON.parse(p.allowedColorspaces || '[]') : p.allowedColorspaces,
+    allowedFormats: typeof p.allowedFormats === 'string' ? JSON.parse(p.allowedFormats || '[]') : p.allowedFormats,
+  }));
 }
 
 export async function getValidationProfileById(id: number) {
@@ -1998,7 +2003,14 @@ export async function getValidationProfileById(id: number) {
   if (!db) return null;
   
   const result = await db.select().from(validationProfiles).where(eq(validationProfiles.id, id)).limit(1);
-  return result[0] || null;
+  if (!result[0]) return null;
+  
+  const p = result[0];
+  return {
+    ...p,
+    allowedColorspaces: typeof p.allowedColorspaces === 'string' ? JSON.parse(p.allowedColorspaces || '[]') : p.allowedColorspaces,
+    allowedFormats: typeof p.allowedFormats === 'string' ? JSON.parse(p.allowedFormats || '[]') : p.allowedFormats,
+  };
 }
 
 export async function createValidationProfile(data: {
