@@ -1,0 +1,9 @@
+{
+  "query": "INSERT INTO `system_settings` (`key`, `value`, `description`) VALUES \n('supplier_recommendation_weights', '{\"price\": 40, \"rating\": 30, \"deliveryTime\": 20, \"reliability\": 10}', 'משקלים להמלצות ספקים באחוזים - סה\"כ חייב להיות 100')\nON DUPLICATE KEY UPDATE `value` = VALUES(`value`);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3vYva24DvPzpP21.root --database RYb7i7Tm2Z5UzKtE96KFJH --execute INSERT INTO `system_settings` (`key`, `value`, `description`) VALUES \n('supplier_recommendation_weights', '{\"price\": 40, \"rating\": 30, \"deliveryTime\": 20, \"reliability\": 10}', 'משקלים להמלצות ספקים באחוזים - סה\"כ חייב להיות 100')\nON DUPLICATE KEY UPDATE `value` = VALUES(`value`);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 69
+}

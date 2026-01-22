@@ -1,0 +1,41 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1769012092865,
+      "tag": "0000_faulty_microbe",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1769012612392,
+      "tag": "0001_clear_vulcan",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1769015656555,
+      "tag": "0002_grey_vampiro",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1769018206112,
+      "tag": "0003_true_stick",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1769033020827,
+      "tag": "0004_modern_ken_ellis",
+      "breakpoints": true
+    }
+  ]
+}
