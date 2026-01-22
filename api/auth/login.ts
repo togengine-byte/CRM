@@ -13,18 +13,29 @@ import { sdk } from '../../server/_core/sdk';
 import 'dotenv/config';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Set CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   // Only allow POST
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { code } = req.body || {};
-
-  if (!code || code !== '1234') {
-    return res.status(401).json({ error: 'Invalid code' });
-  }
-
   try {
+    const { code } = req.body || {};
+
+    if (!code || code !== '1234') {
+      return res.status(401).json({ error: 'Invalid code' });
+    }
+
     // Create a test user with a fixed openId
     const openId = 'test-user-001';
 
@@ -45,13 +56,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const isSecure = req.headers['x-forwarded-proto'] === 'https' || 
                      req.headers.host?.includes('vercel.app');
 
-    // Set cookie
+    // Set cookie with proper formatting for serverless
     const cookieStr = `${COOKIE_NAME}=${sessionToken}; Path=/; HttpOnly; ${isSecure ? 'Secure;' : ''} SameSite=Lax; Max-Age=${Math.floor(ONE_YEAR_MS / 1000)}`;
     res.setHeader('Set-Cookie', cookieStr);
 
     return res.status(200).json({ success: true, user: { openId, name: 'Test User' } });
   } catch (error) {
     console.error('[Auth] Login failed', error);
-    return res.status(500).json({ error: 'Login failed' });
+    return res.status(500).json({ 
+      error: 'Login failed',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 }
