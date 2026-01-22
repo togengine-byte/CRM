@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -61,12 +61,8 @@ export default function LandingPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { isSignedIn, isLoaded } = useAuth();
   
-  // Redirect to dashboard if already signed in
-  useEffect(() => {
-    if (isLoaded && isSignedIn) {
-      setLocation("/dashboard");
-    }
-  }, [isLoaded, isSignedIn, setLocation]);
+  // Note: Clerk SignIn component handles redirect to /dashboard automatically
+  // No need to redirect here - the dialog will close and user will be redirected by Clerk
   
   // Login dialog state
   const [isLoginOpen, setIsLoginOpen] = useState(false);
