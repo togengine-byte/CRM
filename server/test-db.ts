@@ -317,12 +317,12 @@ function insertSampleData(sqlite: Database.Database) {
   `);
 
   // 2. Employees
-  const employees = [
-    ("emp_001", "יוסי כהן", "yossi@crm.com"),
-    ("emp_002", "שרה לוי", "sara@crm.com"),
-    ("emp_003", "דוד ישראלי", "david@crm.com"),
-    ("emp_004", "רחל אברהם", "rachel@crm.com"),
-    ("emp_005", "משה גולן", "moshe@crm.com"),
+  const employees: [string, string, string][] = [
+    ["emp_001", "יוסי כהן", "yossi@crm.com"],
+    ["emp_002", "שרה לוי", "sara@crm.com"],
+    ["emp_003", "דוד ישראלי", "david@crm.com"],
+    ["emp_004", "רחל אברהם", "rachel@crm.com"],
+    ["emp_005", "משה גולן", "moshe@crm.com"],
   ];
 
   employees.forEach(([id, name, email]) => {
@@ -333,12 +333,12 @@ function insertSampleData(sqlite: Database.Database) {
   });
 
   // 3. Active Customers
-  const customers = [
-    ("cust_001", "חברת אלפא בע\"מ", "alpha@company.com", "חברת אלפא", "רחוב הרצל 1, תל אביב"),
-    ("cust_002", "בטא תעשיות", "beta@company.com", "בטא תעשיות", "רחוב ויצמן 15, רמת גן"),
-    ("cust_003", "גמא שירותים", "gamma@company.com", "גמא שירותים", "רחוב בן גוריון 8, הרצליה"),
-    ("cust_004", "דלתא מסחר", "delta@company.com", "דלתא מסחר", "רחוב רוטשילד 22, תל אביב"),
-    ("cust_005", "אפסילון טכנולוגיות", "epsilon@company.com", "אפסילון טכנולוגיות", "רחוב הברזל 3, רמת החייל"),
+  const customers: [string, string, string, string, string][] = [
+    ["cust_001", "חברת אלפא בע\"מ", "alpha@company.com", "חברת אלפא", "רחוב הרצל 1, תל אביב"],
+    ["cust_002", "בטא תעשיות", "beta@company.com", "בטא תעשיות", "רחוב ויצמן 15, רמת גן"],
+    ["cust_003", "גמא שירותים", "gamma@company.com", "גמא שירותים", "רחוב בן גוריון 8, הרצליה"],
+    ["cust_004", "דלתא מסחר", "delta@company.com", "דלתא מסחר", "רחוב רוטשילד 22, תל אביב"],
+    ["cust_005", "אפסילון טכנולוגיות", "epsilon@company.com", "אפסילון טכנולוגיות", "רחוב הברזל 3, רמת החייל"],
   ];
 
   customers.forEach(([id, name, email, company, address]) => {
@@ -349,12 +349,12 @@ function insertSampleData(sqlite: Database.Database) {
   });
 
   // 4. Pending Customers
-  const pending = [
-    ("pending_001", "לקוח ממתין 1", "pending1@company.com", "חברה ממתינה 1", "כתובת 1"),
-    ("pending_002", "לקוח ממתין 2", "pending2@company.com", "חברה ממתינה 2", "כתובת 2"),
-    ("pending_003", "לקוח ממתין 3", "pending3@company.com", "חברה ממתינה 3", "כתובת 3"),
-    ("pending_004", "לקוח ממתין 4", "pending4@company.com", "חברה ממתינה 4", "כתובת 4"),
-    ("pending_005", "לקוח ממתין 5", "pending5@company.com", "חברה ממתינה 5", "כתובת 5"),
+  const pending: [string, string, string, string, string][] = [
+    ["pending_001", "לקוח ממתין 1", "pending1@company.com", "חברה ממתינה 1", "כתובת 1"],
+    ["pending_002", "לקוח ממתין 2", "pending2@company.com", "חברה ממתינה 2", "כתובת 2"],
+    ["pending_003", "לקוח ממתין 3", "pending3@company.com", "חברה ממתינה 3", "כתובת 3"],
+    ["pending_004", "לקוח ממתין 4", "pending4@company.com", "חברה ממתינה 4", "כתובת 4"],
+    ["pending_005", "לקוח ממתין 5", "pending5@company.com", "חברה ממתינה 5", "כתובת 5"],
   ];
 
   pending.forEach(([id, name, email, company, address]) => {
@@ -365,12 +365,12 @@ function insertSampleData(sqlite: Database.Database) {
   });
 
   // 5. Suppliers
-  const suppliers = [
-    ("supp_001", "ספק דפוס מקצועי", "supplier1@print.com", "דפוס מקצועי בע\"מ", "אזור תעשייה חיפה"),
-    ("supp_002", "ספק נייר איכותי", "supplier2@paper.com", "נייר איכותי בע\"מ", "אזור תעשייה נתניה"),
-    ("supp_003", "ספק אריזות", "supplier3@pack.com", "אריזות ישראל", "אזור תעשייה אשדוד"),
-    ("supp_004", "ספק הדפסה דיגיטלית", "supplier4@digital.com", "דיגיטל פרינט", "אזור תעשייה ראשון"),
-    ("supp_005", "ספק חומרי גלם", "supplier5@raw.com", "חומרי גלם בע\"מ", "אזור תעשייה באר שבע"),
+  const suppliers: [string, string, string, string, string][] = [
+    ["supp_001", "ספק דפוס מקצועי", "supplier1@print.com", "דפוס מקצועי בע\"מ", "אזור תעשייה חיפה"],
+    ["supp_002", "ספק נייר איכותי", "supplier2@paper.com", "נייר איכותי בע\"מ", "אזור תעשייה נתניה"],
+    ["supp_003", "ספק אריזות", "supplier3@pack.com", "אריזות ישראל", "אזור תעשייה אשדוד"],
+    ["supp_004", "ספק הדפסה דיגיטלית", "supplier4@digital.com", "דיגיטל פרינט", "אזור תעשייה ראשון"],
+    ["supp_005", "ספק חומרי גלם", "supplier5@raw.com", "חומרי גלם בע\"מ", "אזור תעשייה באר שבע"],
   ];
 
   suppliers.forEach(([id, name, email, company, address]) => {
@@ -381,12 +381,12 @@ function insertSampleData(sqlite: Database.Database) {
   });
 
   // 6. Couriers
-  const couriers = [
-    ("courier_001", "שליח 1 - צפון", "courier1@delivery.com"),
-    ("courier_002", "שליח 2 - מרכז", "courier2@delivery.com"),
-    ("courier_003", "שליח 3 - דרום", "courier3@delivery.com"),
-    ("courier_004", "שליח 4 - שרון", "courier4@delivery.com"),
-    ("courier_005", "שליח 5 - ירושלים", "courier5@delivery.com"),
+  const couriers: [string, string, string][] = [
+    ["courier_001", "שליח 1 - צפון", "courier1@delivery.com"],
+    ["courier_002", "שליח 2 - מרכז", "courier2@delivery.com"],
+    ["courier_003", "שליח 3 - דרום", "courier3@delivery.com"],
+    ["courier_004", "שליח 4 - שרון", "courier4@delivery.com"],
+    ["courier_005", "שליח 5 - ירושלים", "courier5@delivery.com"],
   ];
 
   couriers.forEach(([id, name, email]) => {
@@ -397,12 +397,12 @@ function insertSampleData(sqlite: Database.Database) {
   });
 
   // 7. Base Products
-  const products = [
-    ("כרטיסי ביקור", "כרטיסי ביקור מקצועיים בגדלים שונים", "כרטיסים"),
-    ("פליירים", "פליירים פרסומיים בגדלים A4, A5, A6", "פרסום"),
-    ("ברושורים", "ברושורים מקופלים בעיצובים שונים", "פרסום"),
-    ("פוסטרים", "פוסטרים בגדלים שונים להדפסה", "שילוט"),
-    ("מעטפות", "מעטפות ממותגות בגדלים שונים", "משרדי"),
+  const products: [string, string, string][] = [
+    ["כרטיסי ביקור", "כרטיסי ביקור מקצועיים בגדלים שונים", "כרטיסים"],
+    ["פליירים", "פליירים פרסומיים בגדלים A4, A5, A6", "פרסום"],
+    ["ברושורים", "ברושורים מקופלים בעיצובים שונים", "פרסום"],
+    ["פוסטרים", "פוסטרים בגדלים שונים להדפסה", "שילוט"],
+    ["מעטפות", "מעטפות ממותגות בגדלים שונים", "משרדי"],
   ];
 
   products.forEach(([name, desc, cat]) => {
@@ -413,12 +413,12 @@ function insertSampleData(sqlite: Database.Database) {
   });
 
   // 8. Product Variants
-  const variants = [
-    (1, "BC-STD-001", "כרטיס ביקור סטנדרטי 9x5", '{"size": "9x5cm", "paper": "300gsm"}'),
-    (1, "BC-PRE-002", "כרטיס ביקור פרימיום 9x5", '{"size": "9x5cm", "paper": "400gsm", "lamination": "matt"}'),
-    (2, "FLY-A5-001", "פלייר A5 חד צדדי", '{"size": "A5", "sides": 1}'),
-    (3, "BRO-TRI-001", "ברושור משולש A4", '{"size": "A4", "folds": 2}'),
-    (4, "POS-A2-001", "פוסטר A2", '{"size": "A2", "paper": "170gsm"}'),
+  const variants: [number, string, string, string][] = [
+    [1, "BC-STD-001", "כרטיס ביקור סטנדרטי 9x5", '{"size": "9x5cm", "paper": "300gsm"}'],
+    [1, "BC-PRE-002", "כרטיס ביקור פרימיום 9x5", '{"size": "9x5cm", "paper": "400gsm", "lamination": "matt"}'],
+    [2, "FLY-A5-001", "פלייר A5 חד צדדי", '{"size": "A5", "sides": 1}'],
+    [3, "BRO-TRI-001", "ברושור משולש A4", '{"size": "A4", "folds": 2}'],
+    [4, "POS-A2-001", "פוסטר A2", '{"size": "A2", "paper": "170gsm"}'],
   ];
 
   variants.forEach(([baseId, sku, name, attrs]) => {
@@ -429,12 +429,12 @@ function insertSampleData(sqlite: Database.Database) {
   });
 
   // 9. Validation Profiles
-  const profiles = [
-    ("פרופיל סטנדרטי", "פרופיל בדיקה סטנדרטי לרוב העבודות", 300, 600, 1),
-    ("פרופיל פרימיום", "פרופיל בדיקה לעבודות איכותיות", 300, 1200, 0),
-    ("פרופיל שילוט", "פרופיל לעבודות שילוט גדולות", 150, 300, 0),
-    ("פרופיל דיגיטלי", "פרופיל להדפסה דיגיטלית", 300, 600, 0),
-    ("פרופיל אופסט", "פרופיל להדפסת אופסט", 300, 600, 0),
+  const profiles: [string, string, number, number, number][] = [
+    ["פרופיל סטנדרטי", "פרופיל בדיקה סטנדרטי לרוב העבודות", 300, 600, 1],
+    ["פרופיל פרימיום", "פרופיל בדיקה לעבודות איכותיות", 300, 1200, 0],
+    ["פרופיל שילוט", "פרופיל לעבודות שילוט גדולות", 150, 300, 0],
+    ["פרופיל דיגיטלי", "פרופיל להדפסה דיגיטלית", 300, 600, 0],
+    ["פרופיל אופסט", "פרופיל להדפסת אופסט", 300, 600, 0],
   ];
 
   profiles.forEach(([name, desc, minDpi, maxDpi, isDefault]) => {
@@ -445,12 +445,12 @@ function insertSampleData(sqlite: Database.Database) {
   });
 
   // 10. Pricelists
-  const pricelists = [
-    ("מחירון בסיסי", "מחירון ברירת מחדל לכל הלקוחות", 1, 1),
-    ("מחירון VIP", "מחירון מיוחד ללקוחות VIP", 0, 1),
-    ("מחירון סיטונאי", "מחירון לרכישות בכמויות גדולות", 0, 1),
-    ("מחירון עונתי", "מחירון מבצעים עונתיים", 0, 1),
-    ("מחירון מיוחד", "מחירון להסכמים מיוחדים", 0, 1),
+  const pricelists: [string, string, number, number][] = [
+    ["מחירון בסיסי", "מחירון ברירת מחדל לכל הלקוחות", 1, 1],
+    ["מחירון VIP", "מחירון מיוחד ללקוחות VIP", 0, 1],
+    ["מחירון סיטונאי", "מחירון לרכישות בכמויות גדולות", 0, 1],
+    ["מחירון עונתי", "מחירון מבצעים עונתיים", 0, 1],
+    ["מחירון מיוחד", "מחירון להסכמים מיוחדים", 0, 1],
   ];
 
   pricelists.forEach(([name, desc, isDefault, isActive]) => {
@@ -461,12 +461,12 @@ function insertSampleData(sqlite: Database.Database) {
   });
 
   // 11. System Settings (including code 1234)
-  const settings = [
-    ("admin_code", '{"code": "1234", "description": "Admin access code"}', "קוד גישה למנהל"),
-    ("company_name", '{"name": "CRM Company", "nameHe": "חברת CRM"}', "שם החברה"),
-    ("default_currency", '{"code": "ILS", "symbol": "₪"}', "מטבע ברירת מחדל"),
-    ("tax_rate", '{"rate": 17, "name": "VAT"}', "אחוז מע\"מ"),
-    ("email_notifications", '{"enabled": true, "types": ["quote", "order", "delivery"]}', "הגדרות התראות"),
+  const settings: [string, string, string][] = [
+    ["admin_code", '{"code": "1234", "description": "Admin access code"}', "קוד גישה למנהל"],
+    ["company_name", '{"name": "CRM Company", "nameHe": "חברת CRM"}', "שם החברה"],
+    ["default_currency", '{"code": "ILS", "symbol": "₪"}', "מטבע ברירת מחדל"],
+    ["tax_rate", '{"rate": 17, "name": "VAT"}', "אחוז מע\"מ"],
+    ["email_notifications", '{"enabled": true, "types": ["quote", "order", "delivery"]}', "הגדרות התראות"],
   ];
 
   settings.forEach(([key, value, desc]) => {
