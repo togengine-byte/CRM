@@ -4,6 +4,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { supplierPortalRouter } from "./supplierPortal";
 import { customerPortalRouter } from "./customerPortal";
+import { createCustomerWithQuote } from "./createCustomerWithQuote";
 import { publicProcedure, protectedProcedure, adminProcedure, router } from "./_core/trpc";
 import {
   getDashboardKPIs,
@@ -42,7 +43,6 @@ import {
   removePricelistFromCustomer,
   getAllPricelists,
   getCustomerStats,
-  createCustomerWithQuote,
   // Suppliers API
   getSuppliers,
   getSupplierById,

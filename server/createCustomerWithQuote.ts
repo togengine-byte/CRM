@@ -1,6 +1,6 @@
 import { getDb } from "./db";
-import { users, quotes, quoteItems } from "../drizzle/schema";
-import { logActivity } from "./db";
+import { users, quotes, quoteItems, activityLog } from "../drizzle/schema";
+import { eq } from "drizzle-orm";
 
 interface CreateCustomerWithQuoteInput {
   customerInfo: {
@@ -60,13 +60,17 @@ export async function createCustomerWithQuote(input: CreateCustomerWithQuoteInpu
     });
   }
 
-  // Log activity
-  await logActivity(null, "customer_signup_quote_request", {
-    customerId,
-    customerName: input.customerInfo.name,
-    customerEmail: input.customerInfo.email,
-    quoteId,
-    itemCount: input.quoteItems.length,
+  // Log activity directly to avoid circular dependency
+  await db.insert(activityLog).values({
+    userId: null,
+    actionType: "customer_signup_quote_request",
+    details: {
+      customerId,
+      customerName: input.customerInfo.name,
+      customerEmail: input.customerInfo.email,
+      quoteId,
+      itemCount: input.quoteItems.length,
+    },
   });
 
   return {

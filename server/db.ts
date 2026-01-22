@@ -1,6 +1,5 @@
 import { eq, desc, sql, and, count, inArray, like, gte, lte, SQL } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { createCustomerWithQuote as createCustomerWithQuoteImpl } from "./createCustomerWithQuote";
 import { 
   InsertUser, 
   users, 
@@ -525,7 +524,13 @@ export async function updateQuote(data: UpdateQuoteRequest) {
     employeeId: data.employeeId,
   };
   
-  if (data.finalValue !== undefined) {
+  // Calculate finalValue from items if items are provided
+  if (data.items && data.items.length > 0) {
+    const calculatedFinalValue = data.items.reduce((sum, item) => {
+      return sum + (item.priceAtTimeOfQuote * item.quantity);
+    }, 0);
+    updateData.finalValue = calculatedFinalValue.toString();
+  } else if (data.finalValue !== undefined) {
     updateData.finalValue = data.finalValue.toString();
   }
 
@@ -2429,6 +2434,3 @@ export async function updateSupplierWeights(weights: SupplierWeights, updatedBy:
   return { success: true };
 }
 
-
-// Re-export the createCustomerWithQuote function
-export const createCustomerWithQuote = createCustomerWithQuoteImpl;

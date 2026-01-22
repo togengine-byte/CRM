@@ -59,7 +59,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useState } from "react";
 
 export default function Suppliers() {
   const [searchTerm, setSearchTerm] = useState("");
