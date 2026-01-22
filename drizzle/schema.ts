@@ -1,7 +1,7 @@
-import { integer, pgEnum, pgTable, text, timestamp, varchar, decimal, json, boolean, serial } from "drizzle-orm/pg-core";
+import { integer, pgEnum, pgTable, text, timestamp, varchar, decimal, jsonb, boolean, serial } from "drizzle-orm/pg-core";
 
-export const userRoleEnum = pgEnum("role", ["admin", "employee", "customer", "supplier", "courier"]);
-export const userStatusEnum = pgEnum("status", ["pending_approval", "active", "rejected", "deactivated"]);
+export const userRoleEnum = pgEnum("user_role", ["admin", "employee", "customer", "supplier", "courier"]);
+export const userStatusEnum = pgEnum("user_status", ["pending_approval", "active", "rejected", "deactivated"]);
 export const quoteStatusEnum = pgEnum("quote_status", ["draft", "sent", "approved", "rejected", "superseded", "in_production", "ready"]);
 export const entityTypeEnum = pgEnum("entity_type", ["customer", "quote"]);
 
@@ -41,7 +41,7 @@ export const productVariants = pgTable("product_variants", {
   baseProductId: integer("baseProductId").notNull(),
   sku: varchar("sku", { length: 100 }).notNull().unique(),
   name: varchar("name", { length: 255 }).notNull(),
-  attributes: json("attributes"),
+  attributes: jsonb("attributes"),
   validationProfileId: integer("validationProfileId"),
   isActive: boolean("isActive").default(true),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -55,10 +55,10 @@ export const validationProfiles = pgTable("validation_profiles", {
   description: text("description"),
   minDpi: integer("minDpi").default(300).notNull(),
   maxDpi: integer("maxDpi"),
-  allowedColorspaces: json("allowedColorspaces").default('["CMYK"]'),
+  allowedColorspaces: jsonb("allowedColorspaces").default('["CMYK"]'),
   requiredBleedMm: integer("requiredBleedMm").default(3).notNull(),
   maxFileSizeMb: integer("maxFileSizeMb").default(100).notNull(),
-  allowedFormats: json("allowedFormats").default('["pdf", "ai", "eps", "tiff"]'),
+  allowedFormats: jsonb("allowedFormats").default('["pdf", "ai", "eps", "tiff"]'),
   isDefault: boolean("isDefault").default(false),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
@@ -190,7 +190,7 @@ export const activityLog = pgTable("activity_log", {
   id: serial("id").primaryKey(),
   userId: integer("userId"),
   actionType: varchar("actionType", { length: 100 }).notNull(),
-  details: json("details"),
+  details: jsonb("details"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -198,7 +198,7 @@ export const activityLog = pgTable("activity_log", {
 export const systemSettings = pgTable("system_settings", {
   id: serial("id").primaryKey(),
   key: varchar("key", { length: 100 }).notNull().unique(),
-  value: json("value").notNull(),
+  value: jsonb("value").notNull(),
   description: text("description"),
   updatedBy: integer("updatedBy"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
