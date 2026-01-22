@@ -1,3 +1,4 @@
+import { useAuth as useClerkAuth } from "@clerk/clerk-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -92,31 +93,8 @@ export default function DashboardLayout({
     return <DashboardLayoutSkeleton />
   }
 
-  if (!user) {
-    return (
-      <div className="flex items-center justify-center min-h-screen" dir="rtl">
-        <div className="flex flex-col items-center gap-8 p-8 max-w-md w-full">
-          <div className="flex flex-col items-center gap-6">
-            <h1 className="text-2xl font-semibold tracking-tight text-center">
-              התחבר כדי להמשיך
-            </h1>
-            <p className="text-sm text-muted-foreground text-center max-w-sm">
-              גישה ללוח הבקרה דורשת התחברות. לחץ כדי להמשיך.
-            </p>
-          </div>
-          <Button
-            onClick={() => {
-              window.location.href = getLoginUrl();
-            }}
-            size="lg"
-            className="w-full shadow-lg hover:shadow-xl transition-all"
-          >
-            התחברות
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  // This check is now handled by ProtectedRoute wrapper
+  // If user is not authenticated, they will be redirected to landing page
 
   return (
     <div className="min-h-screen bg-background" dir="rtl">
