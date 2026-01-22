@@ -88,8 +88,10 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
       
-      - name: Setup test database schema
-        run: pnpm run db:push
+      - name: Verify database connection
+        run: |
+          echo "Verifying database connection..."
+          node -e "const { Client } = require('pg'); const c = new Client({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } }); c.connect().then(() => { console.log('✅ Database connected successfully'); c.end(); }).catch(e => { console.error('❌ Database connection failed:', e.message); process.exit(1); });"
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
       
