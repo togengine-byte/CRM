@@ -220,3 +220,24 @@ export type SupplierPrice = typeof supplierPrices.$inferSelect;
 export type InternalNote = typeof internalNotes.$inferSelect;
 export type ActivityLog = typeof activityLog.$inferSelect;
 export type SystemSetting = typeof systemSettings.$inferSelect;
+
+// Customer signup requests table
+export const customerSignupRequests = pgTable("customer_signup_requests", {
+  id: serial("id").primaryKey(),
+  requestId: varchar("requestId", { length: 64 }).notNull().unique(),
+  name: text("name").notNull(),
+  email: varchar("email", { length: 320 }).notNull(),
+  phone: varchar("phone", { length: 20 }).notNull(),
+  companyName: text("companyName"),
+  description: text("description").notNull(),
+  status: varchar("status", { length: 20 }).default("pending").notNull(), // pending, approved, rejected
+  files: jsonb("files").default('[]'),
+  processedAt: timestamp("processedAt"),
+  processedBy: integer("processedBy"),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+export type CustomerSignupRequest = typeof customerSignupRequests.$inferSelect;
+export type InsertCustomerSignupRequest = typeof customerSignupRequests.$inferInsert;

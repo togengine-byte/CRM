@@ -25,6 +25,15 @@ const adminMenuItems = [
   { icon: Settings, label: "הגדרות", path: "/settings" },
 ];
 
+// Employee has limited access - no settings, limited analytics
+const employeeMenuItems = [
+  { icon: LayoutDashboard, label: "לוח בקרה", path: "/" },
+  { icon: FileText, label: "הצעות מחיר", path: "/quotes" },
+  { icon: Users, label: "לקוחות", path: "/customers" },
+  { icon: Truck, label: "ספקים", path: "/suppliers" },
+  { icon: Package, label: "מוצרים", path: "/products" },
+];
+
 const customerMenuItems = [
   { icon: ShoppingBag, label: "הצעות המחיר שלי", path: "/customer-portal" },
 ];
@@ -63,8 +72,12 @@ export default function DashboardLayout({
         return supplierMenuItems;
       case 'courier':
         return courierMenuItems;
-      default:
+      case 'employee':
+        return employeeMenuItems;
+      case 'admin':
         return adminMenuItems;
+      default:
+        return employeeMenuItems; // Default to limited access
     }
   };
   const menuItems = getMenuItems();

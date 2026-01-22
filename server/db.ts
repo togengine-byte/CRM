@@ -1,5 +1,6 @@
 import { eq, desc, sql, and, count, inArray, like, gte, lte, SQL } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
+import crypto from "crypto";
 import { 
   InsertUser, 
   users, 
@@ -2448,3 +2449,226 @@ export async function updateSupplierWeights(weights: SupplierWeights, updatedBy:
   return { success: true };
 }
 
+
+// ==================== CUSTOMER SIGNUP REQUESTS ====================
+
+import { customerSignupRequests } from "../drizzle/schema";
+
+interface SignupRequestFile {
+  originalName: string;
+  storedName: string;
+  size: number;
+  mimeType: string;
+  path: string;
+}
+
+export async function createCustomerSignupRequest(data: {
+  name: string;
+  email: string;
+  phone: string;
+  companyName: string | null;
+  description: string;
+  requestId: string;
+  files: SignupRequestFile[];
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const [result] = await db.insert(customerSignupRequests).values({
+    requestId: data.requestId,
+    name: data.name,
+    email: data.email,
+    phone: data.phone,
+    companyName: data.companyName,
+    description: data.description,
+    files: data.files,
+    status: 'pending',
+  }).returning();
+
+  await logActivity(null, 'customer_signup_request', {
+    requestId: data.requestId,
+    name: data.name,
+    email: data.email,
+    filesCount: data.files.length,
+  });
+
+  return result;
+}
+
+export async function getCustomerSignupRequests(status?: string) {
+  const db = await getDb();
+  if (!db) return [];
+
+  let query = db.select().from(customerSignupRequests);
+  
+  if (status) {
+    query = query.where(eq(customerSignupRequests.status, status)) as any;
+  }
+
+  return await query.orderBy(desc(customerSignupRequests.createdAt));
+}
+
+export async function getCustomerSignupRequestById(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const [result] = await db.select()
+    .from(customerSignupRequests)
+    .where(eq(customerSignupRequests.id, id))
+    .limit(1);
+
+  return result || null;
+}
+
+export async function approveCustomerSignupRequest(requestId: number, userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Get the request
+  const request = await getCustomerSignupRequestById(requestId);
+  if (!request) throw new Error("Request not found");
+
+  // Create user from request
+  const openId = `customer-${crypto.randomUUID()}`;
+  await db.insert(users).values({
+    openId,
+    name: request.name,
+    email: request.email,
+    phone: request.phone,
+    companyName: request.companyName,
+    role: 'customer',
+    status: 'active',
+  });
+
+  // Update request status
+  await db.update(customerSignupRequests)
+    .set({
+      status: 'approved',
+      processedAt: new Date(),
+      processedBy: userId,
+    })
+    .where(eq(customerSignupRequests.id, requestId));
+
+  await logActivity(userId, 'customer_signup_approved', { requestId, email: request.email });
+
+  return { success: true };
+}
+
+export async function rejectCustomerSignupRequest(requestId: number, userId: number, notes?: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(customerSignupRequests)
+    .set({
+      status: 'rejected',
+      processedAt: new Date(),
+      processedBy: userId,
+      notes,
+    })
+    .where(eq(customerSignupRequests.id, requestId));
+
+  await logActivity(userId, 'customer_signup_rejected', { requestId, notes });
+
+  return { success: true };
+}
+
+// ==================== USER MANAGEMENT (SUPPLIERS/COURIERS) ====================
+
+export async function getUserByEmail(email: string) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const [result] = await db.select()
+    .from(users)
+    .where(eq(users.email, email))
+    .limit(1);
+
+  return result || null;
+}
+
+export async function getPendingUsers(role?: string) {
+  const db = await getDb();
+  if (!db) return [];
+
+  let conditions = [eq(users.status, 'pending_approval')];
+  if (role) {
+    conditions.push(eq(users.role, role as any));
+  }
+
+  return await db.select()
+    .from(users)
+    .where(and(...conditions))
+    .orderBy(desc(users.createdAt));
+}
+
+export async function getSuppliersList() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select()
+    .from(users)
+    .where(eq(users.role, 'supplier'))
+    .orderBy(users.name);
+}
+
+export async function getCouriersList() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select()
+    .from(users)
+    .where(eq(users.role, 'courier'))
+    .orderBy(users.name);
+}
+
+export async function approveUser(userId: number, adminId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(users)
+    .set({ status: 'active' })
+    .where(eq(users.id, userId));
+
+  await logActivity(adminId, 'user_approved', { userId });
+
+  return { success: true };
+}
+
+export async function rejectUser(userId: number, adminId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(users)
+    .set({ status: 'rejected' })
+    .where(eq(users.id, userId));
+
+  await logActivity(adminId, 'user_rejected', { userId });
+
+  return { success: true };
+}
+
+export async function deactivateUser(userId: number, adminId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(users)
+    .set({ status: 'deactivated' })
+    .where(eq(users.id, userId));
+
+  await logActivity(adminId, 'user_deactivated', { userId });
+
+  return { success: true };
+}
+
+export async function reactivateUser(userId: number, adminId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(users)
+    .set({ status: 'active' })
+    .where(eq(users.id, userId));
+
+  await logActivity(adminId, 'user_reactivated', { userId });
+
+  return { success: true };
+}
