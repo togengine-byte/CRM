@@ -1,6 +1,5 @@
 import { useAuthContext } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
-import { useEffect } from "react";
 import { Loader2, ShieldX } from "lucide-react";
 import { Button } from "./ui/button";
 
@@ -13,12 +12,8 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
   const { user, loading, isAuthenticated, logout } = useAuthContext();
   const [, setLocation] = useLocation();
 
-  useEffect(() => {
-    // If not loading and not authenticated, redirect to login
-    if (!loading && !isAuthenticated) {
-      setLocation("/");
-    }
-  }, [loading, isAuthenticated, setLocation]);
+  // Note: Authentication check removed - users go directly to dashboard
+  // The dashboard will show appropriate content based on user state
 
   // Loading state
   if (loading) {
@@ -29,9 +24,11 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
     );
   }
 
-  // Not authenticated
+  // Not authenticated - still show the dashboard content
+  // This allows direct access without login
   if (!isAuthenticated || !user) {
-    return null;
+    // Return children anyway - dashboard will handle unauthenticated state
+    return <>{children}</>;
   }
 
   // Check user status

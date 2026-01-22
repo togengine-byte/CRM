@@ -193,6 +193,8 @@ export const activityLog = pgTable("activity_log", {
   id: serial("id").primaryKey(),
   userId: integer("userId"),
   actionType: varchar("actionType", { length: 100 }).notNull(),
+  entityType: varchar("entityType", { length: 50 }),
+  entityId: integer("entityId"),
   details: jsonb("details"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });

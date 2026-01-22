@@ -149,7 +149,7 @@ export const customerPortalRouter = router({
           id: quoteAttachments.id,
           fileName: quoteAttachments.fileName,
           fileUrl: quoteAttachments.fileUrl,
-          createdAt: quoteAttachments.createdAt,
+          uploadedAt: quoteAttachments.uploadedAt,
         })
         .from(quoteAttachments)
         .where(eq(quoteAttachments.quoteId, input.quoteId));

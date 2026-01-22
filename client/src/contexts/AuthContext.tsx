@@ -15,7 +15,6 @@ interface AuthContextType {
   loading: boolean;
   error: string | null;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 }
@@ -53,36 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkSession();
   }, [checkSession]);
 
-  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
-    setLoading(true);
-    setError(null);
 
-    try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-        credentials: "include",
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.error || "התחברות נכשלה");
-        setLoading(false);
-        return { success: false, error: data.error };
-      }
-
-      setUser(data.user);
-      setLoading(false);
-      return { success: true };
-    } catch (err) {
-      const errorMessage = "שגיאה בהתחברות, נסה שוב";
-      setError(errorMessage);
-      setLoading(false);
-      return { success: false, error: errorMessage };
-    }
-  };
 
   const logout = async () => {
     try {
@@ -108,7 +78,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading,
         error,
         isAuthenticated: !!user,
-        login,
         logout,
         refresh,
       }}

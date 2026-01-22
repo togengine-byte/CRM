@@ -5,14 +5,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { 
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { 
   Loader2, 
@@ -29,8 +21,7 @@ import {
   X,
   File,
   AlertTriangle,
-  Mail,
-  Lock
+  Mail
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -59,7 +50,7 @@ interface UploadedFile {
 export default function LandingPage() {
   const [, setLocation] = useLocation();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { isAuthenticated, loading: authLoading, login } = useAuthContext();
+  const { isAuthenticated, loading: authLoading } = useAuthContext();
   
   // Redirect to dashboard if already authenticated
   useEffect(() => {
@@ -67,13 +58,6 @@ export default function LandingPage() {
       setLocation("/dashboard");
     }
   }, [authLoading, isAuthenticated, setLocation]);
-  
-  // Login dialog state
-  const [isLoginOpen, setIsLoginOpen] = useState(false);
-  const [loginEmail, setLoginEmail] = useState("");
-  const [loginPassword, setLoginPassword] = useState("");
-  const [loginError, setLoginError] = useState("");
-  const [loginLoading, setLoginLoading] = useState(false);
 
   // Customer signup form state
   const [customerForm, setCustomerForm] = useState({
@@ -155,21 +139,9 @@ export default function LandingPage() {
     });
   };
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoginError("");
-    setLoginLoading(true);
-
-    const result = await login(loginEmail, loginPassword);
-    
-    if (result.success) {
-      setIsLoginOpen(false);
-      setLocation("/dashboard");
-    } else {
-      setLoginError(result.error || "התחברות נכשלה");
-    }
-    
-    setLoginLoading(false);
+  // Navigate directly to dashboard
+  const handleGoToDashboard = () => {
+    setLocation("/dashboard");
   };
 
   const handleCustomerSignup = async (e: React.FormEvent) => {
@@ -277,76 +249,16 @@ export default function LandingPage() {
           </span>
         </div>
         
-        {/* Login button for existing users */}
-        <Dialog open={isLoginOpen} onOpenChange={setIsLoginOpen}>
-          <DialogTrigger asChild>
-            <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900">
-              <LogIn className="ml-2 h-4 w-4" />
-              כניסה למשתמשים קיימים
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-md" dir="rtl">
-            <DialogHeader>
-              <DialogTitle className="text-center text-xl">התחברות למערכת</DialogTitle>
-              <DialogDescription className="text-center">
-                לעובדים, מנהלים, ספקים ושליחים
-              </DialogDescription>
-            </DialogHeader>
-            
-            <form onSubmit={handleLogin} className="space-y-4 pt-4">
-              {loginError && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm text-center">
-                  {loginError}
-                </div>
-              )}
-              
-              <div className="space-y-2">
-                <Label htmlFor="login-email">אימייל</Label>
-                <div className="relative">
-                  <Mail className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="login-email"
-                    type="email"
-                    placeholder="your@email.com"
-                    value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
-                    className="pr-10"
-                    required
-                    dir="ltr"
-                  />
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="login-password">סיסמה</Label>
-                <div className="relative">
-                  <Lock className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="login-password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    className="pr-10"
-                    required
-                    dir="ltr"
-                  />
-                </div>
-              </div>
-              
-              <Button type="submit" className="w-full" disabled={loginLoading}>
-                {loginLoading ? (
-                  <>
-                    <Loader2 className="ml-2 h-4 w-4 animate-spin" />
-                    מתחבר...
-                  </>
-                ) : (
-                  "התחברות"
-                )}
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
+        {/* Login button - navigates directly to dashboard */}
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="text-gray-600 hover:text-gray-900"
+          onClick={handleGoToDashboard}
+        >
+          <LogIn className="ml-2 h-4 w-4" />
+          כניסה למשתמשים קיימים
+        </Button>
       </header>
 
       {/* Main content */}

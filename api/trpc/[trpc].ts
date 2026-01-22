@@ -17,9 +17,19 @@ import 'dotenv/config';
  * Main handler for Vercel serverless function
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Get origin from request for CORS
+  const origin = req.headers.origin || '';
+  const allowedOrigins = [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    process.env.FRONTEND_URL,
+  ].filter(Boolean);
+  
+  const corsOrigin = allowedOrigins.includes(origin) ? origin : allowedOrigins[0] || '';
+
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Origin', corsOrigin);
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -27,7 +37,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   // Set CORS headers for all responses
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Origin', corsOrigin);
   res.setHeader('Access-Control-Allow-Credentials', 'true');
 
   try {

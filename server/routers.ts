@@ -160,8 +160,9 @@ export const appRouter = router({
         secretKey: z.string() // Simple protection
       }))
       .mutation(async ({ input }) => {
-        // Simple protection - require a secret key
-        if (input.secretKey !== 'SETUP_ADMIN_2024') {
+        // Simple protection - require a secret key from environment variable
+        const adminSetupKey = process.env.ADMIN_SETUP_KEY || 'CHANGE_THIS_DEFAULT_KEY';
+        if (input.secretKey !== adminSetupKey) {
           throw new Error('Invalid secret key');
         }
         

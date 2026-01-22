@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -64,11 +64,11 @@ import {
   Key,
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
-import { useAuth } from "@/_core/hooks/useAuth";
+import { useAuthContext } from "@/contexts/AuthContext";
 
 // ==================== SUPPLIER WEIGHTS SETTINGS ====================
 function SupplierWeightsSettings() {
-  const { user } = useAuth();
+  const { user } = useAuthContext();
   const utils = trpc.useUtils();
   
   const { data: weights, isLoading } = trpc.settings.supplierWeights.get.useQuery();
@@ -82,11 +82,11 @@ function SupplierWeightsSettings() {
   const [hasChanges, setHasChanges] = useState(false);
 
   // Update local state when data loads
-  useState(() => {
+  useEffect(() => {
     if (weights) {
       setLocalWeights(weights);
     }
-  });
+  }, [weights]);
 
   // Sync with server data
   if (weights && !hasChanges) {
@@ -296,7 +296,7 @@ const PERMISSION_LIST: Permission[] = [
 ];
 
 function StaffManagementSettings() {
-  const { user } = useAuth();
+  const { user } = useAuthContext();
   const utils = trpc.useUtils();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
@@ -782,7 +782,7 @@ function StaffManagementSettings() {
 
 // ==================== MAIN SETTINGS COMPONENT ====================
 export default function Settings() {
-  const { user } = useAuth();
+  const { user } = useAuthContext();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingProfile, setEditingProfile] = useState<any>(null);
   

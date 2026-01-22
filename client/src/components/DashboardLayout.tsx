@@ -63,9 +63,9 @@ export default function DashboardLayout({
   const currentWidth = isCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH;
 
   // Select menu items based on user role
-  const getMenuItems = () => {
-    if (!user) return adminMenuItems;
-    switch (user.role) {
+  const getMenuItems = (userRole: string | undefined) => {
+    if (!userRole) return adminMenuItems;
+    switch (userRole) {
       case 'customer':
         return customerMenuItems;
       case 'supplier':
@@ -80,7 +80,7 @@ export default function DashboardLayout({
         return adminMenuItems; // Default to admin access
     }
   };
-  const menuItems = getMenuItems();
+
 
   // Logout function
   const handleLogout = async () => {
@@ -99,11 +99,12 @@ export default function DashboardLayout({
     return <DashboardLayoutSkeleton />
   }
 
-  // If not authenticated, ProtectedRoute should handle redirect
-  // This is a fallback
-  if (!isAuthenticated || !user) {
-    return <DashboardLayoutSkeleton />
-  }
+  // Create a default guest user for unauthenticated access
+  const displayUser = user || {
+    name: 'אורח',
+    email: '',
+    role: 'admin' as const,
+  };
 
   return (
     <div className="min-h-screen bg-background" dir="rtl">
@@ -132,7 +133,7 @@ export default function DashboardLayout({
           {/* Navigation */}
           <nav className="flex-1 py-4 px-2 overflow-y-auto">
             <ul className="space-y-1">
-              {menuItems.map((item: typeof adminMenuItems[0]) => {
+              {getMenuItems(displayUser.role).map((item: typeof adminMenuItems[0]) => {
                 const isActive = location === item.path;
                 return (
                   <li key={item.path}>
@@ -164,16 +165,16 @@ export default function DashboardLayout({
                 )}>
                   <Avatar className="h-9 w-9 border shrink-0">
                     <AvatarFallback className="text-xs font-medium">
-                      {user?.name?.charAt(0).toUpperCase() || '?'}
+                      {displayUser.name?.charAt(0).toUpperCase() || '?'}
                     </AvatarFallback>
                   </Avatar>
                   {!isCollapsed && (
                     <div className="flex-1 min-w-0 text-right">
                       <p className="text-sm font-medium truncate leading-none">
-                        {user?.name || "-"}
+                        {displayUser.name || "-"}
                       </p>
                       <p className="text-xs text-muted-foreground truncate mt-1">
-                        {user?.email || "-"}
+                        {displayUser.email || "-"}
                       </p>
                     </div>
                   )}
@@ -216,7 +217,7 @@ export default function DashboardLayout({
           <aside className="fixed top-14 right-0 bottom-0 w-64 bg-sidebar border-l border-border z-50 flex flex-col animate-in slide-in-from-right">
             <nav className="flex-1 py-4 px-2 overflow-y-auto">
               <ul className="space-y-1">
-                {menuItems.map(item => {
+                {getMenuItems(displayUser.role).map(item => {
                   const isActive = location === item.path;
                   return (
                     <li key={item.path}>
@@ -245,15 +246,15 @@ export default function DashboardLayout({
               <div className="flex items-center gap-3 px-2 py-2">
                 <Avatar className="h-9 w-9 border shrink-0">
                   <AvatarFallback className="text-xs font-medium">
-                    {user?.name?.charAt(0).toUpperCase() || '?'}
+                    {displayUser.name?.charAt(0).toUpperCase() || '?'}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0 text-right">
                   <p className="text-sm font-medium truncate leading-none">
-                    {user?.name || "-"}
+                    {displayUser.name || "-"}
                   </p>
                   <p className="text-xs text-muted-foreground truncate mt-1">
-                    {user?.email || "-"}
+                    {displayUser.email || "-"}
                   </p>
                 </div>
               </div>
