@@ -1,8 +1,8 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import * as schema from "../drizzle/schema";
 
-// Type for database
-type DrizzleDb = ReturnType<typeof drizzle>;
+// Type for database with schema
+type DrizzleDb = ReturnType<typeof drizzle<typeof schema>>;
 
 let db: DrizzleDb | null = null;
 
@@ -23,9 +23,10 @@ export async function initializeTestDb(): Promise<DrizzleDb> {
     connectionString += connectionString.includes('?') ? '&sslmode=require' : '?sslmode=require';
   }
   
+  // Create drizzle instance with schema for query API support
   db = drizzle(connectionString, { schema });
   
-  // Verify connection
+  // Verify connection with a simple query
   try {
     const result = await db.query.users.findFirst();
     console.log("[Test DB] PostgreSQL connection verified successfully");
