@@ -24,7 +24,12 @@ let _db: ReturnType<typeof drizzle> | null = null;
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      // Add SSL/TLS support for Render PostgreSQL
+      const dbUrl = new URL(process.env.DATABASE_URL);
+      if (!dbUrl.searchParams.has('sslmode')) {
+        dbUrl.searchParams.set('sslmode', 'require');
+      }
+      _db = drizzle(dbUrl.toString());
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
