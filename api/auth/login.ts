@@ -5,9 +5,9 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { COOKIE_NAME, ONE_YEAR_MS } from '../../shared/const';
-import * as db from '../../server/db';
-import { sdk } from '../../server/_core/sdk';
+import { COOKIE_NAME, ONE_YEAR_MS } from '../../shared/const.js';
+import * as db from '../../server/db.js';
+import { sdk } from '../../server/_core/sdk.js';
 
 // Import dotenv for environment variables
 import 'dotenv/config';

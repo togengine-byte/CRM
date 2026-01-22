@@ -6,8 +6,9 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { fetchRequestHandler } from '@trpc/server/adapters/fetch';
-import { appRouter } from '../../server/routers';
-import type { ServerRequest, ServerResponse } from '../../server/_core/context';
+import { appRouter } from '../../server/routers.js';
+import type { ServerRequest, ServerResponse } from '../../server/_core/context.js';
+import { sdk } from '../../server/_core/sdk.js';
 
 // Import dotenv for environment variables
 import 'dotenv/config';
@@ -67,8 +68,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       req: fetchRequest,
       router: appRouter,
       createContext: async () => {
-        // Import dynamically to avoid circular dependencies
-        const { sdk } = await import('../../server/_core/sdk');
         let user = null;
         try {
           user = await sdk.authenticateRequest(serverReq);
