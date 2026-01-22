@@ -1294,11 +1294,11 @@ export async function createSupplier(input: {
     address: input.address || null,
     role: 'supplier',
     status: 'active',
-  });
+  }).returning();
 
   await logActivity(null, "supplier_created", { name: input.name, email: input.email });
 
-  return { id: Number(result[0].insertId), success: true };
+  return { id: result[0].id, success: true, supplier: result[0] };
 }
 
 export async function updateSupplier(input: {
