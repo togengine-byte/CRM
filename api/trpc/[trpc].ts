@@ -2,13 +2,12 @@
  * Vercel Serverless Function for tRPC
  * 
  * This file handles all /api/trpc/* requests in a serverless environment.
- * It wraps the existing tRPC router without modifying any business logic.
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { fetchRequestHandler } from '@trpc/server/adapters/fetch';
 import { appRouter } from '../../server/routers';
-import { createContext } from '../../server/_core/context';
+import type { ServerRequest, ServerResponse } from '../../server/_core/context';
 
 // Import dotenv for environment variables
 import 'dotenv/config';
@@ -51,18 +50,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       body,
     });
 
-    // Create context with Vercel request/response
-    const ctx = await createContext({
-      req: req as any,
-      res: res as any,
-    });
+    // Create serverless-compatible request/response objects
+    const serverReq: ServerRequest = {
+      headers: req.headers as Record<string, string | string[] | undefined>,
+      cookies: req.cookies,
+      protocol: req.headers['x-forwarded-proto'] as string || 'https',
+    };
+
+    const serverRes: ServerResponse = {
+      setHeader: (name: string, value: string | string[]) => res.setHeader(name, value),
+    };
 
     // Use fetch adapter for serverless compatibility
     const response = await fetchRequestHandler({
       endpoint: '/api/trpc',
       req: fetchRequest,
       router: appRouter,
-      createContext: () => ctx,
+      createContext: async () => {
+        // Import dynamically to avoid circular dependencies
+        const { sdk } = await import('../../server/_core/sdk');
+        let user = null;
+        try {
+          user = await sdk.authenticateRequest(serverReq);
+        } catch {
+          user = null;
+        }
+        return { req: serverReq, res: serverRes, user };
+      },
       onError: ({ error, path }) => {
         console.error(`[tRPC] Error in ${path}:`, error);
       },
@@ -70,12 +84,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Copy response headers
     response.headers.forEach((value, key) => {
-      if (key.toLowerCase() === 'set-cookie') {
-        // Handle multiple Set-Cookie headers
-        res.setHeader(key, value);
-      } else {
-        res.setHeader(key, value);
-      }
+      res.setHeader(key, value);
     });
 
     // Send response
