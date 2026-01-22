@@ -34,8 +34,9 @@ jobs:
         node-version: [22.x]
     
     env:
-      DATABASE_URL: postgresql://test_user:test_password@localhost:5432/crm_test
       NODE_ENV: test
+      USE_REAL_DB: "true"
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
     
     steps:
       - name: Checkout code
@@ -79,12 +80,12 @@ jobs:
       - name: Setup test database schema
         run: pnpm run db:push
         env:
-          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/crm_test
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
       
       - name: Run tests with Real PostgreSQL
         run: pnpm run test
         env:
-          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/crm_test
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
           NODE_ENV: test
           USE_REAL_DB: "true"
       
