@@ -141,9 +141,16 @@ export function registerOAuthRoutes(app: Express) {
 
   // Google OAuth redirect
   app.get("/api/auth/google", (req: Request, res: Response) => {
-    const clientId = process.env.GOOGLE_CLIENT_ID;
-    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
     const redirectUri = process.env.GOOGLE_REDIRECT_URI || "https://crm-08aq.onrender.com/api/auth/google/callback";
+    
+    // Debug logging
+    console.log('[OAuth] Google OAuth request received');
+    console.log('[OAuth] Client ID length:', clientId?.length);
+    console.log('[OAuth] Client ID first 20 chars:', clientId?.substring(0, 20));
+    console.log('[OAuth] Client ID last 10 chars:', clientId?.substring(clientId?.length - 10));
+    console.log('[OAuth] Redirect URI:', redirectUri);
     
     if (!clientId || !clientSecret) {
       console.error("[OAuth] Google OAuth not configured", { clientId: !!clientId, clientSecret: !!clientSecret });
@@ -163,6 +170,7 @@ export function registerOAuthRoutes(app: Express) {
     googleAuthUrl.searchParams.set('scope', 'openid profile email');
     googleAuthUrl.searchParams.set('state', state);
     
+    console.log('[OAuth] Redirecting to:', googleAuthUrl.toString());
     res.redirect(googleAuthUrl.toString());
   });
   
