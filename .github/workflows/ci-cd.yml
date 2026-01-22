@@ -77,6 +77,17 @@ jobs:
       - name: Run TypeScript check
         run: pnpm run check
       
+      - name: Debug - Check DATABASE_URL
+        run: |
+          echo "Checking DATABASE_URL..."
+          if [ -z "$DATABASE_URL" ]; then
+            echo "ERROR: DATABASE_URL is not set!"
+            exit 1
+          fi
+          echo "DATABASE_URL is set (length: ${#DATABASE_URL})"
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      
       - name: Setup test database schema
         run: pnpm run db:push
         env:
