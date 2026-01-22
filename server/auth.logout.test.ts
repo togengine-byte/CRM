@@ -2,17 +2,17 @@ import { describe, expect, it, beforeAll, afterAll } from "vitest";
 import { appRouter } from "./routers";
 import { COOKIE_NAME } from "../shared/const";
 import type { TrpcContext } from "./_core/context";
-import { initializeTestDb, cleanupTestDb, isUsingPostgres } from "./test-db";
+import { initializeTestDb, cleanupTestDb } from "./test-db";
 
 // Initialize test database before running tests
 beforeAll(async () => {
   await initializeTestDb();
-  console.log(`[Test] Using ${isUsingPostgres() ? 'PostgreSQL' : 'SQLite'} database`);
+  console.log("[Test] Using PostgreSQL database");
 });
 
 // Clean up after tests
-afterAll(() => {
-  cleanupTestDb();
+afterAll(async () => {
+  await cleanupTestDb();
 });
 
 type CookieCall = {

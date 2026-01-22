@@ -12,12 +12,12 @@ import { initializeTestDb, cleanupTestDb, isUsingPostgres } from "./test-db";
 // Initialize test database before running tests
 beforeAll(async () => {
   await initializeTestDb();
-  console.log(`[Test] Using ${isUsingPostgres() ? 'PostgreSQL' : 'SQLite'} database`);
+  console.log("[Test] Using PostgreSQL database");
 });
 
 // Clean up after tests
-afterAll(() => {
-  cleanupTestDb();
+afterAll(async () => {
+  await cleanupTestDb();
 });
 
 describe("Suppliers API", () => {
@@ -30,7 +30,6 @@ describe("Suppliers API", () => {
     it("filters by status when provided", async () => {
       const result = await getSuppliers({ status: "active" });
       expect(Array.isArray(result)).toBe(true);
-      // All results should have active status if any exist
       result.forEach((supplier) => {
         expect(supplier.status).toBe("active");
       });
