@@ -629,8 +629,20 @@ export default function Settings() {
                   </TableHeader>
                   <TableBody>
                     {profiles.map((profile) => {
-                      const colorspaces = JSON.parse(profile.allowedColorspaces as string || '[]');
-                      const formats = JSON.parse(profile.allowedFormats as string || '[]');
+                      // Parse arrays safely - handle both array and string formats
+                      const parseArraySafe = (value: any) => {
+                        if (Array.isArray(value)) return value;
+                        if (typeof value === 'string') {
+                          try {
+                            return JSON.parse(value);
+                          } catch {
+                            return [value];
+                          }
+                        }
+                        return [];
+                      };
+                      const colorspaces = parseArraySafe(profile.allowedColorspaces);
+                      const formats = parseArraySafe(profile.allowedFormats);
                       return (
                         <TableRow key={profile.id}>
                           <TableCell>

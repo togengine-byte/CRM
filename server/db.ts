@@ -1990,6 +1990,20 @@ export async function getAnalyticsSummary() {
 // FILE VALIDATION FUNCTIONS
 // ============================================
 
+// Helper function to safely parse JSON arrays
+function safeParseJsonArray(value: unknown): string[] {
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [value];
+    } catch {
+      return [value];
+    }
+  }
+  return [];
+}
+
 // Validation Profiles
 export async function getValidationProfiles() {
   const db = await getDb();
@@ -1998,8 +2012,8 @@ export async function getValidationProfiles() {
   const profiles = await db.select().from(validationProfiles).orderBy(desc(validationProfiles.createdAt));
   return profiles.map(p => ({
     ...p,
-    allowedColorspaces: typeof p.allowedColorspaces === 'string' ? JSON.parse(p.allowedColorspaces || '[]') : p.allowedColorspaces,
-    allowedFormats: typeof p.allowedFormats === 'string' ? JSON.parse(p.allowedFormats || '[]') : p.allowedFormats,
+    allowedColorspaces: safeParseJsonArray(p.allowedColorspaces),
+    allowedFormats: safeParseJsonArray(p.allowedFormats),
   }));
 }
 
@@ -2013,8 +2027,8 @@ export async function getValidationProfileById(id: number) {
   const p = result[0];
   return {
     ...p,
-    allowedColorspaces: typeof p.allowedColorspaces === 'string' ? JSON.parse(p.allowedColorspaces || '[]') : p.allowedColorspaces,
-    allowedFormats: typeof p.allowedFormats === 'string' ? JSON.parse(p.allowedFormats || '[]') : p.allowedFormats,
+    allowedColorspaces: safeParseJsonArray(p.allowedColorspaces),
+    allowedFormats: safeParseJsonArray(p.allowedFormats),
   };
 }
 
