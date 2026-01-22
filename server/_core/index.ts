@@ -3,7 +3,7 @@ import express from "express";
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { registerOAuthRoutes } from "./oauth";
+import { registerClerkRoutes } from "./clerk-auth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
@@ -30,8 +30,8 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   // Log environment variables for debugging
   console.log('[Server] Environment variables check:');
-  console.log('[Server] GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID ? 'SET' : 'NOT SET');
-  console.log('[Server] GOOGLE_CLIENT_SECRET:', process.env.GOOGLE_CLIENT_SECRET ? 'SET' : 'NOT SET');
+  console.log('[Server] CLERK_SECRET_KEY:', process.env.CLERK_SECRET_KEY ? 'SET' : 'NOT SET');
+  console.log('[Server] VITE_CLERK_PUBLISHABLE_KEY:', process.env.VITE_CLERK_PUBLISHABLE_KEY ? 'SET' : 'NOT SET');
   console.log('[Server] NODE_ENV:', process.env.NODE_ENV);
   
   const app = express();
@@ -39,8 +39,8 @@ async function startServer() {
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
-  // OAuth callback under /api/oauth/callback
-  registerOAuthRoutes(app);
+  // Clerk authentication routes
+  registerClerkRoutes(app);
   // tRPC API
   app.use(
     "/api/trpc",
