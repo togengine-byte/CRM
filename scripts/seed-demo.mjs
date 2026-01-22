@@ -15,7 +15,7 @@ if (!DATABASE_URL) {
 }
 
 async function seed() {
-  const client = new Client({ connectionString: DATABASE_URL });
+  const client = new Client({ connectionString: DATABASE_URL, ssl: { rejectUnauthorized: false } });
   await client.connect();
   
   try {
@@ -40,7 +40,7 @@ async function seed() {
     const customerIds = [];
     for (const c of customers) {
       const result = await client.query(
-        `INSERT INTO users (openId, name, email, loginMethod, role, status, phone, companyName, address) 
+        `INSERT INTO users ("openId", name, email, "loginMethod", role, status, phone, "companyName", address) 
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
         [generateOpenId(), c.name, c.email, 'demo', 'customer', 'active', c.phone, c.company, c.address]
       );
@@ -61,7 +61,7 @@ async function seed() {
     const supplierIds = [];
     for (const s of suppliers) {
       const result = await client.query(
-        `INSERT INTO users (openId, name, email, loginMethod, role, status, phone, companyName, address, totalRatingPoints, ratedDealsCount) 
+        `INSERT INTO users ("openId", name, email, "loginMethod", role, status, phone, "companyName", address, "totalRatingPoints", "ratedDealsCount") 
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
         [generateOpenId(), s.name, s.email, 'demo', 'supplier', 'active', s.phone, s.company, s.address, Math.floor(Math.random() * 50) + 40, Math.floor(Math.random() * 20) + 5]
       );

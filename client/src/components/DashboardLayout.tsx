@@ -33,6 +33,10 @@ const supplierMenuItems = [
   { icon: Package, label: "פורטל ספקים", path: "/supplier-portal" },
 ];
 
+const courierMenuItems = [
+  { icon: Truck, label: "פורטל שליחים", path: "/courier-portal" },
+];
+
 const SIDEBAR_WIDTH = 256;
 const SIDEBAR_COLLAPSED_WIDTH = 64;
 
@@ -57,6 +61,8 @@ export default function DashboardLayout({
         return customerMenuItems;
       case 'supplier':
         return supplierMenuItems;
+      case 'courier':
+        return courierMenuItems;
       default:
         return adminMenuItems;
     }

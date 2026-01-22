@@ -1584,8 +1584,8 @@ export async function getCourierReadyJobs() {
   if (!db) return [];
 
   // Get quote items that are ready for pickup (quote status = 'ready')
-  return await db.select({
-    quoteItemId: quoteItems.id,
+  const results = await db.select({
+    id: quoteItems.id,
     quoteId: quoteItems.quoteId,
     productName: baseProducts.name,
     variantName: productVariants.name,
@@ -1595,10 +1595,11 @@ export async function getCourierReadyJobs() {
     supplierCompany: users.companyName,
     supplierAddress: users.address,
     supplierPhone: users.phone,
-    customerName: sql<string>`(SELECT name FROM users WHERE id = ${quotes.customerId})`,
-    customerAddress: sql<string>`(SELECT address FROM users WHERE id = ${quotes.customerId})`,
+    customerId: quotes.customerId,
     pickedUp: quoteItems.pickedUp,
+    pickedUpAt: quoteItems.pickedUpAt,
     delivered: quoteItems.delivered,
+    deliveredAt: quoteItems.deliveredAt,
     readyAt: quotes.updatedAt,
   })
     .from(quoteItems)
@@ -1611,6 +1612,25 @@ export async function getCourierReadyJobs() {
       sql`${quoteItems.supplierId} IS NOT NULL`
     ))
     .orderBy(desc(quotes.updatedAt));
+
+  // Get customer details for each job
+  const jobsWithCustomers = await Promise.all(results.map(async (job) => {
+    const customerResult = await db.select({
+      name: users.name,
+      address: users.address,
+      phone: users.phone,
+    }).from(users).where(eq(users.id, job.customerId));
+    
+    const customer = customerResult[0];
+    return {
+      ...job,
+      customerName: customer?.name || null,
+      customerAddress: customer?.address || null,
+      customerPhone: customer?.phone || null,
+    };
+  }));
+
+  return jobsWithCustomers;
 }
 
 export async function markJobPickedUp(quoteItemId: number, courierId: number) {
