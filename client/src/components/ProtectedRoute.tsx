@@ -16,7 +16,7 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
     if (!isLoaded) return;
 
     if (!isSignedIn) {
-      setLocation("/login");
+      setLocation("/");
       return;
     }
 

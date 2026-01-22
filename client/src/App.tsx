@@ -13,7 +13,7 @@ import Products from "./pages/Products";
 import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
 import Activity from "./pages/Activity";
-import ClerkLogin from "./pages/ClerkLogin";
+import LandingPage from "./pages/LandingPage";
 import SupplierPortal from "./pages/SupplierPortal";
 import CustomerPortal from "./pages/CustomerPortal";
 import CourierPortal from "./pages/CourierPortal";
@@ -22,29 +22,90 @@ import CustomerSignup from "./pages/CustomerSignup";
 function Router() {
   return (
     <Switch>
-      <Route path="/login" component={ClerkLogin} />
+      {/* Public routes */}
+      <Route path="/" component={LandingPage} />
       <Route path="/signup" component={CustomerSignup} />
-      <Route>
+      
+      {/* Protected dashboard routes */}
+      <Route path="/dashboard">
         <ProtectedRoute>
           <DashboardLayout>
-            <Switch>
-              <Route path="/" component={Home} />
-              <Route path="/quotes" component={Quotes} />
-              <Route path="/customers" component={Customers} />
-              <Route path="/suppliers" component={Suppliers} />
-              <Route path="/products" component={Products} />
-              <Route path="/analytics" component={Analytics} />
-              <Route path="/activity" component={Activity} />
-              <Route path="/settings" component={Settings} />
-              <Route path="/supplier-portal" component={SupplierPortal} />
-              <Route path="/customer-portal" component={CustomerPortal} />
-              <Route path="/courier-portal" component={CourierPortal} />
-              <Route path="/404" component={NotFound} />
-              <Route component={NotFound} />
-            </Switch>
+            <Home />
           </DashboardLayout>
         </ProtectedRoute>
       </Route>
+      <Route path="/quotes">
+        <ProtectedRoute>
+          <DashboardLayout>
+            <Quotes />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customers">
+        <ProtectedRoute>
+          <DashboardLayout>
+            <Customers />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/suppliers">
+        <ProtectedRoute>
+          <DashboardLayout>
+            <Suppliers />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/products">
+        <ProtectedRoute>
+          <DashboardLayout>
+            <Products />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/analytics">
+        <ProtectedRoute>
+          <DashboardLayout>
+            <Analytics />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/activity">
+        <ProtectedRoute>
+          <DashboardLayout>
+            <Activity />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/settings">
+        <ProtectedRoute>
+          <DashboardLayout>
+            <Settings />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/supplier-portal">
+        <ProtectedRoute>
+          <DashboardLayout>
+            <SupplierPortal />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer-portal">
+        <ProtectedRoute>
+          <DashboardLayout>
+            <CustomerPortal />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/courier-portal">
+        <ProtectedRoute>
+          <DashboardLayout>
+            <CourierPortal />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/404" component={NotFound} />
+      <Route component={NotFound} />
     </Switch>
   );
 }
