@@ -578,15 +578,15 @@ export async function reviseQuote(data: ReviseQuoteRequest) {
     .set({ status: "superseded" })
     .where(eq(quotes.id, data.quoteId));
 
-  const [result] = await db.insert(quotes).values({
+  const result = await db.insert(quotes).values({
     customerId: currentQuote.customerId,
     employeeId: data.employeeId,
     status: "draft",
     version: currentQuote.version + 1,
     parentQuoteId: data.quoteId,
-  });
+  }).returning();
 
-  const newQuoteId = result.insertId;
+  const newQuoteId = result[0].id;
 
   const items = await db.select()
     .from(quoteItems)
