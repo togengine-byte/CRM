@@ -1,13 +1,11 @@
-import { useAuth as useClerkAuth } from "@clerk/clerk-react";
-import { useAuth } from "@/_core/hooks/useAuth";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useAuth, useUser, useClerk } from "@clerk/clerk-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
 import { LayoutDashboard, LogOut, PanelRight, Users, FileText, Truck, Package, BarChart3, Settings, Menu, X, ShoppingBag } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -17,7 +15,7 @@ import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 
 const adminMenuItems = [
-  { icon: LayoutDashboard, label: "לוח בקרה", path: "/" },
+  { icon: LayoutDashboard, label: "לוח בקרה", path: "/dashboard" },
   { icon: FileText, label: "הצעות מחיר", path: "/quotes" },
   { icon: Users, label: "לקוחות", path: "/customers" },
   { icon: Truck, label: "ספקים", path: "/suppliers" },
@@ -28,7 +26,7 @@ const adminMenuItems = [
 
 // Employee has limited access - no settings, limited analytics
 const employeeMenuItems = [
-  { icon: LayoutDashboard, label: "לוח בקרה", path: "/" },
+  { icon: LayoutDashboard, label: "לוח בקרה", path: "/dashboard" },
   { icon: FileText, label: "הצעות מחיר", path: "/quotes" },
   { icon: Users, label: "לקוחות", path: "/customers" },
   { icon: Truck, label: "ספקים", path: "/suppliers" },
@@ -55,13 +53,25 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { loading, user, logout } = useAuth();
+  // Use Clerk hooks for authentication
+  const { isLoaded, isSignedIn } = useAuth();
+  const { user: clerkUser } = useUser();
+  const { signOut } = useClerk();
+  
   const [location, setLocation] = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const isMobile = useIsMobile();
 
   const currentWidth = isCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH;
+
+  // Get user info from Clerk
+  const user = clerkUser ? {
+    name: clerkUser.fullName || clerkUser.firstName || clerkUser.emailAddresses[0]?.emailAddress?.split('@')[0] || 'משתמש',
+    email: clerkUser.emailAddresses[0]?.emailAddress || '',
+    picture: clerkUser.imageUrl,
+    role: (clerkUser.publicMetadata?.role as string) || 'admin', // Default to admin for now
+  } : null;
 
   // Select menu items based on user role
   const getMenuItems = () => {
@@ -78,10 +88,16 @@ export default function DashboardLayout({
       case 'admin':
         return adminMenuItems;
       default:
-        return employeeMenuItems; // Default to limited access
+        return adminMenuItems; // Default to admin access
     }
   };
   const menuItems = getMenuItems();
+
+  // Logout function using Clerk
+  const logout = async () => {
+    await signOut();
+    setLocation("/");
+  };
 
   useEffect(() => {
     if (isMobile) {
@@ -89,12 +105,16 @@ export default function DashboardLayout({
     }
   }, [location, isMobile]);
 
-  if (loading) {
+  // Show loading while Clerk is loading
+  if (!isLoaded) {
     return <DashboardLayoutSkeleton />
   }
 
-  // This check is now handled by ProtectedRoute wrapper
-  // If user is not authenticated, they will be redirected to landing page
+  // If not signed in, ProtectedRoute should handle redirect
+  // This is a fallback
+  if (!isSignedIn) {
+    return <DashboardLayoutSkeleton />
+  }
 
   return (
     <div className="min-h-screen bg-background" dir="rtl">
@@ -154,8 +174,9 @@ export default function DashboardLayout({
                   isCollapsed && "justify-center"
                 )}>
                   <Avatar className="h-9 w-9 border shrink-0">
+                    {user?.picture && <AvatarImage src={user.picture} />}
                     <AvatarFallback className="text-xs font-medium">
-                      {user?.name?.charAt(0).toUpperCase()}
+                      {user?.name?.charAt(0).toUpperCase() || '?'}
                     </AvatarFallback>
                   </Avatar>
                   {!isCollapsed && (
@@ -235,8 +256,9 @@ export default function DashboardLayout({
             <div className="p-3 border-t border-border">
               <div className="flex items-center gap-3 px-2 py-2">
                 <Avatar className="h-9 w-9 border shrink-0">
+                  {user?.picture && <AvatarImage src={user.picture} />}
                   <AvatarFallback className="text-xs font-medium">
-                    {user?.name?.charAt(0).toUpperCase()}
+                    {user?.name?.charAt(0).toUpperCase() || '?'}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0 text-right">
