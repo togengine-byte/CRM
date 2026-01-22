@@ -331,15 +331,28 @@ export default function Settings() {
 
   const handleEdit = (profile: any) => {
     setEditingProfile(profile);
+    // Parse arrays safely - check if already an array or string
+    const parseArray = (value: any) => {
+      if (Array.isArray(value)) return value;
+      if (typeof value === 'string') {
+        try {
+          return JSON.parse(value);
+        } catch {
+          return [value];
+        }
+      }
+      return [];
+    };
+    
     setFormData({
       name: profile.name,
       description: profile.description || "",
       minDpi: profile.minDpi,
       maxDpi: profile.maxDpi || undefined,
-      allowedColorspaces: JSON.parse(profile.allowedColorspaces || '["CMYK"]'),
+      allowedColorspaces: parseArray(profile.allowedColorspaces) || ["CMYK"],
       requiredBleedMm: profile.requiredBleedMm,
       maxFileSizeMb: profile.maxFileSizeMb,
-      allowedFormats: JSON.parse(profile.allowedFormats || '["pdf"]'),
+      allowedFormats: parseArray(profile.allowedFormats) || ["pdf"],
       isDefault: profile.isDefault || false,
     });
   };
