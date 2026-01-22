@@ -306,6 +306,7 @@ function StaffManagementSettings() {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
+    password: "",
     phone: "",
     companyName: "",
     role: "employee" as "employee" | "courier",
@@ -362,6 +363,7 @@ function StaffManagementSettings() {
     setFormData({
       name: "",
       email: "",
+      password: "",
       phone: "",
       companyName: "",
       role: "employee",
@@ -401,9 +403,14 @@ function StaffManagementSettings() {
         companyName: formData.companyName || undefined,
       });
     } else {
+      if (!formData.password || formData.password.length < 4) {
+        toast.error("סיסמה חייבת להכיל לפחות 4 תווים");
+        return;
+      }
       createStaffMutation.mutate({
         name: formData.name,
         email: formData.email,
+        password: formData.password,
         phone: formData.phone || undefined,
         companyName: formData.companyName || undefined,
         role: formData.role,
@@ -541,6 +548,20 @@ function StaffManagementSettings() {
                   />
                 </div>
 
+                {!editingUser && (
+                  <div className="space-y-2">
+                    <Label htmlFor="password">סיסמה *</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      value={formData.password}
+                      onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                      placeholder="לפחות 4 תווים"
+                      dir="ltr"
+                    />
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <Label htmlFor="phone">טלפון</Label>
                   <Input
@@ -609,7 +630,7 @@ function StaffManagementSettings() {
                 </Button>
                 <Button 
                   onClick={handleSubmit}
-                  disabled={!formData.name || !formData.email || createStaffMutation.isPending || updateStaffMutation.isPending}
+                  disabled={!formData.name || !formData.email || (!editingUser && !formData.password) || createStaffMutation.isPending || updateStaffMutation.isPending}
                 >
                   {createStaffMutation.isPending || updateStaffMutation.isPending ? (
                     <RefreshCw className="h-4 w-4 ml-2 animate-spin" />

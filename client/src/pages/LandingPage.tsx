@@ -13,7 +13,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { SignIn, useAuth } from "@clerk/clerk-react";
+import { useAuthContext } from "@/contexts/AuthContext";
 import { 
   Loader2, 
   User, 
@@ -29,10 +29,10 @@ import {
   X,
   File,
   AlertTriangle,
-  Mail
+  Mail,
+  Lock
 } from "lucide-react";
 import { toast } from "sonner";
-import { useEffect } from "react";
 
 // Allowed file types for security
 const ALLOWED_FILE_TYPES = [
@@ -59,13 +59,21 @@ interface UploadedFile {
 export default function LandingPage() {
   const [, setLocation] = useLocation();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { isSignedIn, isLoaded } = useAuth();
+  const { isAuthenticated, loading: authLoading, login } = useAuthContext();
   
-  // Note: Clerk SignIn component handles redirect to /dashboard automatically
-  // No need to redirect here - the dialog will close and user will be redirected by Clerk
+  // Redirect to dashboard if already authenticated
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      setLocation("/dashboard");
+    }
+  }, [authLoading, isAuthenticated, setLocation]);
   
   // Login dialog state
   const [isLoginOpen, setIsLoginOpen] = useState(false);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginError, setLoginError] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
 
   // Customer signup form state
   const [customerForm, setCustomerForm] = useState({
@@ -145,6 +153,23 @@ export default function LandingPage() {
       }
       return prev.filter(f => f.id !== id);
     });
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError("");
+    setLoginLoading(true);
+
+    const result = await login(loginEmail, loginPassword);
+    
+    if (result.success) {
+      setIsLoginOpen(false);
+      setLocation("/dashboard");
+    } else {
+      setLoginError(result.error || "התחברות נכשלה");
+    }
+    
+    setLoginLoading(false);
   };
 
   const handleCustomerSignup = async (e: React.FormEvent) => {
@@ -252,7 +277,7 @@ export default function LandingPage() {
           </span>
         </div>
         
-        {/* Small login button for existing users - Opens Clerk SignIn */}
+        {/* Login button for existing users */}
         <Dialog open={isLoginOpen} onOpenChange={setIsLoginOpen}>
           <DialogTrigger asChild>
             <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900">
@@ -268,20 +293,58 @@ export default function LandingPage() {
               </DialogDescription>
             </DialogHeader>
             
-            <div className="pt-4">
-              <SignIn
-                appearance={{
-                  elements: {
-                    rootBox: "w-full",
-                    card: "shadow-none border-0 p-0",
-                    headerTitle: "hidden",
-                    headerSubtitle: "hidden",
-                    socialButtonsBlockButton: "w-full",
-                  },
-                }}
-                redirectUrl="/dashboard"
-              />
-            </div>
+            <form onSubmit={handleLogin} className="space-y-4 pt-4">
+              {loginError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm text-center">
+                  {loginError}
+                </div>
+              )}
+              
+              <div className="space-y-2">
+                <Label htmlFor="login-email">אימייל</Label>
+                <div className="relative">
+                  <Mail className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    id="login-email"
+                    type="email"
+                    placeholder="your@email.com"
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    className="pr-10"
+                    required
+                    dir="ltr"
+                  />
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="login-password">סיסמה</Label>
+                <div className="relative">
+                  <Lock className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    id="login-password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    className="pr-10"
+                    required
+                    dir="ltr"
+                  />
+                </div>
+              </div>
+              
+              <Button type="submit" className="w-full" disabled={loginLoading}>
+                {loginLoading ? (
+                  <>
+                    <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                    מתחבר...
+                  </>
+                ) : (
+                  "התחברות"
+                )}
+              </Button>
+            </form>
           </DialogContent>
         </Dialog>
       </header>
@@ -293,24 +356,25 @@ export default function LandingPage() {
           {/* Left side - Hero text */}
           <div className="space-y-8 text-center lg:text-right lg:sticky lg:top-8">
             <div className="space-y-4">
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight">
-                קבלו הצעת מחיר
-                <span className="block bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                  בדקות ספורות
+              <h1 className="text-4xl md:text-5xl font-bold text-gray-900 leading-tight">
+                קבלו הצעות מחיר
+                <span className="block text-transparent bg-clip-text bg-gradient-to-l from-blue-600 to-indigo-600">
+                  בקליק אחד
                 </span>
               </h1>
               <p className="text-xl text-gray-600 max-w-lg mx-auto lg:mx-0">
-                מערכת חכמה להשוואת מחירים מספקים מובילים. מלאו את הפרטים ונחזור אליכם עם ההצעה הטובה ביותר.
+                מערכת חכמה להשוואת מחירים מספקי דפוס מובילים. חסכו זמן וכסף עם QuoteFlow.
               </p>
             </div>
 
             {/* Features */}
-            <div className="grid sm:grid-cols-3 gap-4 pt-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {features.map((feature, index) => (
-                <div key={index} className="flex flex-col items-center lg:items-start gap-2 p-4 rounded-xl bg-white/50 backdrop-blur-sm">
-                  <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <feature.icon className="h-5 w-5 text-blue-600" />
-                  </div>
+                <div
+                  key={index}
+                  className="p-4 rounded-xl bg-white/60 backdrop-blur-sm border border-white/20 shadow-lg"
+                >
+                  <feature.icon className="h-8 w-8 text-blue-600 mb-2 mx-auto lg:mx-0" />
                   <h3 className="font-semibold text-gray-900">{feature.title}</h3>
                   <p className="text-sm text-gray-600">{feature.description}</p>
                 </div>
@@ -319,20 +383,20 @@ export default function LandingPage() {
           </div>
 
           {/* Right side - Signup form */}
-          <div className="flex justify-center lg:justify-end">
-            <Card className="w-full max-w-md shadow-2xl border-0 bg-white/90 backdrop-blur-sm">
-              <CardHeader className="text-center pb-2">
-                <CardTitle className="text-2xl">בקשת הצעת מחיר</CardTitle>
-                <CardDescription>
-                  מלאו את הפרטים והעלו קבצים לקבלת הצעה מדויקת
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleCustomerSignup} className="space-y-4">
+          <Card className="shadow-2xl border-0 bg-white/90 backdrop-blur-sm">
+            <CardHeader className="text-center pb-2">
+              <CardTitle className="text-2xl">בקשת הצעת מחיר</CardTitle>
+              <CardDescription>
+                מלאו את הפרטים ונחזור אליכם עם הצעה מותאמת
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleCustomerSignup} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="name">שם מלא *</Label>
                     <div className="relative">
-                      <User className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <User className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                       <Input
                         id="name"
                         placeholder="ישראל ישראלי"
@@ -343,28 +407,29 @@ export default function LandingPage() {
                       />
                     </div>
                   </div>
-
                   <div className="space-y-2">
-                    <Label htmlFor="email">מייל *</Label>
+                    <Label htmlFor="email">אימייל *</Label>
                     <div className="relative">
-                      <Mail className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Mail className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                       <Input
                         id="email"
                         type="email"
-                        placeholder="your@email.com"
+                        placeholder="email@example.com"
                         value={customerForm.email}
                         onChange={(e) => setCustomerForm({ ...customerForm, email: e.target.value })}
                         className="pr-10"
-                        dir="ltr"
                         required
+                        dir="ltr"
                       />
                     </div>
                   </div>
+                </div>
 
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="phone">טלפון *</Label>
                     <div className="relative">
-                      <Phone className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Phone className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                       <Input
                         id="phone"
                         type="tel"
@@ -372,18 +437,17 @@ export default function LandingPage() {
                         value={customerForm.phone}
                         onChange={(e) => setCustomerForm({ ...customerForm, phone: e.target.value })}
                         className="pr-10"
-                        dir="ltr"
                         required
+                        dir="ltr"
                       />
                     </div>
                   </div>
-
                   <div className="space-y-2">
-                    <Label htmlFor="companyName">שם החברה</Label>
+                    <Label htmlFor="company">שם החברה</Label>
                     <div className="relative">
-                      <Building2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Building2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                       <Input
-                        id="companyName"
+                        id="company"
                         placeholder="שם החברה (אופציונלי)"
                         value={customerForm.companyName}
                         onChange={(e) => setCustomerForm({ ...customerForm, companyName: e.target.value })}
@@ -391,108 +455,108 @@ export default function LandingPage() {
                       />
                     </div>
                   </div>
+                </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="description">תיאור הפרויקט *</Label>
+                <div className="space-y-2">
+                  <Label htmlFor="description">תיאור הפרויקט *</Label>
+                  <div className="relative">
+                    <FileText className="absolute right-3 top-3 h-4 w-4 text-gray-400" />
                     <Textarea
                       id="description"
-                      placeholder="תארו את הפרויקט שלכם, כמויות, מידות, צבעים וכל מידע רלוונטי..."
+                      placeholder="תארו את הפרויקט שלכם: סוג המוצר, כמות, מידות, צבעים וכו'..."
                       value={customerForm.description}
                       onChange={(e) => setCustomerForm({ ...customerForm, description: e.target.value })}
-                      rows={4}
+                      className="pr-10 min-h-[100px]"
                       required
                     />
                   </div>
+                </div>
 
-                  {/* File Upload Section */}
-                  <div className="space-y-2">
-                    <Label>העלאת קבצים</Label>
-                    <div className="text-xs text-gray-500 mb-2">
-                      PDF, JPG, PNG, TIFF, AI, EPS, PSD (עד 100MB לקובץ, עד 10 קבצים)
-                    </div>
-                    
-                    <div
-                      className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-400 transition-colors cursor-pointer"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      <Upload className="mx-auto h-8 w-8 text-gray-400 mb-2" />
+                {/* File upload section */}
+                <div className="space-y-2">
+                  <Label>קבצים (אופציונלי)</Label>
+                  <div className="border-2 border-dashed border-gray-200 rounded-lg p-4 text-center hover:border-blue-400 transition-colors">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      accept={ALLOWED_EXTENSIONS.join(',')}
+                      onChange={handleFileSelect}
+                      className="hidden"
+                      id="file-upload"
+                    />
+                    <label htmlFor="file-upload" className="cursor-pointer">
+                      <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
                       <p className="text-sm text-gray-600">
-                        לחצו להעלאה או גררו קבצים לכאן
+                        לחצו להעלאת קבצים או גררו לכאן
                       </p>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        multiple
-                        accept={ALLOWED_EXTENSIONS.join(',')}
-                        onChange={handleFileSelect}
-                        className="hidden"
-                      />
-                    </div>
-
-                    {/* Uploaded files list */}
-                    {uploadedFiles.length > 0 && (
-                      <div className="space-y-2 mt-3">
-                        {uploadedFiles.map((uploadedFile) => (
-                          <div
-                            key={uploadedFile.id}
-                            className="flex items-center justify-between p-2 bg-gray-50 rounded-lg"
-                          >
-                            <div className="flex items-center gap-2 overflow-hidden">
-                              {uploadedFile.preview ? (
-                                <img
-                                  src={uploadedFile.preview}
-                                  alt={uploadedFile.file.name}
-                                  className="w-8 h-8 object-cover rounded"
-                                />
-                              ) : (
-                                <File className="w-8 h-8 text-gray-400" />
-                              )}
-                              <div className="overflow-hidden">
-                                <p className="text-sm font-medium truncate">
-                                  {uploadedFile.file.name}
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  {formatFileSize(uploadedFile.file.size)}
-                                </p>
-                              </div>
-                            </div>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => removeFile(uploadedFile.id)}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                      <p className="text-xs text-gray-400 mt-1">
+                        PDF, JPG, PNG, TIFF, AI, EPS, PSD (עד 100MB לקובץ)
+                      </p>
+                    </label>
                   </div>
 
-                  <Button
-                    type="submit"
-                    disabled={signupLoading || !customerForm.name || !customerForm.email || !customerForm.phone || !customerForm.description}
-                    className="w-full h-12 text-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
-                  >
-                    {signupLoading ? (
-                      <>
-                        <Loader2 className="ml-2 h-5 w-5 animate-spin" />
-                        שולח...
-                      </>
-                    ) : (
-                      <>
-                        <FileText className="ml-2 h-5 w-5" />
-                        שליחת בקשה
-                      </>
-                    )}
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-          </div>
+                  {/* Uploaded files list */}
+                  {uploadedFiles.length > 0 && (
+                    <div className="space-y-2 mt-3">
+                      {uploadedFiles.map((uploadedFile) => (
+                        <div
+                          key={uploadedFile.id}
+                          className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg"
+                        >
+                          {uploadedFile.preview ? (
+                            <img
+                              src={uploadedFile.preview}
+                              alt={uploadedFile.file.name}
+                              className="w-10 h-10 object-cover rounded"
+                            />
+                          ) : (
+                            <File className="w-10 h-10 text-gray-400 p-2 bg-gray-100 rounded" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{uploadedFile.file.name}</p>
+                            <p className="text-xs text-gray-500">{formatFileSize(uploadedFile.file.size)}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeFile(uploadedFile.id)}
+                            className="p-1 hover:bg-gray-200 rounded"
+                          >
+                            <X className="h-4 w-4 text-gray-500" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <Button
+                  type="submit"
+                  className="w-full h-12 text-lg bg-gradient-to-l from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+                  disabled={signupLoading}
+                >
+                  {signupLoading ? (
+                    <>
+                      <Loader2 className="ml-2 h-5 w-5 animate-spin" />
+                      שולח...
+                    </>
+                  ) : (
+                    <>
+                      שליחת בקשה
+                      <CheckCircle className="mr-2 h-5 w-5" />
+                    </>
+                  )}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
         </div>
       </main>
+
+      {/* Footer */}
+      <footer className="relative z-10 text-center py-8 text-gray-500 text-sm">
+        <p>© 2024 QuoteFlow. כל הזכויות שמורות.</p>
+      </footer>
     </div>
   );
 }

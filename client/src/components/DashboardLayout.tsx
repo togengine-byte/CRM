@@ -1,4 +1,4 @@
-import { useAuth, useUser, useClerk } from "@clerk/clerk-react";
+import { useAuthContext } from "@/contexts/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -53,10 +53,7 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Use Clerk hooks for authentication
-  const { isLoaded, isSignedIn } = useAuth();
-  const { user: clerkUser } = useUser();
-  const { signOut } = useClerk();
+  const { user, loading, isAuthenticated, logout } = useAuthContext();
   
   const [location, setLocation] = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -64,14 +61,6 @@ export default function DashboardLayout({
   const isMobile = useIsMobile();
 
   const currentWidth = isCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH;
-
-  // Get user info from Clerk
-  const user = clerkUser ? {
-    name: clerkUser.fullName || clerkUser.firstName || clerkUser.emailAddresses[0]?.emailAddress?.split('@')[0] || 'משתמש',
-    email: clerkUser.emailAddresses[0]?.emailAddress || '',
-    picture: clerkUser.imageUrl,
-    role: (clerkUser.publicMetadata?.role as string) || 'admin', // Default to admin for now
-  } : null;
 
   // Select menu items based on user role
   const getMenuItems = () => {
@@ -93,9 +82,9 @@ export default function DashboardLayout({
   };
   const menuItems = getMenuItems();
 
-  // Logout function using Clerk
-  const logout = async () => {
-    await signOut();
+  // Logout function
+  const handleLogout = async () => {
+    await logout();
     setLocation("/");
   };
 
@@ -105,14 +94,14 @@ export default function DashboardLayout({
     }
   }, [location, isMobile]);
 
-  // Show loading while Clerk is loading
-  if (!isLoaded) {
+  // Show loading while checking auth
+  if (loading) {
     return <DashboardLayoutSkeleton />
   }
 
-  // If not signed in, ProtectedRoute should handle redirect
+  // If not authenticated, ProtectedRoute should handle redirect
   // This is a fallback
-  if (!isSignedIn) {
+  if (!isAuthenticated || !user) {
     return <DashboardLayoutSkeleton />
   }
 
@@ -174,7 +163,6 @@ export default function DashboardLayout({
                   isCollapsed && "justify-center"
                 )}>
                   <Avatar className="h-9 w-9 border shrink-0">
-                    {user?.picture && <AvatarImage src={user.picture} />}
                     <AvatarFallback className="text-xs font-medium">
                       {user?.name?.charAt(0).toUpperCase() || '?'}
                     </AvatarFallback>
@@ -193,7 +181,7 @@ export default function DashboardLayout({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
                 <DropdownMenuItem
-                  onClick={logout}
+                  onClick={handleLogout}
                   className="cursor-pointer text-destructive focus:text-destructive"
                 >
                   <LogOut className="ml-2 h-4 w-4" />
@@ -256,7 +244,6 @@ export default function DashboardLayout({
             <div className="p-3 border-t border-border">
               <div className="flex items-center gap-3 px-2 py-2">
                 <Avatar className="h-9 w-9 border shrink-0">
-                  {user?.picture && <AvatarImage src={user.picture} />}
                   <AvatarFallback className="text-xs font-medium">
                     {user?.name?.charAt(0).toUpperCase() || '?'}
                   </AvatarFallback>
@@ -272,7 +259,7 @@ export default function DashboardLayout({
               </div>
               <Button
                 variant="ghost"
-                onClick={logout}
+                onClick={handleLogout}
                 className="w-full justify-start text-destructive hover:text-destructive mt-2"
               >
                 <LogOut className="ml-2 h-4 w-4" />

@@ -4,10 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle, AlertCircle, Loader2 } from "lucide-react";
+import { useLocation } from "wouter";
 
 export default function AdminSetup() {
+  const [, setLocation] = useLocation();
   const [email, setEmail] = useState("idicrmai@gmail.com");
   const [name, setName] = useState("איתמר");
+  const [password, setPassword] = useState("");
   const [secretKey, setSecretKey] = useState("");
   const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
 
@@ -23,7 +26,7 @@ export default function AdminSetup() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setResult(null);
-    seedAdminMutation.mutate({ email, name, secretKey });
+    seedAdminMutation.mutate({ email, name, password, secretKey });
   };
 
   return (
@@ -44,6 +47,7 @@ export default function AdminSetup() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                dir="ltr"
               />
             </div>
             <div>
@@ -56,6 +60,18 @@ export default function AdminSetup() {
               />
             </div>
             <div>
+              <label className="block text-sm font-medium mb-1">סיסמה</label>
+              <Input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="לפחות 4 תווים"
+                required
+                minLength={4}
+                dir="ltr"
+              />
+            </div>
+            <div>
               <label className="block text-sm font-medium mb-1">מפתח סודי</label>
               <Input
                 type="password"
@@ -63,6 +79,7 @@ export default function AdminSetup() {
                 onChange={(e) => setSecretKey(e.target.value)}
                 placeholder="הזן מפתח סודי"
                 required
+                dir="ltr"
               />
             </div>
             
@@ -79,10 +96,21 @@ export default function AdminSetup() {
               </div>
             )}
 
+            {result?.success && (
+              <Button 
+                type="button" 
+                variant="outline"
+                className="w-full"
+                onClick={() => setLocation("/")}
+              >
+                עבור לעמוד ההתחברות
+              </Button>
+            )}
+
             <Button 
               type="submit" 
               className="w-full"
-              disabled={seedAdminMutation.isPending}
+              disabled={seedAdminMutation.isPending || !password || password.length < 4}
             >
               {seedAdminMutation.isPending ? (
                 <>

@@ -4,6 +4,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
+import bcrypt from "bcryptjs";
 import * as db from "../db";
 import { getSessionCookieOptions } from "./cookies";
 import { sdk } from "./sdk";
@@ -86,44 +87,62 @@ const upload = multer({
   }
 });
 
+// Helper function to hash password
+export async function hashPassword(password: string): Promise<string> {
+  const salt = await bcrypt.genSalt(10);
+  return bcrypt.hash(password, salt);
+}
+
+// Helper function to verify password
+export async function verifyPassword(password: string, hashedPassword: string): Promise<boolean> {
+  return bcrypt.compare(password, hashedPassword);
+}
+
 export function registerOAuthRoutes(app: Express) {
-  // Simple login with email and password
+  // Login with email and password
   app.post("/api/auth/login", async (req: Request, res: Response) => {
     const { email, password } = req.body;
 
-    // For now, accept code 1234 or specific test credentials
-    if (password !== "1234" && !(email && password)) {
-      res.status(401).json({ error: "פרטי התחברות שגויים" });
+    if (!email || !password) {
+      res.status(400).json({ error: "נא להזין אימייל וסיסמה" });
       return;
     }
 
     try {
-      // Find or create user by email
-      let user = await db.getUserByEmail(email);
+      // Find user by email
+      const user = await db.getUserByEmail(email.toLowerCase());
       
       if (!user) {
-        // For test purposes, create user if using code 1234
-        if (password === "1234") {
-          const openId = `user-${crypto.randomUUID()}`;
-          await db.upsertUser({
-            openId,
-            name: email.split('@')[0],
-            email,
-            loginMethod: "email",
-            lastSignedIn: new Date(),
-          });
-          user = await db.getUserByEmail(email);
-        } else {
-          res.status(401).json({ error: "משתמש לא נמצא" });
-          return;
-        }
-      }
-
-      if (!user) {
-        res.status(401).json({ error: "שגיאה ביצירת משתמש" });
+        res.status(401).json({ error: "משתמש לא נמצא במערכת" });
         return;
       }
 
+      // Check if user is active
+      if (user.status !== 'active') {
+        res.status(401).json({ error: "החשבון שלך אינו פעיל. פנה למנהל המערכת." });
+        return;
+      }
+
+      // Verify password
+      if (!user.password) {
+        // User has no password set - might be first login or legacy user
+        res.status(401).json({ error: "לא הוגדרה סיסמה למשתמש זה. פנה למנהל המערכת." });
+        return;
+      }
+
+      const isValidPassword = await verifyPassword(password, user.password);
+      if (!isValidPassword) {
+        res.status(401).json({ error: "סיסמה שגויה" });
+        return;
+      }
+
+      // Update last sign in
+      await db.upsertUser({
+        openId: user.openId,
+        lastSignedIn: new Date(),
+      });
+
+      // Create session token
       const sessionToken = await sdk.createSessionToken(user.openId, {
         name: user.name || "User",
         expiresInMs: ONE_YEAR_MS,
@@ -132,151 +151,50 @@ export function registerOAuthRoutes(app: Express) {
       const cookieOptions = getSessionCookieOptions(req);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
-      res.json({ success: true, user: { openId: user.openId, name: user.name, role: user.role } });
+      res.json({ 
+        success: true, 
+        user: { 
+          id: user.id,
+          openId: user.openId, 
+          name: user.name, 
+          email: user.email,
+          role: user.role,
+          permissions: user.permissions,
+        } 
+      });
     } catch (error) {
       console.error("[Auth] Login failed", error);
       res.status(500).json({ error: "שגיאה בהתחברות" });
     }
   });
 
-  // Google OAuth redirect
-  app.get("/api/auth/google", (req: Request, res: Response) => {
-    const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
-    const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
-    const redirectUri = process.env.GOOGLE_REDIRECT_URI || "https://crm-08aq.onrender.com/api/auth/google/callback";
-    
-    // Debug logging
-    console.log('[OAuth] Google OAuth request received');
-    console.log('[OAuth] Client ID length:', clientId?.length);
-    console.log('[OAuth] Client ID first 20 chars:', clientId?.substring(0, 20));
-    console.log('[OAuth] Client ID last 10 chars:', clientId?.substring(clientId?.length - 10));
-    console.log('[OAuth] Redirect URI:', redirectUri);
-    
-    if (!clientId || !clientSecret) {
-      console.error("[OAuth] Google OAuth not configured", { clientId: !!clientId, clientSecret: !!clientSecret });
-      res.status(500).json({ error: "Google OAuth לא מוגדר עדיין" });
-      return;
-    }
-    
-    // Generate state for CSRF protection
-    const state = crypto.randomBytes(32).toString('hex');
-    res.cookie('oauth_state', state, { httpOnly: true, maxAge: 10 * 60 * 1000 });
-    
-    // Build Google OAuth URL
-    const googleAuthUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-    googleAuthUrl.searchParams.set('client_id', clientId);
-    googleAuthUrl.searchParams.set('redirect_uri', redirectUri);
-    googleAuthUrl.searchParams.set('response_type', 'code');
-    googleAuthUrl.searchParams.set('scope', 'openid profile email');
-    googleAuthUrl.searchParams.set('state', state);
-    
-    console.log('[OAuth] Redirecting to:', googleAuthUrl.toString());
-    res.redirect(googleAuthUrl.toString());
-  });
-  
-  // Google OAuth callback
-  app.get("/api/auth/google/callback", async (req: Request, res: Response) => {
+  // Get current user session
+  app.get("/api/auth/me", async (req: Request, res: Response) => {
     try {
-      const code = getQueryParam(req, 'code');
-      const state = getQueryParam(req, 'state');
-      const storedState = req.cookies.oauth_state;
-      
-      if (!code || !state || state !== storedState) {
-        res.status(400).json({ error: "Invalid OAuth state" });
-        return;
-      }
-      
-      const clientId = process.env.GOOGLE_CLIENT_ID;
-      const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-      const redirectUri = process.env.GOOGLE_REDIRECT_URI || "https://crm-08aq.onrender.com/api/auth/google/callback";
-      
-      if (!clientId || !clientSecret) {
-        res.status(500).json({ error: "Google OAuth not configured" });
-        return;
-      }
-      
-      // Exchange code for tokens
-      const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          client_id: clientId,
-          client_secret: clientSecret,
-          code,
-          grant_type: 'authorization_code',
-          redirect_uri: redirectUri,
-        }),
-      });
-      
-      if (!tokenResponse.ok) {
-        const error = await tokenResponse.text();
-        console.error('[OAuth] Token exchange failed:', error);
-        res.status(400).json({ error: "Failed to exchange code for token" });
-        return;
-      }
-      
-      const tokens = await tokenResponse.json();
-      const idToken = tokens.id_token;
-      
-      if (!idToken) {
-        res.status(400).json({ error: "No ID token received" });
-        return;
-      }
-      
-      // Decode JWT (without verification for now - in production, verify the signature)
-      const parts = idToken.split('.');
-      if (parts.length !== 3) {
-        res.status(400).json({ error: "Invalid ID token format" });
-        return;
-      }
-      
-      const decoded = JSON.parse(Buffer.from(parts[1], 'base64').toString());
-      const { sub: openId, email, name, picture } = decoded;
-      
-      if (!openId || !email) {
-        res.status(400).json({ error: "Missing required user info" });
-        return;
-      }
-      
-      // Upsert user in database
-      await db.upsertUser({
-        openId,
-        email,
-        name: name || email.split('@')[0],
-        picture: picture,
-        role: 'customer',
-      });
-      
-      // Get user from database
-      const user = await db.getUserByEmail(email);
+      const user = await sdk.authenticateRequest(req);
       if (!user) {
-        res.status(500).json({ error: "Failed to create/retrieve user" });
+        res.status(401).json({ error: "לא מחובר" });
         return;
       }
-      
-      // Create session
-      const sessionId = crypto.randomUUID();
-      const sessionData = {
-        userId: user.id,
-        email: user.email,
+      res.json({
+        id: user.id,
+        openId: user.openId,
         name: user.name,
+        email: user.email,
         role: user.role,
-        picture: user.picture,
-      };
-      
-      // Set session cookie
-      const cookieOptions = getSessionCookieOptions();
-      res.cookie('session', sessionId, cookieOptions);
-      
-      // Store session in memory or database (for now, just set cookie)
-      // In production, store in Redis or database
-      
-      // Redirect to dashboard
-      res.redirect('/');
+        permissions: user.permissions,
+        status: user.status,
+      });
     } catch (error) {
-      console.error('[OAuth] Callback error:', error);
-      res.status(500).json({ error: "OAuth callback failed" });
+      res.status(401).json({ error: "לא מחובר" });
     }
+  });
+
+  // Logout
+  app.post("/api/auth/logout", (req: Request, res: Response) => {
+    const cookieOptions = getSessionCookieOptions(req);
+    res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+    res.json({ success: true });
   });
 
   // Customer signup with files
@@ -359,10 +277,5 @@ export function registerOAuthRoutes(app: Express) {
       console.error("[Signup] Customer signup failed", error);
       res.status(500).json({ error: "שגיאה בשליחת הבקשה" });
     }
-  });
-
-  // OAuth callback (kept for backward compatibility but disabled)
-  app.get("/api/oauth/callback", async (req: Request, res: Response) => {
-    res.status(400).json({ error: "OAuth is disabled. Use POST /api/auth/login" });
   });
 }

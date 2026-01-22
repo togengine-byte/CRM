@@ -2734,6 +2734,7 @@ export async function getAllStaff() {
 export async function createStaffUser(data: {
   name: string;
   email: string;
+  password: string;
   phone?: string;
   companyName?: string;
   role: 'employee' | 'supplier' | 'courier';
@@ -2748,6 +2749,11 @@ export async function createStaffUser(data: {
     throw new Error("כתובת המייל כבר קיימת במערכת");
   }
 
+  // Hash the password
+  const bcrypt = await import('bcryptjs');
+  const salt = await bcrypt.genSalt(10);
+  const hashedPassword = await bcrypt.hash(data.password, salt);
+
   const openId = `${data.role}-${crypto.randomUUID()}`;
   const defaultPerms = DEFAULT_PERMISSIONS[data.role] || {};
   
@@ -2755,6 +2761,7 @@ export async function createStaffUser(data: {
     openId,
     name: data.name,
     email: data.email,
+    password: hashedPassword,
     phone: data.phone || null,
     companyName: data.companyName || null,
     role: data.role,

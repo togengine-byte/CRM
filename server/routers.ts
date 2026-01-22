@@ -156,6 +156,7 @@ export const appRouter = router({
       .input(z.object({ 
         email: z.string().email(),
         name: z.string(),
+        password: z.string().min(4, "סיסמה חייבת להכיל לפחות 4 תווים"),
         secretKey: z.string() // Simple protection
       }))
       .mutation(async ({ input }) => {
@@ -172,6 +173,11 @@ export const appRouter = router({
         const { users } = await import('../drizzle/schema');
         const { eq, sql } = await import('drizzle-orm');
         const crypto = await import('crypto');
+        const bcrypt = await import('bcryptjs');
+        
+        // Hash the password
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(input.password, salt);
         
         try {
           // First, check if table exists by trying a simple query
@@ -244,10 +250,11 @@ export const appRouter = router({
             openId: `admin-${crypto.randomUUID()}`,
             name: input.name,
             email: input.email.toLowerCase(),
+            password: hashedPassword,
             role: 'admin',
             status: 'active',
             permissions: DEFAULT_PERMISSIONS.admin,
-            loginMethod: 'clerk',
+            loginMethod: 'email',
           });
           
           return { success: true, message: 'Admin user created successfully!' };
@@ -1236,6 +1243,7 @@ export const appRouter = router({
       .input(z.object({
         name: z.string().min(1, "שם חובה"),
         email: z.string().email("כתובת מייל לא תקינה"),
+        password: z.string().min(4, "סיסמה חייבת להכיל לפחות 4 תווים"),
         phone: z.string().optional(),
         companyName: z.string().optional(),
         role: z.enum(['employee', 'supplier', 'courier']),
