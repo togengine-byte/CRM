@@ -10,10 +10,6 @@ const dbUrl = new URL(connectionString);
 if (!dbUrl.searchParams.has('sslmode')) {
   dbUrl.searchParams.set('sslmode', 'require');
 }
-// Allow self-signed certificates from Render
-if (!dbUrl.searchParams.has('sslcert')) {
-  dbUrl.searchParams.set('sslcert', 'disable');
-}
 
 export default defineConfig({
   schema: "./drizzle/schema.ts",
