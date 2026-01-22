@@ -141,8 +141,134 @@ export function registerOAuthRoutes(app: Express) {
 
   // Google OAuth redirect
   app.get("/api/auth/google", (req: Request, res: Response) => {
-    // TODO: Implement Google OAuth
-    res.status(501).json({ error: "Google OAuth לא מוגדר עדיין" });
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    const redirectUri = process.env.GOOGLE_REDIRECT_URI || "https://crm-08aq.onrender.com/api/auth/google/callback";
+    
+    if (!clientId || !clientSecret) {
+      console.error("[OAuth] Google OAuth not configured", { clientId: !!clientId, clientSecret: !!clientSecret });
+      res.status(500).json({ error: "Google OAuth לא מוגדר עדיין" });
+      return;
+    }
+    
+    // Generate state for CSRF protection
+    const state = crypto.randomBytes(32).toString('hex');
+    res.cookie('oauth_state', state, { httpOnly: true, maxAge: 10 * 60 * 1000 });
+    
+    // Build Google OAuth URL
+    const googleAuthUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+    googleAuthUrl.searchParams.set('client_id', clientId);
+    googleAuthUrl.searchParams.set('redirect_uri', redirectUri);
+    googleAuthUrl.searchParams.set('response_type', 'code');
+    googleAuthUrl.searchParams.set('scope', 'openid profile email');
+    googleAuthUrl.searchParams.set('state', state);
+    
+    res.redirect(googleAuthUrl.toString());
+  });
+  
+  // Google OAuth callback
+  app.get("/api/auth/google/callback", async (req: Request, res: Response) => {
+    try {
+      const code = getQueryParam(req, 'code');
+      const state = getQueryParam(req, 'state');
+      const storedState = req.cookies.oauth_state;
+      
+      if (!code || !state || state !== storedState) {
+        res.status(400).json({ error: "Invalid OAuth state" });
+        return;
+      }
+      
+      const clientId = process.env.GOOGLE_CLIENT_ID;
+      const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+      const redirectUri = process.env.GOOGLE_REDIRECT_URI || "https://crm-08aq.onrender.com/api/auth/google/callback";
+      
+      if (!clientId || !clientSecret) {
+        res.status(500).json({ error: "Google OAuth not configured" });
+        return;
+      }
+      
+      // Exchange code for tokens
+      const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client_id: clientId,
+          client_secret: clientSecret,
+          code,
+          grant_type: 'authorization_code',
+          redirect_uri: redirectUri,
+        }),
+      });
+      
+      if (!tokenResponse.ok) {
+        const error = await tokenResponse.text();
+        console.error('[OAuth] Token exchange failed:', error);
+        res.status(400).json({ error: "Failed to exchange code for token" });
+        return;
+      }
+      
+      const tokens = await tokenResponse.json();
+      const idToken = tokens.id_token;
+      
+      if (!idToken) {
+        res.status(400).json({ error: "No ID token received" });
+        return;
+      }
+      
+      // Decode JWT (without verification for now - in production, verify the signature)
+      const parts = idToken.split('.');
+      if (parts.length !== 3) {
+        res.status(400).json({ error: "Invalid ID token format" });
+        return;
+      }
+      
+      const decoded = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+      const { sub: openId, email, name, picture } = decoded;
+      
+      if (!openId || !email) {
+        res.status(400).json({ error: "Missing required user info" });
+        return;
+      }
+      
+      // Upsert user in database
+      await db.upsertUser({
+        openId,
+        email,
+        name: name || email.split('@')[0],
+        picture: picture,
+        role: 'customer',
+      });
+      
+      // Get user from database
+      const user = await db.getUserByEmail(email);
+      if (!user) {
+        res.status(500).json({ error: "Failed to create/retrieve user" });
+        return;
+      }
+      
+      // Create session
+      const sessionId = crypto.randomUUID();
+      const sessionData = {
+        userId: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        picture: user.picture,
+      };
+      
+      // Set session cookie
+      const cookieOptions = getSessionCookieOptions();
+      res.cookie('session', sessionId, cookieOptions);
+      
+      // Store session in memory or database (for now, just set cookie)
+      // In production, store in Redis or database
+      
+      // Redirect to dashboard
+      res.redirect('/');
+    } catch (error) {
+      console.error('[OAuth] Callback error:', error);
+      res.status(500).json({ error: "OAuth callback failed" });
+    }
   });
 
   // Customer signup with files
