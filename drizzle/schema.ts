@@ -11,12 +11,15 @@ export const users = pgTable("users", {
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
+  password: varchar("password", { length: 255 }), // Hashed password for email login
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: userRoleEnum("role").default("customer").notNull(),
   status: userStatusEnum("status").default("pending_approval").notNull(),
   phone: varchar("phone", { length: 20 }),
   companyName: text("companyName"),
   address: text("address"),
+  // Permissions for employees - JSON object with permission flags
+  permissions: jsonb("permissions").default('{}'),
   totalRatingPoints: integer("totalRatingPoints").default(0),
   ratedDealsCount: integer("ratedDealsCount").default(0),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

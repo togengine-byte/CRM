@@ -2672,3 +2672,201 @@ export async function reactivateUser(userId: number, adminId: number) {
 
   return { success: true };
 }
+
+// ==================== STAFF MANAGEMENT (EMPLOYEES/SUPPLIERS/COURIERS) ====================
+
+// Default permissions for different roles
+export const DEFAULT_PERMISSIONS = {
+  employee: {
+    canViewDashboard: true,
+    canManageQuotes: true,
+    canViewCustomers: true,
+    canEditCustomers: false,
+    canViewSuppliers: true,
+    canEditSuppliers: false,
+    canViewProducts: true,
+    canEditProducts: false,
+    canViewAnalytics: false,
+    canManageSettings: false,
+  },
+  admin: {
+    canViewDashboard: true,
+    canManageQuotes: true,
+    canViewCustomers: true,
+    canEditCustomers: true,
+    canViewSuppliers: true,
+    canEditSuppliers: true,
+    canViewProducts: true,
+    canEditProducts: true,
+    canViewAnalytics: true,
+    canManageSettings: true,
+  },
+  supplier: {},
+  courier: {},
+  customer: {},
+};
+
+export interface UserPermissions {
+  canViewDashboard?: boolean;
+  canManageQuotes?: boolean;
+  canViewCustomers?: boolean;
+  canEditCustomers?: boolean;
+  canViewSuppliers?: boolean;
+  canEditSuppliers?: boolean;
+  canViewProducts?: boolean;
+  canEditProducts?: boolean;
+  canViewAnalytics?: boolean;
+  canManageSettings?: boolean;
+}
+
+export async function getAllStaff() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select()
+    .from(users)
+    .where(
+      inArray(users.role, ['admin', 'employee', 'supplier', 'courier'])
+    )
+    .orderBy(users.role, users.name);
+}
+
+export async function createStaffUser(data: {
+  name: string;
+  email: string;
+  phone?: string;
+  companyName?: string;
+  role: 'employee' | 'supplier' | 'courier';
+  permissions?: UserPermissions;
+}, adminId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Check if email already exists
+  const existing = await getUserByEmail(data.email);
+  if (existing) {
+    throw new Error("כתובת המייל כבר קיימת במערכת");
+  }
+
+  const openId = `${data.role}-${crypto.randomUUID()}`;
+  const defaultPerms = DEFAULT_PERMISSIONS[data.role] || {};
+  
+  const [newUser] = await db.insert(users).values({
+    openId,
+    name: data.name,
+    email: data.email,
+    phone: data.phone || null,
+    companyName: data.companyName || null,
+    role: data.role,
+    status: 'active', // Staff created by admin are active immediately
+    permissions: data.permissions || defaultPerms,
+    loginMethod: 'email',
+  }).returning();
+
+  await logActivity(adminId, 'staff_user_created', { 
+    userId: newUser.id, 
+    role: data.role,
+    email: data.email 
+  });
+
+  return newUser;
+}
+
+export async function updateUserPermissions(userId: number, permissions: UserPermissions, adminId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(users)
+    .set({ 
+      permissions,
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, userId));
+
+  await logActivity(adminId, 'user_permissions_updated', { userId, permissions });
+
+  return { success: true };
+}
+
+export async function updateUserRole(userId: number, role: string, adminId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Get default permissions for new role
+  const defaultPerms = DEFAULT_PERMISSIONS[role as keyof typeof DEFAULT_PERMISSIONS] || {};
+
+  await db.update(users)
+    .set({ 
+      role: role as any,
+      permissions: defaultPerms,
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, userId));
+
+  await logActivity(adminId, 'user_role_updated', { userId, role });
+
+  return { success: true };
+}
+
+export async function updateStaffUser(userId: number, data: {
+  name?: string;
+  email?: string;
+  phone?: string;
+  companyName?: string;
+}, adminId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // If email is being changed, check it doesn't exist
+  if (data.email) {
+    const existing = await getUserByEmail(data.email);
+    if (existing && existing.id !== userId) {
+      throw new Error("כתובת המייל כבר קיימת במערכת");
+    }
+  }
+
+  await db.update(users)
+    .set({ 
+      ...data,
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, userId));
+
+  await logActivity(adminId, 'staff_user_updated', { userId, ...data });
+
+  return { success: true };
+}
+
+export async function deleteStaffUser(userId: number, adminId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Don't allow deleting yourself
+  if (userId === adminId) {
+    throw new Error("לא ניתן למחוק את המשתמש שלך");
+  }
+
+  // Soft delete - just deactivate
+  await db.update(users)
+    .set({ 
+      status: 'deactivated',
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, userId));
+
+  await logActivity(adminId, 'staff_user_deleted', { userId });
+
+  return { success: true };
+}
+
+export async function getUserById(userId: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const [result] = await db.select()
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  return result || null;
+}
