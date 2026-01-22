@@ -1,3 +1,7 @@
+DROP TYPE IF EXISTS "public"."entity_type" CASCADE;--> statement-breakpoint
+DROP TYPE IF EXISTS "public"."quote_status" CASCADE;--> statement-breakpoint
+DROP TYPE IF EXISTS "public"."user_role" CASCADE;--> statement-breakpoint
+DROP TYPE IF EXISTS "public"."user_status" CASCADE;--> statement-breakpoint
 CREATE TYPE "public"."entity_type" AS ENUM('customer', 'quote');--> statement-breakpoint
 CREATE TYPE "public"."quote_status" AS ENUM('draft', 'sent', 'approved', 'rejected', 'superseded', 'in_production', 'ready');--> statement-breakpoint
 CREATE TYPE "public"."user_role" AS ENUM('admin', 'employee', 'customer', 'supplier', 'courier');--> statement-breakpoint
