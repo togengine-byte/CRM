@@ -3,6 +3,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { supplierPortalRouter } from "./supplierPortal";
+import { customerPortalRouter } from "./customerPortal";
 import { publicProcedure, protectedProcedure, adminProcedure, router } from "./_core/trpc";
 import {
   getDashboardKPIs,
@@ -89,6 +90,7 @@ import {
 export const appRouter = router({
   system: systemRouter,
   supplierPortal: supplierPortalRouter,
+  customerPortal: customerPortalRouter,
   
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),

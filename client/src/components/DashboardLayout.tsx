@@ -8,14 +8,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelRight, Users, FileText, Truck, Package, BarChart3, Settings, Menu, X } from "lucide-react";
+import { LayoutDashboard, LogOut, PanelRight, Users, FileText, Truck, Package, BarChart3, Settings, Menu, X, ShoppingBag } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 
-const menuItems = [
+const adminMenuItems = [
   { icon: LayoutDashboard, label: "לוח בקרה", path: "/" },
   { icon: FileText, label: "הצעות מחיר", path: "/quotes" },
   { icon: Users, label: "לקוחות", path: "/customers" },
@@ -23,6 +23,14 @@ const menuItems = [
   { icon: Package, label: "מוצרים", path: "/products" },
   { icon: BarChart3, label: "אנליטיקס", path: "/analytics" },
   { icon: Settings, label: "הגדרות", path: "/settings" },
+];
+
+const customerMenuItems = [
+  { icon: ShoppingBag, label: "הצעות המחיר שלי", path: "/customer-portal" },
+];
+
+const supplierMenuItems = [
+  { icon: Package, label: "פורטל ספקים", path: "/supplier-portal" },
 ];
 
 const SIDEBAR_WIDTH = 256;
@@ -40,6 +48,20 @@ export default function DashboardLayout({
   const isMobile = useIsMobile();
 
   const currentWidth = isCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH;
+
+  // Select menu items based on user role
+  const getMenuItems = () => {
+    if (!user) return adminMenuItems;
+    switch (user.role) {
+      case 'customer':
+        return customerMenuItems;
+      case 'supplier':
+        return supplierMenuItems;
+      default:
+        return adminMenuItems;
+    }
+  };
+  const menuItems = getMenuItems();
 
   useEffect(() => {
     if (isMobile) {
@@ -104,7 +126,7 @@ export default function DashboardLayout({
           {/* Navigation */}
           <nav className="flex-1 py-4 px-2 overflow-y-auto">
             <ul className="space-y-1">
-              {menuItems.map(item => {
+              {menuItems.map((item: typeof adminMenuItems[0]) => {
                 const isActive = location === item.path;
                 return (
                   <li key={item.path}>

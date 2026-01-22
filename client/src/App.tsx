@@ -15,6 +15,7 @@ import Settings from "./pages/Settings";
 import Activity from "./pages/Activity";
 import Login from "./pages/Login";
 import SupplierPortal from "./pages/SupplierPortal";
+import CustomerPortal from "./pages/CustomerPortal";
 
 function Router() {
   return (
@@ -32,6 +33,7 @@ function Router() {
             <Route path="/activity" component={Activity} />
             <Route path="/settings" component={Settings} />
             <Route path="/supplier-portal" component={SupplierPortal} />
+            <Route path="/customer-portal" component={CustomerPortal} />
             <Route path="/404" component={NotFound} />
             <Route component={NotFound} />
           </Switch>
