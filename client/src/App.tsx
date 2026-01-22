@@ -17,11 +17,13 @@ import Login from "./pages/Login";
 import SupplierPortal from "./pages/SupplierPortal";
 import CustomerPortal from "./pages/CustomerPortal";
 import CourierPortal from "./pages/CourierPortal";
+import CustomerSignup from "./pages/CustomerSignup";
 
 function Router() {
   return (
     <Switch>
       <Route path="/login" component={Login} />
+      <Route path="/signup" component={CustomerSignup} />
       <Route>
         <DashboardLayout>
           <Switch>

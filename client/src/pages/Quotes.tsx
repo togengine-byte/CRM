@@ -320,6 +320,19 @@ export default function Quotes() {
     if (quote.status === "sent") {
       buttons.push(
         <Button
+          key="email"
+          size="sm"
+          variant="outline"
+          className="text-purple-600 border-purple-200 hover:bg-purple-50"
+          onClick={(e) => {
+            e.stopPropagation();
+            toast.info("שלח למייל - פונקציה זמינה כשיוזן מפתח Google API בהגדרות");
+          }}
+        >
+          <Send className="ml-1 h-3 w-3" />
+          שלח למייל
+        </Button>,
+        <Button
           key="approve"
           size="sm"
           variant="outline"

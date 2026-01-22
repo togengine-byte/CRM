@@ -42,6 +42,7 @@ import {
   removePricelistFromCustomer,
   getAllPricelists,
   getCustomerStats,
+  createCustomerWithQuote,
   // Suppliers API
   getSuppliers,
   getSupplierById,
@@ -497,6 +498,25 @@ export const appRouter = router({
       }))
       .mutation(async ({ input }) => {
         return await removePricelistFromCustomer(input.customerId, input.pricelistId);
+      }),
+
+    createWithQuote: publicProcedure
+      .input(z.object({
+        customerInfo: z.object({
+          name: z.string().min(1),
+          email: z.string().email(),
+          phone: z.string().min(1),
+          companyName: z.string().optional(),
+          address: z.string().optional(),
+        }),
+        quoteItems: z.array(z.object({
+          productVariantId: z.number(),
+          quantity: z.number().int().positive(),
+        })).min(1),
+        notes: z.string().optional(),
+      }))
+      .mutation(async ({ input }) => {
+        return await createCustomerWithQuote(input);
       }),
   }),
 

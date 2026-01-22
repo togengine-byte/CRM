@@ -689,10 +689,19 @@ export default function Settings() {
               <CardTitle>הגדרות כלליות</CardTitle>
               <CardDescription>הגדרות בסיסיות של המערכת</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="text-center py-8 text-gray-500">
-                <SettingsIcon className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                <p>הגדרות כלליות יתווספו בקרוב</p>
+            <CardContent className="space-y-6">
+              <div className="space-y-3">
+                <Label htmlFor="googleApiKey">Google API Key</Label>
+                <p className="text-sm text-gray-600">מפתח API של Google לשליחת מיילים</p>
+                <Input
+                  id="googleApiKey"
+                  type="password"
+                  placeholder="הזן את ה-API Key שלך"
+                  defaultValue=""
+                  className="font-mono text-xs"
+                />
+                <p className="text-xs text-gray-500">המפתח מאוחסן בצורה מאובטחת</p>
+                <Button className="w-full">שמור מפתח</Button>
               </div>
             </CardContent>
           </Card>

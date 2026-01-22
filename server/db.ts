@@ -1,5 +1,6 @@
 import { eq, desc, sql, and, count, inArray, like, gte, lte, SQL } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
+import { createCustomerWithQuote as createCustomerWithQuoteImpl } from "./createCustomerWithQuote";
 import { 
   InsertUser, 
   users, 
@@ -1048,6 +1049,16 @@ export async function approveCustomer(customerId: number, approvedBy: number) {
   await db.update(users)
     .set({ status: 'active' })
     .where(eq(users.id, customerId));
+
+  const customerQuotes = await db.select({ id: quotes.id })
+    .from(quotes)
+    .where(and(eq(quotes.customerId, customerId), eq(quotes.status, 'draft')));
+
+  for (const quote of customerQuotes) {
+    await db.update(quotes)
+      .set({ status: 'sent' })
+      .where(eq(quotes.id, quote.id));
+  }
 
   await logActivity(approvedBy, "customer_approved", { customerId });
 
@@ -2405,3 +2416,7 @@ export async function updateSupplierWeights(weights: SupplierWeights, updatedBy:
 
   return { success: true };
 }
+
+
+// Re-export the createCustomerWithQuote function
+export const createCustomerWithQuote = createCustomerWithQuoteImpl;
