@@ -28,6 +28,12 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 async function startServer() {
+  // Log environment variables for debugging
+  console.log('[Server] Environment variables check:');
+  console.log('[Server] GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID ? 'SET' : 'NOT SET');
+  console.log('[Server] GOOGLE_CLIENT_SECRET:', process.env.GOOGLE_CLIENT_SECRET ? 'SET' : 'NOT SET');
+  console.log('[Server] NODE_ENV:', process.env.NODE_ENV);
+  
   const app = express();
   const server = createServer(app);
   // Configure body parser with larger size limit for file uploads
