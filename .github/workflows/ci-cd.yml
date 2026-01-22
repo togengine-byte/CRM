@@ -51,8 +51,11 @@ jobs:
       - name: Run TypeScript check
         run: pnpm run check
       
-      - name: Run tests
+      - name: Run tests with Mock Database
         run: pnpm run test
+        env:
+          NODE_ENV: test
+          DATABASE_URL: "sqlite::memory:"
       
       - name: Build project
         run: pnpm run build
