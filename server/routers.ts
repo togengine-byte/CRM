@@ -7,6 +7,7 @@ import { customerPortalRouter } from "./customerPortal";
 import { createCustomerWithQuote } from "./createCustomerWithQuote";
 import { publicProcedure, protectedProcedure, adminProcedure, router } from "./_core/trpc";
 import {
+  getUserByEmail,
   getDashboardKPIs,
   getRecentActivity,
   getRecentQuotes,
@@ -126,6 +127,85 @@ export const appRouter = router({
       }
       return { success: true } as const;
     }),
+    // Check if user email exists in database and return their role/permissions
+    checkUserByEmail: publicProcedure
+      .input(z.object({ email: z.string().email() }))
+      .query(async ({ input }) => {
+        const user = await getUserByEmail(input.email.toLowerCase());
+        if (!user) {
+          return { authorized: false, user: null };
+        }
+        // Check if user is active
+        if (user.status !== 'active') {
+          return { authorized: false, user: null, reason: 'user_not_active' };
+        }
+        return {
+          authorized: true,
+          user: {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            permissions: user.permissions,
+            status: user.status,
+          },
+        };
+      }),
+    // Seed admin user (only works if admin doesn't exist yet)
+    seedAdmin: publicProcedure
+      .input(z.object({ 
+        email: z.string().email(),
+        name: z.string(),
+        secretKey: z.string() // Simple protection
+      }))
+      .mutation(async ({ input }) => {
+        // Simple protection - require a secret key
+        if (input.secretKey !== 'SETUP_ADMIN_2024') {
+          throw new Error('Invalid secret key');
+        }
+        
+        // Check if admin already exists
+        const existing = await getUserByEmail(input.email.toLowerCase());
+        if (existing) {
+          // If exists but not admin, update to admin
+          if (existing.role !== 'admin') {
+            const db = await import('./db').then(m => m.getDb());
+            if (db) {
+              const { eq } = await import('drizzle-orm');
+              const { users } = await import('../drizzle/schema');
+              await db.update(users)
+                .set({ 
+                  role: 'admin',
+                  status: 'active',
+                  permissions: DEFAULT_PERMISSIONS.admin,
+                  updatedAt: new Date(),
+                })
+                .where(eq(users.email, input.email.toLowerCase()));
+            }
+            return { success: true, message: 'User upgraded to admin' };
+          }
+          return { success: true, message: 'Admin already exists' };
+        }
+        
+        // Create new admin user
+        const db = await import('./db').then(m => m.getDb());
+        if (!db) throw new Error('Database not available');
+        
+        const { users } = await import('../drizzle/schema');
+        const crypto = await import('crypto');
+        
+        await db.insert(users).values({
+          openId: `admin-${crypto.randomUUID()}`,
+          name: input.name,
+          email: input.email.toLowerCase(),
+          role: 'admin',
+          status: 'active',
+          permissions: DEFAULT_PERMISSIONS.admin,
+          loginMethod: 'clerk',
+        });
+        
+        return { success: true, message: 'Admin user created' };
+      }),
   }),
 
   dashboard: router({

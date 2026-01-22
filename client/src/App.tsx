@@ -18,6 +18,7 @@ import SupplierPortal from "./pages/SupplierPortal";
 import CustomerPortal from "./pages/CustomerPortal";
 import CourierPortal from "./pages/CourierPortal";
 import CustomerSignup from "./pages/CustomerSignup";
+import AdminSetup from "./pages/AdminSetup";
 
 function Router() {
   return (
@@ -25,6 +26,7 @@ function Router() {
       {/* Public routes */}
       <Route path="/" component={LandingPage} />
       <Route path="/signup" component={CustomerSignup} />
+      <Route path="/admin-setup" component={AdminSetup} />
       
       {/* Protected dashboard routes */}
       <Route path="/dashboard">
