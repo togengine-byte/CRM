@@ -29,6 +29,10 @@ export async function getDb() {
       if (!dbUrl.searchParams.has('sslmode')) {
         dbUrl.searchParams.set('sslmode', 'require');
       }
+      // Allow self-signed certificates from Render
+      if (!dbUrl.searchParams.has('sslcert')) {
+        dbUrl.searchParams.set('sslcert', 'disable');
+      }
       _db = drizzle(dbUrl.toString());
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);

@@ -22,6 +22,10 @@ export async function initializeTestDb(): Promise<DrizzleDb> {
   if (!connectionString.includes('sslmode=')) {
     connectionString += connectionString.includes('?') ? '&sslmode=require' : '?sslmode=require';
   }
+  // Allow self-signed certificates from Render
+  if (!connectionString.includes('sslcert=')) {
+    connectionString += '&sslcert=disable';
+  }
   
   // Create drizzle instance with schema for query API support
   db = drizzle(connectionString, { schema });
