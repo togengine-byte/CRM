@@ -63,7 +63,18 @@ export default function Jobs() {
   const [newStatus, setNewStatus] = useState<string>("");
 
   // Fetch jobs from supplier_jobs table
-  const { data: jobs, isLoading, refetch } = trpc.dashboard.activeJobs.useQuery();
+  const { data: jobs, isLoading, refetch } = trpc.jobs.list.useQuery();
+  
+  // Mutation for updating job status
+  const updateStatusMutation = trpc.jobs.updateStatus.useMutation({
+    onSuccess: () => {
+      toast.success(`סטטוס העבודה עודכן בהצלחה`);
+      refetch();
+    },
+    onError: (error) => {
+      toast.error(`שגיאה בעדכון סטטוס: ${error.message}`);
+    },
+  });
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -117,10 +128,11 @@ export default function Jobs() {
 
   const confirmStatusUpdate = () => {
     if (selectedJob && newStatus) {
-      // TODO: Call API to update status
-      toast.success(`סטטוס העבודה עודכן ל${getStatusLabel(newStatus)}`);
+      updateStatusMutation.mutate({
+        jobId: selectedJob.id,
+        status: newStatus as 'in_production' | 'ready' | 'picked_up' | 'delivered',
+      });
       setIsStatusDialogOpen(false);
-      refetch();
     }
   };
 

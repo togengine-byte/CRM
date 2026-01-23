@@ -2939,3 +2939,153 @@ export async function getUserById(userId: number) {
 
   return result || null;
 }
+
+
+// ==================== JOBS API ====================
+
+export async function getActiveJobs() {
+  const db = await getDb();
+  if (!db) return [];
+
+  const result = await db.execute(sql`
+    SELECT 
+      sj.id,
+      sj."quoteId",
+      sj."supplierId",
+      sj."customerId",
+      sj."productVariantId",
+      sj.quantity,
+      sj."pricePerUnit",
+      sj."totalPrice",
+      sj.status,
+      sj."supplierMarkedReady",
+      sj."supplierReadyAt",
+      sj."expectedDeliveryDate",
+      sj."actualDeliveryDate",
+      sj."createdAt",
+      sj.notes,
+      supplier.name as "supplierName",
+      supplier."companyName" as "supplierCompany",
+      customer.name as "customerName",
+      customer."companyName" as "customerCompany",
+      pv.name as "variantName",
+      bp.name as "productName"
+    FROM supplier_jobs sj
+    LEFT JOIN users supplier ON sj."supplierId" = supplier.id
+    LEFT JOIN users customer ON sj."customerId" = customer.id
+    LEFT JOIN product_variants pv ON sj."productVariantId" = pv.id
+    LEFT JOIN base_products bp ON pv."baseProductId" = bp.id
+    ORDER BY 
+      CASE sj.status 
+        WHEN 'ready' THEN 1
+        WHEN 'in_production' THEN 2
+        WHEN 'picked_up' THEN 3
+        WHEN 'delivered' THEN 4
+        ELSE 5
+      END,
+      sj."createdAt" DESC
+  `);
+
+  return result.rows.map((row: any) => ({
+    id: row.id,
+    quoteId: row.quoteId,
+    supplierId: row.supplierId,
+    customerId: row.customerId,
+    productVariantId: row.productVariantId,
+    quantity: row.quantity,
+    pricePerUnit: row.pricePerUnit,
+    totalPrice: row.totalPrice,
+    status: row.status,
+    supplierMarkedReady: row.supplierMarkedReady,
+    supplierReadyAt: row.supplierReadyAt,
+    expectedDeliveryDate: row.expectedDeliveryDate,
+    actualDeliveryDate: row.actualDeliveryDate,
+    createdAt: row.createdAt,
+    notes: row.notes,
+    supplierName: row.supplierName || 'ספק לא מזוהה',
+    supplierCompany: row.supplierCompany,
+    customerName: row.customerName || 'לקוח לא מזוהה',
+    customerCompany: row.customerCompany,
+    productName: row.productName ? `${row.productName} - ${row.variantName}` : 'מוצר לא מזוהה',
+  }));
+}
+
+export async function getJobsReadyForPickup() {
+  const db = await getDb();
+  if (!db) return [];
+
+  const result = await db.execute(sql`
+    SELECT 
+      sj.id,
+      sj."supplierId",
+      sj."customerId",
+      sj."productVariantId",
+      sj.quantity,
+      sj."supplierReadyAt",
+      sj.notes,
+      supplier.name as "supplierName",
+      supplier."companyName" as "supplierCompany",
+      supplier.address as "supplierAddress",
+      customer.name as "customerName",
+      customer."companyName" as "customerCompany",
+      customer.address as "customerAddress",
+      pv.name as "variantName",
+      bp.name as "productName"
+    FROM supplier_jobs sj
+    LEFT JOIN users supplier ON sj."supplierId" = supplier.id
+    LEFT JOIN users customer ON sj."customerId" = customer.id
+    LEFT JOIN product_variants pv ON sj."productVariantId" = pv.id
+    LEFT JOIN base_products bp ON pv."baseProductId" = bp.id
+    WHERE sj.status = 'ready'
+    ORDER BY sj."supplierReadyAt" ASC
+  `);
+
+  return result.rows.map((row: any) => ({
+    id: row.id,
+    supplierId: row.supplierId,
+    customerId: row.customerId,
+    productVariantId: row.productVariantId,
+    quantity: row.quantity,
+    supplierReadyAt: row.supplierReadyAt,
+    notes: row.notes,
+    supplierName: row.supplierName || 'ספק לא מזוהה',
+    supplierCompany: row.supplierCompany,
+    supplierAddress: row.supplierAddress,
+    customerName: row.customerName || 'לקוח לא מזוהה',
+    customerCompany: row.customerCompany,
+    customerAddress: row.customerAddress,
+    productName: row.productName ? `${row.productName} - ${row.variantName}` : 'מוצר לא מזוהה',
+  }));
+}
+
+export async function updateJobStatus(jobId: number, status: string, userId?: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const updateData: any = { status };
+  
+  // Set timestamps based on status
+  if (status === 'ready') {
+    updateData.supplierMarkedReady = true;
+    updateData.supplierReadyAt = new Date();
+  } else if (status === 'picked_up') {
+    updateData.pickedUpAt = new Date();
+    if (userId) updateData.courierId = userId;
+  } else if (status === 'delivered') {
+    updateData.deliveredAt = new Date();
+    updateData.actualDeliveryDate = new Date();
+  }
+
+  await db.execute(sql`
+    UPDATE supplier_jobs 
+    SET 
+      status = ${status},
+      ${status === 'ready' ? sql`"supplierMarkedReady" = true, "supplierReadyAt" = NOW(),` : sql``}
+      ${status === 'picked_up' ? sql`"pickedUpAt" = NOW(),` : sql``}
+      ${status === 'delivered' ? sql`"deliveredAt" = NOW(), "actualDeliveryDate" = CURRENT_DATE,` : sql``}
+      "updatedAt" = NOW()
+    WHERE id = ${jobId}
+  `);
+
+  return { success: true };
+}

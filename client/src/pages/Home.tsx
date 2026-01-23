@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -76,11 +77,15 @@ function formatFullDate(dateString: string): string {
 }
 
 // Courier Pickup Card - עבודות מוכנות לאיסוף
-function CourierPickupCard({ isLoading }: { isLoading: boolean }) {
-  const mockPickups = [
-    { id: 1, supplier: "דפוס הצפון", customer: "חברת ABC", product: "כרטיסי ביקור", readyAt: "10:30" },
-    { id: 2, supplier: "פרינט פלוס", customer: "משרד XYZ", product: "ברושורים", readyAt: "11:00" },
-  ];
+function CourierPickupCard({ isLoading: parentLoading }: { isLoading: boolean }) {
+  const { data: pickups, isLoading } = trpc.jobs.readyForPickup.useQuery();
+  const loading = parentLoading || isLoading;
+
+  const formatTime = (dateString: string | null) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
+  };
 
   return (
     <Card className="animate-slide-up opacity-0 stagger-3">
@@ -90,28 +95,28 @@ function CourierPickupCard({ isLoading }: { isLoading: boolean }) {
             <Truck className="h-4 w-4 text-muted-foreground" />
             איסוף לשליח
           </CardTitle>
-          {mockPickups.length > 0 && (
+          {pickups && pickups.length > 0 && (
             <Badge variant="outline" className="text-[11px] font-normal bg-green-50 text-green-700 border-green-200">
-              {mockPickups.length} מוכנים
+              {pickups.length} מוכנים
             </Badge>
           )}
         </div>
       </CardHeader>
       <CardContent className="pt-0">
-        {isLoading ? (
+        {loading ? (
           <div className="space-y-2">
             {[...Array(2)].map((_, i) => (
               <Skeleton key={i} className="h-14 w-full" />
             ))}
           </div>
-        ) : mockPickups.length === 0 ? (
+        ) : !pickups || pickups.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <CheckCircle2 className="h-8 w-8 text-muted-foreground/40 mb-2" />
             <p className="text-sm text-muted-foreground">אין עבודות ממתינות לאיסוף</p>
           </div>
         ) : (
           <div className="space-y-2">
-            {mockPickups.map((pickup) => (
+            {pickups.map((pickup: any) => (
               <div 
                 key={pickup.id}
                 className="flex items-center justify-between p-3 rounded-lg border border-green-200 bg-green-50/50 hover:bg-green-50 transition-colors cursor-pointer"
@@ -121,15 +126,15 @@ function CourierPickupCard({ isLoading }: { isLoading: boolean }) {
                     <Package className="h-4 w-4 text-green-600" />
                   </div>
                   <div className="flex flex-col">
-                    <span className="text-sm font-medium text-foreground">{pickup.product}</span>
+                    <span className="text-sm font-medium text-foreground">{pickup.productName}</span>
                     <span className="text-xs text-muted-foreground">
-                      <span className="text-green-600 font-medium">{pickup.supplier}</span> → {pickup.customer}
+                      <span className="text-green-600 font-medium">{pickup.supplierName}</span> → {pickup.customerName}
                     </span>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="text-[11px] font-normal bg-green-100 text-green-700 border-green-300">
-                    מוכן {pickup.readyAt}
+                    מוכן {formatTime(pickup.supplierReadyAt)}
                   </Badge>
                 </div>
               </div>
@@ -141,17 +146,35 @@ function CourierPickupCard({ isLoading }: { isLoading: boolean }) {
   );
 }
 
-function OpenJobsCard({ isLoading }: { isLoading: boolean }) {
-  const mockJobs = [
-    { id: 1, supplier: "דפוס הצפון", product: "כרטיסי ביקור", quantity: 500, status: "בהדפסה", dueDate: "03/01" },
-    { id: 2, supplier: "אריזות ישראל", product: "קופסאות מתנה", quantity: 200, status: "ממתין לאישור", dueDate: "05/01" },
-    { id: 3, supplier: "פרינט פלוס", product: "ברושורים A4", quantity: 1000, status: "בייצור", dueDate: "04/01" },
-  ];
+function OpenJobsCard({ isLoading: parentLoading }: { isLoading: boolean }) {
+  const { data: jobs, isLoading } = trpc.jobs.list.useQuery();
+  const loading = parentLoading || isLoading;
+  const [, navigate] = useLocation();
+  
+  // Filter to show only in_production jobs
+  const openJobs = jobs?.filter((job: any) => job.status === 'in_production').slice(0, 5) || [];
 
   const getStatusStyle = (status: string) => {
-    if (status === "בהדפסה" || status === "בייצור") return "bg-blue-50 text-blue-700 border-blue-200";
-    if (status === "ממתין לאישור") return "bg-amber-50 text-amber-700 border-amber-200";
+    if (status === "in_production") return "bg-blue-50 text-blue-700 border-blue-200";
+    if (status === "ready") return "bg-green-50 text-green-700 border-green-200";
+    if (status === "picked_up") return "bg-amber-50 text-amber-700 border-amber-200";
     return "bg-slate-50 text-slate-600 border-slate-200";
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'in_production': return 'בייצור';
+      case 'ready': return 'מוכן';
+      case 'picked_up': return 'נאסף';
+      case 'delivered': return 'נמסר';
+      default: return status;
+    }
+  };
+
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit' });
   };
 
   return (
@@ -162,37 +185,45 @@ function OpenJobsCard({ isLoading }: { isLoading: boolean }) {
             <Truck className="h-4 w-4 text-muted-foreground" />
             עבודות פתוחות אצל ספקים
           </CardTitle>
-          <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground hover:text-foreground" onClick={() => toast.info("בקרוב")}>
+          <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground hover:text-foreground" onClick={() => navigate('/jobs')}>
             צפה בהכל
             <ChevronLeft className="h-3 w-3 mr-1" />
           </Button>
         </div>
       </CardHeader>
       <CardContent className="pt-0">
-        {isLoading ? (
+        {loading ? (
           <div className="space-y-2">
             {[...Array(3)].map((_, i) => (
               <Skeleton key={i} className="h-14 w-full" />
             ))}
           </div>
+        ) : openJobs.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <CheckCircle2 className="h-8 w-8 text-muted-foreground/40 mb-2" />
+            <p className="text-sm text-muted-foreground">אין עבודות פתוחות</p>
+          </div>
         ) : (
           <div className="space-y-2">
-            {mockJobs.map((job) => (
+            {openJobs.map((job: any) => (
               <div 
                 key={job.id}
                 className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-accent/30 transition-colors cursor-pointer"
+                onClick={() => navigate('/jobs')}
               >
                 <div className="flex items-center gap-3">
                   <div className="flex flex-col">
-                    <span className="text-sm font-medium text-foreground">{job.product}</span>
-                    <span className="text-xs text-muted-foreground">{job.supplier} · {formatNumber(job.quantity)} יח'</span>
+                    <span className="text-sm font-medium text-foreground">{job.productName}</span>
+                    <span className="text-xs text-muted-foreground">{job.supplierName} · {formatNumber(job.quantity)} יח'</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <Badge variant="outline" className={`text-[11px] font-normal ${getStatusStyle(job.status)}`}>
-                    {job.status}
+                    {getStatusLabel(job.status)}
                   </Badge>
-                  <span className="text-xs text-muted-foreground">עד {job.dueDate}</span>
+                  {job.expectedDeliveryDate && (
+                    <span className="text-xs text-muted-foreground">עד {formatDate(job.expectedDeliveryDate)}</span>
+                  )}
                 </div>
               </div>
             ))}

@@ -114,6 +114,9 @@ import {
   deleteStaffUser,
   getUserById,
   DEFAULT_PERMISSIONS,
+  getActiveJobs,
+  getJobsReadyForPickup,
+  updateJobStatus,
 } from "./db";
 
 export const appRouter = router({
@@ -296,6 +299,16 @@ export const appRouter = router({
 
     pendingApprovals: protectedProcedure.query(async () => {
       return await getPendingApprovals(5);
+    }),
+
+    // Active jobs for Jobs page
+    activeJobs: protectedProcedure.query(async () => {
+      return await getActiveJobs();
+    }),
+
+    // Jobs ready for courier pickup
+    readyForPickup: protectedProcedure.query(async () => {
+      return await getJobsReadyForPickup();
     }),
   }),
 
@@ -1380,6 +1393,29 @@ export const appRouter = router({
       .input(z.object({ role: z.string() }))
       .query(async ({ ctx, input }) => {
         return DEFAULT_PERMISSIONS[input.role as keyof typeof DEFAULT_PERMISSIONS] || {};
+      }),
+  }),
+
+  // ==================== JOBS API ====================
+  jobs: router({
+    // Get all active jobs
+    list: protectedProcedure.query(async () => {
+      return await getActiveJobs();
+    }),
+
+    // Get jobs ready for pickup
+    readyForPickup: protectedProcedure.query(async () => {
+      return await getJobsReadyForPickup();
+    }),
+
+    // Update job status
+    updateStatus: protectedProcedure
+      .input(z.object({
+        jobId: z.number(),
+        status: z.enum(['in_production', 'ready', 'picked_up', 'delivered']),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        return await updateJobStatus(input.jobId, input.status, ctx.user?.id);
       }),
   }),
 });
