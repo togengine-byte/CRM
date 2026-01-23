@@ -339,6 +339,7 @@ export const appRouter = router({
     list: protectedProcedure
       .input(z.object({
         category: z.string().optional(),
+        categoryId: z.number().optional(),
         isActive: z.boolean().optional(),
         limit: z.number().optional(),
       }).optional())
@@ -357,11 +358,20 @@ export const appRouter = router({
         return await getProductCategories();
       }),
 
+    getCategories: protectedProcedure
+      .query(async () => {
+        const db = await getDb();
+        return await db.query.categories.findMany({
+          orderBy: (categories, { asc }) => [asc(categories.displayOrder)],
+        });
+      }),
+
     create: protectedProcedure
       .input(z.object({
         name: z.string().min(1, "שם המוצר נדרש"),
         description: z.string().optional(),
         category: z.string().optional(),
+        categoryId: z.number().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         if (!ctx.user) throw new Error("Not authenticated");
@@ -377,6 +387,7 @@ export const appRouter = router({
         name: z.string().optional(),
         description: z.string().optional(),
         category: z.string().optional(),
+        categoryId: z.number().optional(),
         isActive: z.boolean().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
@@ -402,6 +413,8 @@ export const appRouter = router({
         baseProductId: z.number(),
         sku: z.string().min(1, "מק\"ט נדרש"),
         name: z.string().min(1, "שם הוריאנט נדרש"),
+        price: z.number().optional(),
+        pricingType: z.string().optional(),
         attributes: z.record(z.string(), z.unknown()).optional(),
         validationProfileId: z.number().optional(),
       }))
@@ -414,6 +427,8 @@ export const appRouter = router({
           baseProductId: input.baseProductId,
           sku: input.sku,
           name: input.name,
+          price: input.price,
+          pricingType: input.pricingType,
           attributes: input.attributes as Record<string, unknown> | undefined,
           validationProfileId: input.validationProfileId,
         });
@@ -424,6 +439,8 @@ export const appRouter = router({
         id: z.number(),
         sku: z.string().optional(),
         name: z.string().optional(),
+        price: z.number().optional(),
+        pricingType: z.string().optional(),
         attributes: z.record(z.string(), z.unknown()).optional(),
         validationProfileId: z.number().optional(),
         isActive: z.boolean().optional(),
@@ -437,6 +454,8 @@ export const appRouter = router({
           id: input.id,
           sku: input.sku,
           name: input.name,
+          price: input.price,
+          pricingType: input.pricingType,
           attributes: input.attributes as Record<string, unknown> | undefined,
           validationProfileId: input.validationProfileId,
           isActive: input.isActive,

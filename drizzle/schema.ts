@@ -29,6 +29,18 @@ export const users = pgTable("users", {
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
 });
 
+// Categories table
+export const categories = pgTable("categories", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  icon: varchar("icon", { length: 50 }),
+  displayOrder: integer("displayOrder").default(0),
+  isActive: boolean("isActive").default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
 // Base products table
 export const baseProducts = pgTable("base_products", {
   id: serial("id").primaryKey(),
@@ -36,6 +48,7 @@ export const baseProducts = pgTable("base_products", {
   description: text("description"),
   productNumber: integer("productNumber"), // Auto-generated product number starting at 1001
   category: varchar("category", { length: 100 }),
+  categoryId: integer("categoryId"), // Reference to categories table
   isActive: boolean("isActive").default(true),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
@@ -47,6 +60,8 @@ export const productVariants = pgTable("product_variants", {
   baseProductId: integer("baseProductId").notNull(),
   sku: varchar("sku", { length: 100 }).notNull().unique(),
   name: varchar("name", { length: 255 }).notNull(),
+  price: decimal("price", { precision: 10, scale: 2 }),
+  pricingType: varchar("pricingType", { length: 20 }).default("fixed"), // 'fixed' or 'per_sqm'
   attributes: jsonb("attributes"),
   validationProfileId: integer("validationProfileId"),
   isActive: boolean("isActive").default(true),

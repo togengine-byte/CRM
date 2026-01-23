@@ -769,6 +769,8 @@ export interface CreateVariantInput {
   baseProductId: number;
   sku: string;
   name: string;
+  price?: number;
+  pricingType?: string;
   attributes?: Record<string, unknown>;
   validationProfileId?: number;
 }
@@ -777,6 +779,8 @@ export interface UpdateVariantInput {
   id: number;
   sku?: string;
   name?: string;
+  price?: number;
+  pricingType?: string;
   attributes?: Record<string, unknown>;
   validationProfileId?: number;
   isActive?: boolean;
@@ -784,6 +788,7 @@ export interface UpdateVariantInput {
 
 export async function getProducts(filters?: {
   category?: string;
+  categoryId?: number;
   isActive?: boolean;
   limit?: number;
 }) {
@@ -795,17 +800,21 @@ export async function getProducts(filters?: {
     name: baseProducts.name,
     description: baseProducts.description,
     category: baseProducts.category,
+    categoryId: baseProducts.categoryId,
     isActive: baseProducts.isActive,
     createdAt: baseProducts.createdAt,
     updatedAt: baseProducts.updatedAt,
   })
   .from(baseProducts)
-  .orderBy(desc(baseProducts.createdAt))
-  .limit(filters?.limit || 100);
+  .orderBy(baseProducts.categoryId, baseProducts.name)
+  .limit(filters?.limit || 200);
 
   let filtered = products;
   if (filters?.category) {
     filtered = filtered.filter(p => p.category === filters.category);
+  }
+  if (filters?.categoryId) {
+    filtered = filtered.filter(p => p.categoryId === filters.categoryId);
   }
   if (filters?.isActive !== undefined) {
     filtered = filtered.filter(p => p.isActive === filters.isActive);
@@ -818,6 +827,8 @@ export async function getProducts(filters?: {
         id: productVariants.id,
         sku: productVariants.sku,
         name: productVariants.name,
+        price: productVariants.price,
+        pricingType: productVariants.pricingType,
         attributes: productVariants.attributes,
         validationProfileId: productVariants.validationProfileId,
         isActive: productVariants.isActive,
@@ -946,6 +957,8 @@ export async function createVariant(input: CreateVariantInput) {
     baseProductId: input.baseProductId,
     sku: input.sku,
     name: input.name,
+    price: input.price?.toString() || null,
+    pricingType: input.pricingType || 'fixed',
     attributes: input.attributes || null,
     validationProfileId: input.validationProfileId || null,
     isActive: true,
@@ -983,6 +996,8 @@ export async function updateVariant(input: UpdateVariantInput) {
     updateData.sku = input.sku;
   }
   if (input.name !== undefined) updateData.name = input.name;
+  if (input.price !== undefined) updateData.price = input.price.toString();
+  if (input.pricingType !== undefined) updateData.pricingType = input.pricingType;
   if (input.attributes !== undefined) updateData.attributes = input.attributes;
   if (input.validationProfileId !== undefined) updateData.validationProfileId = input.validationProfileId;
   if (input.isActive !== undefined) updateData.isActive = input.isActive;

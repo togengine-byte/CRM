@@ -23,17 +23,18 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 import { toast } from "sonner";
 import { 
   Package, 
@@ -43,51 +44,103 @@ import {
   Trash2, 
   Layers,
   Search,
-  Filter,
-  RefreshCw
+  RefreshCw,
+  ChevronDown,
+  ChevronUp,
+  Printer,
+  Maximize,
+  SignpostBig,
+  Shirt,
+  Flame,
+  Ruler
 } from "lucide-react";
+
+// Icon mapping for categories
+const categoryIcons: Record<string, any> = {
+  'Printer': Printer,
+  'Maximize': Maximize,
+  'SignpostBig': SignpostBig,
+  'Shirt': Shirt,
+  'Flame': Flame,
+};
+
+interface Category {
+  id: number;
+  name: string;
+  description: string | null;
+  icon: string | null;
+  displayOrder: number;
+}
+
+interface ProductVariant {
+  id: number;
+  sku: string;
+  name: string;
+  price: number | null;
+  pricingType: string | null;
+  attributes: unknown;
+  isActive: boolean;
+}
+
+interface Product {
+  id: number;
+  name: string;
+  description: string | null;
+  category: string | null;
+  categoryId: number | null;
+  isActive: boolean;
+  variantCount: number;
+  variants: ProductVariant[];
+}
 
 interface ProductFormData {
   name: string;
   description: string;
-  category: string;
+  categoryId: number | null;
 }
 
 interface VariantFormData {
   sku: string;
   name: string;
-  attributes: string;
+  price: string;
+  pricingType: string;
 }
 
 export default function Products() {
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [expandedProducts, setExpandedProducts] = useState<Set<number>>(new Set());
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
   const [isVariantDialogOpen, setIsVariantDialogOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
   const [selectedVariantId, setSelectedVariantId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
 
   const [productForm, setProductForm] = useState<ProductFormData>({
     name: "",
     description: "",
-    category: "",
+    categoryId: null,
   });
 
   const [variantForm, setVariantForm] = useState<VariantFormData>({
     sku: "",
     name: "",
-    attributes: "",
+    price: "",
+    pricingType: "fixed",
   });
 
   const utils = trpc.useUtils();
 
+  // Fetch categories
+  const { data: categoriesData } = trpc.products.getCategories.useQuery();
+  const categories = categoriesData || [];
+
+  // Fetch products
   const { data: products, isLoading, refetch } = trpc.products.list.useQuery({
-    category: categoryFilter || undefined,
+    categoryId: selectedCategoryId || undefined,
   });
 
-  const { data: categories } = trpc.products.categories.useQuery();
-
+  // Mutations
   const createProductMutation = trpc.products.create.useMutation({
     onSuccess: () => {
       toast.success("המוצר נוצר בהצלחה");
@@ -95,9 +148,7 @@ export default function Products() {
       setIsProductDialogOpen(false);
       resetProductForm();
     },
-    onError: (error) => {
-      toast.error(`שגיאה ביצירת המוצר: ${error.message}`);
-    },
+    onError: (error) => toast.error(`שגיאה ביצירת המוצר: ${error.message}`),
   });
 
   const updateProductMutation = trpc.products.update.useMutation({
@@ -107,9 +158,7 @@ export default function Products() {
       setIsProductDialogOpen(false);
       resetProductForm();
     },
-    onError: (error) => {
-      toast.error(`שגיאה בעדכון המוצר: ${error.message}`);
-    },
+    onError: (error) => toast.error(`שגיאה בעדכון המוצר: ${error.message}`),
   });
 
   const deleteProductMutation = trpc.products.delete.useMutation({
@@ -117,9 +166,7 @@ export default function Products() {
       toast.success("המוצר נמחק בהצלחה");
       refetch();
     },
-    onError: (error) => {
-      toast.error(`שגיאה במחיקת המוצר: ${error.message}`);
-    },
+    onError: (error) => toast.error(`שגיאה במחיקת המוצר: ${error.message}`),
   });
 
   const createVariantMutation = trpc.products.createVariant.useMutation({
@@ -129,9 +176,7 @@ export default function Products() {
       setIsVariantDialogOpen(false);
       resetVariantForm();
     },
-    onError: (error) => {
-      toast.error(`שגיאה ביצירת הוריאנט: ${error.message}`);
-    },
+    onError: (error) => toast.error(`שגיאה ביצירת הוריאנט: ${error.message}`),
   });
 
   const updateVariantMutation = trpc.products.updateVariant.useMutation({
@@ -141,9 +186,7 @@ export default function Products() {
       setIsVariantDialogOpen(false);
       resetVariantForm();
     },
-    onError: (error) => {
-      toast.error(`שגיאה בעדכון הוריאנט: ${error.message}`);
-    },
+    onError: (error) => toast.error(`שגיאה בעדכון הוריאנט: ${error.message}`),
   });
 
   const deleteVariantMutation = trpc.products.deleteVariant.useMutation({
@@ -151,19 +194,18 @@ export default function Products() {
       toast.success("הוריאנט נמחק בהצלחה");
       refetch();
     },
-    onError: (error) => {
-      toast.error(`שגיאה במחיקת הוריאנט: ${error.message}`);
-    },
+    onError: (error) => toast.error(`שגיאה במחיקת הוריאנט: ${error.message}`),
   });
 
+  // Form handlers
   const resetProductForm = () => {
-    setProductForm({ name: "", description: "", category: "" });
+    setProductForm({ name: "", description: "", categoryId: selectedCategoryId });
     setIsEditMode(false);
     setSelectedProductId(null);
   };
 
   const resetVariantForm = () => {
-    setVariantForm({ sku: "", name: "", attributes: "" });
+    setVariantForm({ sku: "", name: "", price: "", pricingType: "fixed" });
     setIsEditMode(false);
     setSelectedVariantId(null);
     setSelectedProductId(null);
@@ -171,15 +213,16 @@ export default function Products() {
 
   const handleCreateProduct = () => {
     resetProductForm();
+    setProductForm(prev => ({ ...prev, categoryId: selectedCategoryId }));
     setIsEditMode(false);
     setIsProductDialogOpen(true);
   };
 
-  const handleEditProduct = (product: NonNullable<typeof products>[0]) => {
+  const handleEditProduct = (product: Product) => {
     setProductForm({
       name: product.name,
       description: product.description || "",
-      category: product.category || "",
+      categoryId: product.categoryId,
     });
     setSelectedProductId(product.id);
     setIsEditMode(true);
@@ -199,11 +242,12 @@ export default function Products() {
     setIsVariantDialogOpen(true);
   };
 
-  const handleEditVariant = (productId: number, variant: { id: number; sku: string; name: string; attributes: unknown }) => {
+  const handleEditVariant = (productId: number, variant: ProductVariant) => {
     setVariantForm({
       sku: variant.sku,
       name: variant.name,
-      attributes: variant.attributes ? JSON.stringify(variant.attributes, null, 2) : "",
+      price: variant.price?.toString() || "",
+      pricingType: variant.pricingType || "fixed",
     });
     setSelectedProductId(productId);
     setSelectedVariantId(variant.id);
@@ -228,13 +272,13 @@ export default function Products() {
         id: selectedProductId,
         name: productForm.name,
         description: productForm.description || undefined,
-        category: productForm.category || undefined,
+        categoryId: productForm.categoryId || undefined,
       });
     } else {
       createProductMutation.mutate({
         name: productForm.name,
         description: productForm.description || undefined,
-        category: productForm.category || undefined,
+        categoryId: productForm.categoryId || undefined,
       });
     }
   };
@@ -245,39 +289,43 @@ export default function Products() {
       return;
     }
 
-    let attributes: Record<string, unknown> | undefined;
-    if (variantForm.attributes.trim()) {
-      try {
-        attributes = JSON.parse(variantForm.attributes);
-      } catch {
-        toast.error("פורמט JSON לא תקין עבור מאפיינים");
-        return;
-      }
-    }
+    const price = variantForm.price ? parseFloat(variantForm.price) : undefined;
 
     if (isEditMode && selectedVariantId) {
       updateVariantMutation.mutate({
         id: selectedVariantId,
         sku: variantForm.sku,
         name: variantForm.name,
-        attributes,
+        price,
+        pricingType: variantForm.pricingType,
       });
     } else if (selectedProductId) {
       createVariantMutation.mutate({
         baseProductId: selectedProductId,
         sku: variantForm.sku,
         name: variantForm.name,
-        attributes,
+        price,
+        pricingType: variantForm.pricingType,
       });
     }
   };
 
-  const filteredProducts = products?.filter((product) => {
+  const toggleProductExpand = (productId: number) => {
+    const newExpanded = new Set(expandedProducts);
+    if (newExpanded.has(productId)) {
+      newExpanded.delete(productId);
+    } else {
+      newExpanded.add(productId);
+    }
+    setExpandedProducts(newExpanded);
+  };
+
+  // Filter products by search
+  const filteredProducts = products?.filter((product: Product) => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
     return (
       product.name.toLowerCase().includes(query) ||
-      product.category?.toLowerCase().includes(query) ||
       product.variants.some(
         (v) =>
           v.name.toLowerCase().includes(query) ||
@@ -286,13 +334,16 @@ export default function Products() {
     );
   });
 
+  // Get current category
+  const currentCategory = categories.find((c: Category) => c.id === selectedCategoryId);
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">מוצרים</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-xl font-semibold text-slate-900">מוצרים</h1>
+          <p className="text-sm text-slate-500 mt-0.5">
             ניהול קטלוג המוצרים והוריאנטים
           </p>
         </div>
@@ -302,72 +353,96 @@ export default function Products() {
         </Button>
       </div>
 
-      {/* Filters */}
-      <Card className="border-0 shadow-sm">
-        <CardContent className="pt-4 pb-4">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-            <div className="relative flex-1">
-              <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="חיפוש מוצרים, וריאנטים או מק״ט..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pr-10"
-              />
-            </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="gap-2">
-                  <Filter className="h-4 w-4" />
-                  {categoryFilter || "כל הקטגוריות"}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setCategoryFilter(null)}>
-                  כל הקטגוריות
-                </DropdownMenuItem>
-                {categories?.map((category) => (
-                  <DropdownMenuItem
-                    key={category}
-                    onClick={() => setCategoryFilter(category)}
-                  >
-                    {category}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Button variant="outline" size="icon" onClick={() => refetch()}>
-              <RefreshCw className="h-4 w-4" />
+      {/* Category Tabs */}
+      <div className="flex gap-2 overflow-x-auto pb-2">
+        <Button
+          variant={selectedCategoryId === null ? "default" : "outline"}
+          size="sm"
+          onClick={() => setSelectedCategoryId(null)}
+          className="shrink-0"
+        >
+          הכל
+          <Badge variant="secondary" className="mr-2 bg-white/20">
+            {products?.length || 0}
+          </Badge>
+        </Button>
+        {categories.map((category: Category) => {
+          const IconComponent = categoryIcons[category.icon || ''] || Package;
+          const categoryProducts = products?.filter((p: Product) => p.categoryId === category.id) || [];
+          return (
+            <Button
+              key={category.id}
+              variant={selectedCategoryId === category.id ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSelectedCategoryId(category.id)}
+              className="shrink-0 gap-2"
+            >
+              <IconComponent className="h-4 w-4" />
+              {category.name}
+              <Badge variant="secondary" className={selectedCategoryId === category.id ? "bg-white/20" : ""}>
+                {categoryProducts.length}
+              </Badge>
             </Button>
+          );
+        })}
+      </div>
+
+      {/* Search */}
+      <Card className="border-0 shadow-sm bg-white">
+        <CardContent className="py-4">
+          <div className="relative">
+            <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Input
+              placeholder="חיפוש מוצרים, וריאנטים או מק״ט..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pr-10 border-slate-200"
+            />
           </div>
         </CardContent>
       </Card>
 
       {/* Products List */}
-      <Card className="border-0 shadow-sm">
-        <CardHeader className="pb-4">
+      <Card className="border-0 shadow-sm bg-white">
+        <CardHeader className="pb-2 pt-5 px-5">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-base font-medium flex items-center gap-2 text-foreground">
-              <Package className="h-4 w-4 text-muted-foreground" />
-              קטלוג מוצרים
-            </CardTitle>
-            {filteredProducts && filteredProducts.length > 0 && (
-              <Badge variant="outline" className="text-[11px] font-normal">
-                {filteredProducts.length}
-              </Badge>
-            )}
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-lg bg-slate-100 flex items-center justify-center">
+                <Package className="h-4 w-4 text-slate-600" />
+              </div>
+              <div>
+                <CardTitle className="text-sm font-semibold text-slate-900">
+                  {currentCategory ? currentCategory.name : 'כל המוצרים'}
+                </CardTitle>
+                <p className="text-xs text-slate-500">
+                  {currentCategory?.description || 'קטלוג מוצרים מלא'}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {filteredProducts && filteredProducts.length > 0 && (
+                <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100 border-0">
+                  {filteredProducts.length} מוצרים
+                </Badge>
+              )}
+              <Button variant="ghost" size="icon" onClick={() => refetch()}>
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-5 pb-5">
           {isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+            <div className="flex items-center justify-center py-12">
+              <RefreshCw className="h-6 w-6 animate-spin text-slate-400" />
             </div>
           ) : filteredProducts?.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <Package className="h-12 w-12 text-muted-foreground/50 mb-4" />
-              <h3 className="text-lg font-medium">אין מוצרים</h3>
-              <p className="text-muted-foreground mt-1">
+              <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center mb-3">
+                <Package className="h-6 w-6 text-slate-400" />
+              </div>
+              <h3 className="text-sm font-medium text-slate-900">אין מוצרים</h3>
+              <p className="text-sm text-slate-500 mt-1">
                 התחל על ידי יצירת מוצר חדש
               </p>
               <Button onClick={handleCreateProduct} className="mt-4 gap-2">
@@ -376,82 +451,79 @@ export default function Products() {
               </Button>
             </div>
           ) : (
-            <Accordion type="multiple" className="space-y-2">
-              {filteredProducts?.map((product) => (
-                <AccordionItem
+            <div className="space-y-3 pt-2">
+              {filteredProducts?.map((product: Product) => (
+                <div
                   key={product.id}
-                  value={`product-${product.id}`}
-                  className="border rounded-lg px-4"
+                  className="border border-slate-200 rounded-lg overflow-hidden"
                 >
-                  <div className="flex items-center py-4">
-                    <AccordionTrigger className="hover:no-underline flex-1">
-                      <div className="flex items-center gap-4 flex-1 text-right">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{product.name}</span>
-                            {product.category && (
-                              <Badge variant="outline">{product.category}</Badge>
-                            )}
-                            {!product.isActive && (
-                              <Badge variant="destructive">לא פעיל</Badge>
-                            )}
-                          </div>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            {product.description || "ללא תיאור"}
-                          </p>
-                        </div>
-                        <Badge variant="secondary" className="gap-1">
-                          <Layers className="h-3 w-3" />
-                          {product.variantCount} וריאנטים
-                        </Badge>
+                  {/* Product Header */}
+                  <div 
+                    className="flex items-center justify-between p-4 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors"
+                    onClick={() => toggleProductExpand(product.id)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-lg bg-white border border-slate-200 flex items-center justify-center">
+                        <Package className="h-5 w-5 text-slate-600" />
                       </div>
-                    </AccordionTrigger>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEditProduct(product);
-                          }}
-                        >
-                          <Pencil className="ml-2 h-4 w-4" />
-                          עריכה
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleCreateVariant(product.id);
-                          }}
-                        >
-                          <Plus className="ml-2 h-4 w-4" />
-                          הוסף וריאנט
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteProduct(product.id);
-                          }}
-                          className="text-red-600"
-                        >
-                          <Trash2 className="ml-2 h-4 w-4" />
-                          מחיקה
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-slate-900">{product.name}</span>
+                          {!product.isActive && (
+                            <Badge variant="destructive" className="text-[10px]">לא פעיל</Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-slate-500">
+                          {product.description || "ללא תיאור"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Badge variant="outline" className="gap-1 bg-white">
+                        <Layers className="h-3 w-3" />
+                        {product.variantCount} וריאנטים
+                      </Badge>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEditProduct(product); }}>
+                            <Pencil className="ml-2 h-4 w-4" />
+                            עריכה
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleCreateVariant(product.id); }}>
+                            <Plus className="ml-2 h-4 w-4" />
+                            הוסף וריאנט
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={(e) => { e.stopPropagation(); handleDeleteProduct(product.id); }}
+                            className="text-red-600"
+                          >
+                            <Trash2 className="ml-2 h-4 w-4" />
+                            מחיקה
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                      {expandedProducts.has(product.id) ? (
+                        <ChevronUp className="h-5 w-5 text-slate-400" />
+                      ) : (
+                        <ChevronDown className="h-5 w-5 text-slate-400" />
+                      )}
+                    </div>
                   </div>
-                  <AccordionContent>
-                    <div className="pt-2 pb-4">
+
+                  {/* Variants Table */}
+                  {expandedProducts.has(product.id) && (
+                    <div className="p-4 border-t border-slate-200">
                       {product.variants.length === 0 ? (
-                        <div className="text-center py-4 text-muted-foreground">
+                        <div className="text-center py-6 text-slate-500">
                           <p>אין וריאנטים למוצר זה</p>
                           <Button
                             variant="outline"
@@ -466,31 +538,42 @@ export default function Products() {
                       ) : (
                         <Table>
                           <TableHeader>
-                            <TableRow>
-                              <TableHead className="text-right">מק״ט</TableHead>
-                              <TableHead className="text-right">שם</TableHead>
-                              <TableHead className="text-right">מאפיינים</TableHead>
-                              <TableHead className="text-right">סטטוס</TableHead>
-                              <TableHead className="text-left w-[100px]">פעולות</TableHead>
+                            <TableRow className="hover:bg-transparent">
+                              <TableHead className="text-right text-slate-600">מק״ט</TableHead>
+                              <TableHead className="text-right text-slate-600">שם</TableHead>
+                              <TableHead className="text-right text-slate-600">מחיר</TableHead>
+                              <TableHead className="text-right text-slate-600">תמחור</TableHead>
+                              <TableHead className="text-right text-slate-600">סטטוס</TableHead>
+                              <TableHead className="text-left w-[80px]"></TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {product.variants.map((variant) => (
-                              <TableRow key={variant.id}>
-                                <TableCell className="font-mono text-sm">
+                              <TableRow key={variant.id} className="hover:bg-slate-50">
+                                <TableCell className="font-mono text-sm text-slate-600">
                                   {variant.sku}
                                 </TableCell>
-                                <TableCell>{variant.name}</TableCell>
-                                <TableCell className="text-muted-foreground text-sm">
-                                  {variant.attributes
-                                    ? Object.entries(variant.attributes as Record<string, unknown>)
-                                        .map(([k, v]) => `${k}: ${v}`)
-                                        .join(", ")
-                                    : "-"}
+                                <TableCell className="font-medium text-slate-900">
+                                  {variant.name}
+                                </TableCell>
+                                <TableCell className="text-slate-900">
+                                  {variant.price ? `₪${variant.price}` : '-'}
+                                </TableCell>
+                                <TableCell>
+                                  {variant.pricingType === 'per_sqm' ? (
+                                    <Badge variant="outline" className="gap-1 bg-blue-50 text-blue-700 border-blue-200">
+                                      <Ruler className="h-3 w-3" />
+                                      למ"ר
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="outline" className="bg-slate-50 text-slate-600 border-slate-200">
+                                      קבוע
+                                    </Badge>
+                                  )}
                                 </TableCell>
                                 <TableCell>
                                   {variant.isActive ? (
-                                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                    <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
                                       פעיל
                                     </Badge>
                                   ) : (
@@ -505,19 +588,13 @@ export default function Products() {
                                       </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
-                                      <DropdownMenuItem
-                                        onClick={() =>
-                                          handleEditVariant(product.id, variant)
-                                        }
-                                      >
+                                      <DropdownMenuItem onClick={() => handleEditVariant(product.id, variant)}>
                                         <Pencil className="ml-2 h-4 w-4" />
                                         עריכה
                                       </DropdownMenuItem>
                                       <DropdownMenuItem
-                                        onClick={() =>
-                                          handleDeleteVariant(variant.id)
-                                        }
-                                        className="text-destructive focus:text-destructive"
+                                        onClick={() => handleDeleteVariant(variant.id)}
+                                        className="text-red-600"
                                       >
                                         <Trash2 className="ml-2 h-4 w-4" />
                                         מחיקה
@@ -530,26 +607,33 @@ export default function Products() {
                           </TableBody>
                         </Table>
                       )}
+                      <div className="mt-3 pt-3 border-t border-slate-100">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-2"
+                          onClick={() => handleCreateVariant(product.id)}
+                        >
+                          <Plus className="h-4 w-4" />
+                          הוסף וריאנט
+                        </Button>
+                      </div>
                     </div>
-                  </AccordionContent>
-                </AccordionItem>
+                  )}
+                </div>
               ))}
-            </Accordion>
+            </div>
           )}
         </CardContent>
       </Card>
 
       {/* Product Dialog */}
       <Dialog open={isProductDialogOpen} onOpenChange={setIsProductDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[425px]" dir="rtl">
           <DialogHeader>
-            <DialogTitle>
-              {isEditMode ? "עריכת מוצר" : "מוצר חדש"}
-            </DialogTitle>
+            <DialogTitle>{isEditMode ? "עריכת מוצר" : "מוצר חדש"}</DialogTitle>
             <DialogDescription>
-              {isEditMode
-                ? "עדכן את פרטי המוצר"
-                : "הזן את פרטי המוצר החדש"}
+              {isEditMode ? "עדכן את פרטי המוצר" : "הזן את פרטי המוצר החדש"}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -558,54 +642,50 @@ export default function Products() {
               <Input
                 id="name"
                 value={productForm.name}
-                onChange={(e) =>
-                  setProductForm({ ...productForm, name: e.target.value })
-                }
+                onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
                 placeholder="לדוגמה: כרטיסי ביקור"
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="category">קטגוריה</Label>
-              <Input
-                id="category"
-                value={productForm.category}
-                onChange={(e) =>
-                  setProductForm({ ...productForm, category: e.target.value })
-                }
-                placeholder="לדוגמה: דפוס דיגיטלי"
-              />
+              <Label htmlFor="category">תחום</Label>
+              <Select
+                value={productForm.categoryId?.toString() || ""}
+                onValueChange={(value) => setProductForm({ ...productForm, categoryId: value ? parseInt(value) : null })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="בחר תחום" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((category: Category) => (
+                    <SelectItem key={category.id} value={category.id.toString()}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="description">תיאור</Label>
               <Textarea
                 id="description"
                 value={productForm.description}
-                onChange={(e) =>
-                  setProductForm({ ...productForm, description: e.target.value })
-                }
+                onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
                 placeholder="תיאור קצר של המוצר..."
                 rows={3}
               />
             </div>
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsProductDialogOpen(false)}
-            >
+            <Button variant="outline" onClick={() => setIsProductDialogOpen(false)}>
               ביטול
             </Button>
             <Button
               onClick={handleProductSubmit}
-              disabled={
-                createProductMutation.isPending || updateProductMutation.isPending
-              }
+              disabled={createProductMutation.isPending || updateProductMutation.isPending}
             >
               {createProductMutation.isPending || updateProductMutation.isPending
                 ? "שומר..."
-                : isEditMode
-                ? "עדכון"
-                : "יצירה"}
+                : isEditMode ? "עדכון" : "יצירה"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -613,15 +693,11 @@ export default function Products() {
 
       {/* Variant Dialog */}
       <Dialog open={isVariantDialogOpen} onOpenChange={setIsVariantDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[425px]" dir="rtl">
           <DialogHeader>
-            <DialogTitle>
-              {isEditMode ? "עריכת וריאנט" : "וריאנט חדש"}
-            </DialogTitle>
+            <DialogTitle>{isEditMode ? "עריכת וריאנט" : "וריאנט חדש"}</DialogTitle>
             <DialogDescription>
-              {isEditMode
-                ? "עדכן את פרטי הוריאנט"
-                : "הזן את פרטי הוריאנט החדש"}
+              {isEditMode ? "עדכן את פרטי הוריאנט" : "הזן את פרטי הוריאנט החדש"}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -630,9 +706,7 @@ export default function Products() {
               <Input
                 id="sku"
                 value={variantForm.sku}
-                onChange={(e) =>
-                  setVariantForm({ ...variantForm, sku: e.target.value })
-                }
+                onChange={(e) => setVariantForm({ ...variantForm, sku: e.target.value })}
                 placeholder="לדוגמה: BC-001-A4"
                 className="font-mono"
               />
@@ -642,47 +716,47 @@ export default function Products() {
               <Input
                 id="variantName"
                 value={variantForm.name}
-                onChange={(e) =>
-                  setVariantForm({ ...variantForm, name: e.target.value })
-                }
+                onChange={(e) => setVariantForm({ ...variantForm, name: e.target.value })}
                 placeholder="לדוגמה: A4 מבריק 300 גרם"
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="attributes">מאפיינים (JSON)</Label>
-              <Textarea
-                id="attributes"
-                value={variantForm.attributes}
-                onChange={(e) =>
-                  setVariantForm({ ...variantForm, attributes: e.target.value })
-                }
-                placeholder='{"size": "A4", "weight": "300gsm"}'
-                rows={4}
-                className="font-mono text-sm"
+              <Label htmlFor="price">מחיר (₪)</Label>
+              <Input
+                id="price"
+                type="number"
+                value={variantForm.price}
+                onChange={(e) => setVariantForm({ ...variantForm, price: e.target.value })}
+                placeholder="0.00"
               />
-              <p className="text-xs text-muted-foreground">
-                פורמט JSON לדוגמה: {`{"מידה": "A4", "משקל": "300 גרם"}`}
-              </p>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="pricingType">סוג תמחור</Label>
+              <Select
+                value={variantForm.pricingType}
+                onValueChange={(value) => setVariantForm({ ...variantForm, pricingType: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="fixed">מחיר קבוע</SelectItem>
+                  <SelectItem value="per_sqm">מחיר למטר רבוע</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsVariantDialogOpen(false)}
-            >
+            <Button variant="outline" onClick={() => setIsVariantDialogOpen(false)}>
               ביטול
             </Button>
             <Button
               onClick={handleVariantSubmit}
-              disabled={
-                createVariantMutation.isPending || updateVariantMutation.isPending
-              }
+              disabled={createVariantMutation.isPending || updateVariantMutation.isPending}
             >
               {createVariantMutation.isPending || updateVariantMutation.isPending
                 ? "שומר..."
-                : isEditMode
-                ? "עדכון"
-                : "יצירה"}
+                : isEditMode ? "עדכון" : "יצירה"}
             </Button>
           </DialogFooter>
         </DialogContent>
