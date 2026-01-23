@@ -65,6 +65,98 @@ import {
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { useAuthContext } from "@/contexts/AuthContext";
+import { Loader2 } from "lucide-react";
+
+// ==================== DEVELOPER LOGS SETTINGS ====================
+function DeveloperLogsSettings() {
+  const [isClearing, setIsClearing] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  const handleClearLogs = async () => {
+    setIsClearing(true);
+    try {
+      const response = await fetch('/api/admin/clear-logs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmDelete: true }),
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        toast.success('כל הלוגים נמחקו בהצלחה');
+        setShowConfirm(false);
+      } else {
+        const data = await response.json();
+        toast.error(data.error || 'שגיאה בניקוי הלוגים');
+      }
+    } catch (error) {
+      toast.error('שגיאה בניקוי הלוגים');
+      console.error(error);
+    } finally {
+      setIsClearing(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Developer Logs</CardTitle>
+        <CardDescription>ניהול לוגים ופעולות במערכת</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <h3 className="font-semibold text-blue-900 mb-2">מידע</h3>
+          <p className="text-sm text-blue-800">
+            טבלת הלוגים שומרת את כל הפעולות והאירועים במערכת לצורכי דיבאגינג וניטור.
+          </p>
+        </div>
+
+        <div className="border-t pt-4">
+          <h3 className="font-semibold mb-4">ניקוי לוגים</h3>
+          <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
+            <DialogTrigger asChild>
+              <Button variant="destructive">
+                <Trash2 className="ml-2 h-4 w-4" />
+                נקה את כל הלוגים
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>אישור מחיקה</DialogTitle>
+                <DialogDescription>
+                  האם אתה בטוח שברצונך למחוק את כל הלוגים? פעולה זו לא ניתנת לביטול.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowConfirm(false)}
+                  disabled={isClearing}
+                >
+                  ביטול
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleClearLogs}
+                  disabled={isClearing}
+                >
+                  {isClearing ? (
+                    <>
+                      <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                      מוחק...
+                    </>
+                  ) : (
+                    <>מחק את כל הלוגים</>
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 // ==================== SUPPLIER WEIGHTS SETTINGS ====================
 function SupplierWeightsSettings() {
@@ -1273,18 +1365,7 @@ export default function Settings() {
         </TabsContent>
 
         <TabsContent value="developers">
-          <Card>
-            <CardHeader>
-              <CardTitle>Developer Logs</CardTitle>
-              <CardDescription>רישום פעולות ואירועים במערכת</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-12 text-gray-500">
-                <Key className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                <p>מסך Developer Logs יטוען בקרוב</p>
-              </div>
-            </CardContent>
-          </Card>
+          <DeveloperLogsSettings />
         </TabsContent>
       </Tabs>
     </div>
