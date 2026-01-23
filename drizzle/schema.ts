@@ -50,9 +50,49 @@ export const baseProducts = pgTable("base_products", {
   category: varchar("category", { length: 100 }),
   categoryId: integer("categoryId"), // Reference to categories table
   imageUrl: text("image_url"), // Product image URL
+  allowCustomQuantity: boolean("allow_custom_quantity").default(true), // Allow custom quantity input
   isActive: boolean("isActive").default(true),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+// Product sizes table
+export const productSizes = pgTable("product_sizes", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").notNull(),
+  name: varchar("name", { length: 100 }).notNull(),
+  dimensions: varchar("dimensions", { length: 50 }),
+  basePrice: decimal("base_price", { precision: 10, scale: 2 }).notNull().default("0"),
+  displayOrder: integer("display_order").default(0),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Product quantities table
+export const productQuantities = pgTable("product_quantities", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").notNull(),
+  quantity: integer("quantity").notNull(),
+  priceMultiplier: decimal("price_multiplier", { precision: 5, scale: 2 }).notNull().default("1.0"),
+  displayOrder: integer("display_order").default(0),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Product addons table
+export const productAddons = pgTable("product_addons", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id"),
+  categoryId: integer("category_id"),
+  name: varchar("name", { length: 100 }).notNull(),
+  description: text("description"),
+  priceType: varchar("price_type", { length: 20 }).notNull().default("fixed"), // fixed, percentage, per_unit
+  price: decimal("price", { precision: 10, scale: 2 }).notNull().default("0"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // Product variants table

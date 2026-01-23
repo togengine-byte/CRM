@@ -3104,3 +3104,337 @@ export async function updateJobStatus(jobId: number, status: string, userId?: nu
 
   return { success: true };
 }
+
+
+// ==================== PRODUCT SIZES, QUANTITIES, ADDONS ====================
+
+import { productSizes, productQuantities, productAddons } from '../drizzle/schema';
+
+// Get product with all details (sizes, quantities, addons)
+export async function getProductWithDetails(productId: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const [product] = await db.select()
+    .from(baseProducts)
+    .where(eq(baseProducts.id, productId))
+    .limit(1);
+
+  if (!product) return null;
+
+  const sizes = await db.select()
+    .from(productSizes)
+    .where(and(eq(productSizes.productId, productId), eq(productSizes.isActive, true)))
+    .orderBy(productSizes.displayOrder);
+
+  const quantities = await db.select()
+    .from(productQuantities)
+    .where(and(eq(productQuantities.productId, productId), eq(productQuantities.isActive, true)))
+    .orderBy(productQuantities.displayOrder);
+
+  const addons = await db.select()
+    .from(productAddons)
+    .where(and(
+      sql`(${productAddons.productId} = ${productId} OR ${productAddons.productId} IS NULL)`,
+      eq(productAddons.isActive, true)
+    ))
+    .orderBy(productAddons.name);
+
+  return {
+    ...product,
+    sizes,
+    quantities,
+    addons,
+  };
+}
+
+// Get all products with their sizes, quantities, and addons
+export async function getProductsWithDetails(categoryId?: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  let query = db.select()
+    .from(baseProducts)
+    .where(eq(baseProducts.isActive, true))
+    .orderBy(baseProducts.categoryId, baseProducts.name);
+
+  const products = categoryId 
+    ? await db.select().from(baseProducts).where(and(eq(baseProducts.isActive, true), eq(baseProducts.categoryId, categoryId))).orderBy(baseProducts.name)
+    : await db.select().from(baseProducts).where(eq(baseProducts.isActive, true)).orderBy(baseProducts.categoryId, baseProducts.name);
+
+  const productsWithDetails = await Promise.all(products.map(async (product) => {
+    const sizes = await db.select()
+      .from(productSizes)
+      .where(and(eq(productSizes.productId, product.id), eq(productSizes.isActive, true)))
+      .orderBy(productSizes.displayOrder);
+
+    const quantities = await db.select()
+      .from(productQuantities)
+      .where(and(eq(productQuantities.productId, product.id), eq(productQuantities.isActive, true)))
+      .orderBy(productQuantities.displayOrder);
+
+    const addons = await db.select()
+      .from(productAddons)
+      .where(and(
+        sql`(${productAddons.productId} = ${product.id} OR ${productAddons.categoryId} = ${product.categoryId} OR (${productAddons.productId} IS NULL AND ${productAddons.categoryId} IS NULL))`,
+        eq(productAddons.isActive, true)
+      ))
+      .orderBy(productAddons.name);
+
+    return {
+      ...product,
+      sizes,
+      quantities,
+      addons,
+    };
+  }));
+
+  return productsWithDetails;
+}
+
+// ===== SIZES =====
+export async function createProductSize(input: {
+  productId: number;
+  name: string;
+  dimensions?: string;
+  basePrice: number;
+  displayOrder?: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.insert(productSizes).values({
+    productId: input.productId,
+    name: input.name,
+    dimensions: input.dimensions || null,
+    basePrice: input.basePrice.toString(),
+    displayOrder: input.displayOrder || 0,
+    isActive: true,
+  });
+
+  return { success: true };
+}
+
+export async function updateProductSize(input: {
+  id: number;
+  name?: string;
+  dimensions?: string;
+  basePrice?: number;
+  displayOrder?: number;
+  isActive?: boolean;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const updateData: Record<string, unknown> = {};
+  if (input.name !== undefined) updateData.name = input.name;
+  if (input.dimensions !== undefined) updateData.dimensions = input.dimensions;
+  if (input.basePrice !== undefined) updateData.basePrice = input.basePrice.toString();
+  if (input.displayOrder !== undefined) updateData.displayOrder = input.displayOrder;
+  if (input.isActive !== undefined) updateData.isActive = input.isActive;
+
+  await db.update(productSizes)
+    .set(updateData)
+    .where(eq(productSizes.id, input.id));
+
+  return { success: true };
+}
+
+export async function deleteProductSize(sizeId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(productSizes)
+    .set({ isActive: false })
+    .where(eq(productSizes.id, sizeId));
+
+  return { success: true };
+}
+
+// ===== QUANTITIES =====
+export async function createProductQuantity(input: {
+  productId: number;
+  quantity: number;
+  priceMultiplier: number;
+  displayOrder?: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.insert(productQuantities).values({
+    productId: input.productId,
+    quantity: input.quantity,
+    priceMultiplier: input.priceMultiplier.toString(),
+    displayOrder: input.displayOrder || 0,
+    isActive: true,
+  });
+
+  return { success: true };
+}
+
+export async function updateProductQuantity(input: {
+  id: number;
+  quantity?: number;
+  priceMultiplier?: number;
+  displayOrder?: number;
+  isActive?: boolean;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const updateData: Record<string, unknown> = {};
+  if (input.quantity !== undefined) updateData.quantity = input.quantity;
+  if (input.priceMultiplier !== undefined) updateData.priceMultiplier = input.priceMultiplier.toString();
+  if (input.displayOrder !== undefined) updateData.displayOrder = input.displayOrder;
+  if (input.isActive !== undefined) updateData.isActive = input.isActive;
+
+  await db.update(productQuantities)
+    .set(updateData)
+    .where(eq(productQuantities.id, input.id));
+
+  return { success: true };
+}
+
+export async function deleteProductQuantity(quantityId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(productQuantities)
+    .set({ isActive: false })
+    .where(eq(productQuantities.id, quantityId));
+
+  return { success: true };
+}
+
+// ===== ADDONS =====
+export async function createProductAddon(input: {
+  productId?: number;
+  categoryId?: number;
+  name: string;
+  description?: string;
+  priceType: 'fixed' | 'percentage' | 'per_unit';
+  price: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.insert(productAddons).values({
+    productId: input.productId || null,
+    categoryId: input.categoryId || null,
+    name: input.name,
+    description: input.description || null,
+    priceType: input.priceType,
+    price: input.price.toString(),
+    isActive: true,
+  });
+
+  return { success: true };
+}
+
+export async function updateProductAddon(input: {
+  id: number;
+  name?: string;
+  description?: string;
+  priceType?: 'fixed' | 'percentage' | 'per_unit';
+  price?: number;
+  isActive?: boolean;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const updateData: Record<string, unknown> = {};
+  if (input.name !== undefined) updateData.name = input.name;
+  if (input.description !== undefined) updateData.description = input.description;
+  if (input.priceType !== undefined) updateData.priceType = input.priceType;
+  if (input.price !== undefined) updateData.price = input.price.toString();
+  if (input.isActive !== undefined) updateData.isActive = input.isActive;
+
+  await db.update(productAddons)
+    .set(updateData)
+    .where(eq(productAddons.id, input.id));
+
+  return { success: true };
+}
+
+export async function deleteProductAddon(addonId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(productAddons)
+    .set({ isActive: false })
+    .where(eq(productAddons.id, addonId));
+
+  return { success: true };
+}
+
+// ===== PRICE CALCULATION =====
+export async function calculateProductPrice(input: {
+  productId: number;
+  sizeId: number;
+  quantityId?: number;
+  customQuantity?: number;
+  addonIds?: number[];
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Get size base price
+  const [size] = await db.select()
+    .from(productSizes)
+    .where(eq(productSizes.id, input.sizeId))
+    .limit(1);
+
+  if (!size) throw new Error("Size not found");
+
+  let basePrice = parseFloat(size.basePrice || '0');
+  let multiplier = 1;
+  let isCustomQuantity = false;
+
+  // Get quantity multiplier
+  if (input.quantityId) {
+    const [quantity] = await db.select()
+      .from(productQuantities)
+      .where(eq(productQuantities.id, input.quantityId))
+      .limit(1);
+
+    if (quantity) {
+      multiplier = parseFloat(quantity.priceMultiplier || '1');
+    }
+  } else if (input.customQuantity) {
+    isCustomQuantity = true;
+    // For custom quantity, return null price (manual pricing required)
+  }
+
+  let subtotal = basePrice * multiplier;
+  let addonsTotal = 0;
+
+  // Calculate addons
+  if (input.addonIds && input.addonIds.length > 0) {
+    const addons = await db.select()
+      .from(productAddons)
+      .where(sql`${productAddons.id} IN (${input.addonIds.join(',')})`);
+
+    for (const addon of addons) {
+      const addonPrice = parseFloat(addon.price || '0');
+      if (addon.priceType === 'fixed') {
+        addonsTotal += addonPrice;
+      } else if (addon.priceType === 'percentage') {
+        addonsTotal += subtotal * (addonPrice / 100);
+      } else if (addon.priceType === 'per_unit' && input.customQuantity) {
+        addonsTotal += addonPrice * input.customQuantity;
+      }
+    }
+  }
+
+  const totalPrice = isCustomQuantity ? null : subtotal + addonsTotal;
+
+  return {
+    basePrice,
+    multiplier,
+    subtotal,
+    addonsTotal,
+    totalPrice,
+    isCustomQuantity,
+    requiresManualPricing: isCustomQuantity,
+  };
+}

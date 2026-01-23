@@ -1,15 +1,7 @@
 import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -34,6 +26,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { 
@@ -42,7 +35,6 @@ import {
   MoreHorizontal, 
   Pencil, 
   Trash2, 
-  Layers,
   Search,
   RefreshCw,
   ChevronDown,
@@ -52,7 +44,10 @@ import {
   SignpostBig,
   Shirt,
   Flame,
-  Ruler
+  Ruler,
+  Hash,
+  Sparkles,
+  Image as ImageIcon,
 } from "lucide-react";
 
 // Icon mapping for categories
@@ -72,13 +67,33 @@ interface Category {
   displayOrder: number;
 }
 
-interface ProductVariant {
+interface ProductSize {
   id: number;
-  sku: string;
+  productId: number;
   name: string;
-  price: number | null;
-  pricingType: string | null;
-  attributes: unknown;
+  dimensions: string | null;
+  basePrice: string;
+  displayOrder: number;
+  isActive: boolean;
+}
+
+interface ProductQuantity {
+  id: number;
+  productId: number;
+  quantity: number;
+  priceMultiplier: string;
+  displayOrder: number;
+  isActive: boolean;
+}
+
+interface ProductAddon {
+  id: number;
+  productId: number | null;
+  categoryId: number | null;
+  name: string;
+  description: string | null;
+  priceType: string;
+  price: string;
   isActive: boolean;
 }
 
@@ -86,48 +101,54 @@ interface Product {
   id: number;
   name: string;
   description: string | null;
-  category: string | null;
   categoryId: number | null;
+  imageUrl: string | null;
+  allowCustomQuantity: boolean;
   isActive: boolean;
-  variantCount: number;
-  variants: ProductVariant[];
-}
-
-interface ProductFormData {
-  name: string;
-  description: string;
-  categoryId: number | null;
-}
-
-interface VariantFormData {
-  sku: string;
-  name: string;
-  price: string;
-  pricingType: string;
+  sizes: ProductSize[];
+  quantities: ProductQuantity[];
+  addons: ProductAddon[];
 }
 
 export default function Products() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [initialCategorySet, setInitialCategorySet] = useState(false);
   const [expandedProducts, setExpandedProducts] = useState<Set<number>>(new Set());
+  const [searchQuery, setSearchQuery] = useState("");
+  
+  // Dialog states
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
-  const [isVariantDialogOpen, setIsVariantDialogOpen] = useState(false);
+  const [isSizeDialogOpen, setIsSizeDialogOpen] = useState(false);
+  const [isQuantityDialogOpen, setIsQuantityDialogOpen] = useState(false);
+  const [isAddonDialogOpen, setIsAddonDialogOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
-  const [selectedVariantId, setSelectedVariantId] = useState<number | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
 
-  const [productForm, setProductForm] = useState<ProductFormData>({
+  // Form states
+  const [productForm, setProductForm] = useState({
     name: "",
     description: "",
-    categoryId: null,
+    categoryId: null as number | null,
+    allowCustomQuantity: true,
   });
 
-  const [variantForm, setVariantForm] = useState<VariantFormData>({
-    sku: "",
+  const [sizeForm, setSizeForm] = useState({
     name: "",
+    dimensions: "",
+    basePrice: "",
+  });
+
+  const [quantityForm, setQuantityForm] = useState({
+    quantity: "",
+    priceMultiplier: "1.0",
+  });
+
+  const [addonForm, setAddonForm] = useState({
+    name: "",
+    description: "",
+    priceType: "fixed" as "fixed" | "percentage" | "per_unit",
     price: "",
-    pricingType: "fixed",
   });
 
   const utils = trpc.useUtils();
@@ -136,7 +157,7 @@ export default function Products() {
   const { data: categoriesData } = trpc.products.getCategories.useQuery();
   const categories = categoriesData || [];
 
-  // Set first category as default when categories load
+  // Set first category as default
   useEffect(() => {
     if (categories.length > 0 && !initialCategorySet) {
       setSelectedCategoryId(categories[0].id);
@@ -144,8 +165,8 @@ export default function Products() {
     }
   }, [categories, initialCategorySet]);
 
-  // Fetch products only when a category is selected
-  const { data: products, isLoading, refetch } = trpc.products.list.useQuery(
+  // Fetch products with details
+  const { data: products, isLoading, refetch } = trpc.products.listWithDetails.useQuery(
     { categoryId: selectedCategoryId || undefined },
     { enabled: selectedCategoryId !== null }
   );
@@ -154,21 +175,21 @@ export default function Products() {
   const createProductMutation = trpc.products.create.useMutation({
     onSuccess: () => {
       toast.success("המוצר נוצר בהצלחה");
-      refetch();
       setIsProductDialogOpen(false);
       resetProductForm();
+      refetch();
     },
-    onError: (error) => toast.error(`שגיאה ביצירת המוצר: ${error.message}`),
+    onError: (error) => toast.error(error.message),
   });
 
   const updateProductMutation = trpc.products.update.useMutation({
     onSuccess: () => {
       toast.success("המוצר עודכן בהצלחה");
-      refetch();
       setIsProductDialogOpen(false);
       resetProductForm();
+      refetch();
     },
-    onError: (error) => toast.error(`שגיאה בעדכון המוצר: ${error.message}`),
+    onError: (error) => toast.error(error.message),
   });
 
   const deleteProductMutation = trpc.products.delete.useMutation({
@@ -176,103 +197,148 @@ export default function Products() {
       toast.success("המוצר נמחק בהצלחה");
       refetch();
     },
-    onError: (error) => toast.error(`שגיאה במחיקת המוצר: ${error.message}`),
+    onError: (error) => toast.error(error.message),
   });
 
-  const createVariantMutation = trpc.products.createVariant.useMutation({
+  // Size mutations
+  const createSizeMutation = trpc.products.createSize.useMutation({
     onSuccess: () => {
-      toast.success("הוריאנט נוצר בהצלחה");
-      refetch();
-      setIsVariantDialogOpen(false);
-      resetVariantForm();
-    },
-    onError: (error) => toast.error(`שגיאה ביצירת הוריאנט: ${error.message}`),
-  });
-
-  const updateVariantMutation = trpc.products.updateVariant.useMutation({
-    onSuccess: () => {
-      toast.success("הוריאנט עודכן בהצלחה");
-      refetch();
-      setIsVariantDialogOpen(false);
-      resetVariantForm();
-    },
-    onError: (error) => toast.error(`שגיאה בעדכון הוריאנט: ${error.message}`),
-  });
-
-  const deleteVariantMutation = trpc.products.deleteVariant.useMutation({
-    onSuccess: () => {
-      toast.success("הוריאנט נמחק בהצלחה");
+      toast.success("הגודל נוסף בהצלחה");
+      setIsSizeDialogOpen(false);
+      resetSizeForm();
       refetch();
     },
-    onError: (error) => toast.error(`שגיאה במחיקת הוריאנט: ${error.message}`),
+    onError: (error) => toast.error(error.message),
   });
 
-  // Form handlers
+  const updateSizeMutation = trpc.products.updateSize.useMutation({
+    onSuccess: () => {
+      toast.success("הגודל עודכן בהצלחה");
+      setIsSizeDialogOpen(false);
+      resetSizeForm();
+      refetch();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const deleteSizeMutation = trpc.products.deleteSize.useMutation({
+    onSuccess: () => {
+      toast.success("הגודל נמחק בהצלחה");
+      refetch();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  // Quantity mutations
+  const createQuantityMutation = trpc.products.createQuantity.useMutation({
+    onSuccess: () => {
+      toast.success("הכמות נוספה בהצלחה");
+      setIsQuantityDialogOpen(false);
+      resetQuantityForm();
+      refetch();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const updateQuantityMutation = trpc.products.updateQuantity.useMutation({
+    onSuccess: () => {
+      toast.success("הכמות עודכנה בהצלחה");
+      setIsQuantityDialogOpen(false);
+      resetQuantityForm();
+      refetch();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const deleteQuantityMutation = trpc.products.deleteQuantity.useMutation({
+    onSuccess: () => {
+      toast.success("הכמות נמחקה בהצלחה");
+      refetch();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  // Addon mutations
+  const createAddonMutation = trpc.products.createAddon.useMutation({
+    onSuccess: () => {
+      toast.success("התוספת נוספה בהצלחה");
+      setIsAddonDialogOpen(false);
+      resetAddonForm();
+      refetch();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const updateAddonMutation = trpc.products.updateAddon.useMutation({
+    onSuccess: () => {
+      toast.success("התוספת עודכנה בהצלחה");
+      setIsAddonDialogOpen(false);
+      resetAddonForm();
+      refetch();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const deleteAddonMutation = trpc.products.deleteAddon.useMutation({
+    onSuccess: () => {
+      toast.success("התוספת נמחקה בהצלחה");
+      refetch();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  // Reset functions
   const resetProductForm = () => {
-    setProductForm({ name: "", description: "", categoryId: selectedCategoryId });
+    setProductForm({ name: "", description: "", categoryId: selectedCategoryId, allowCustomQuantity: true });
     setIsEditMode(false);
     setSelectedProductId(null);
   };
 
-  const resetVariantForm = () => {
-    setVariantForm({ sku: "", name: "", price: "", pricingType: "fixed" });
+  const resetSizeForm = () => {
+    setSizeForm({ name: "", dimensions: "", basePrice: "" });
     setIsEditMode(false);
-    setSelectedVariantId(null);
-    setSelectedProductId(null);
+    setSelectedItemId(null);
   };
 
-  const handleCreateProduct = () => {
-    resetProductForm();
-    setProductForm(prev => ({ ...prev, categoryId: selectedCategoryId }));
+  const resetQuantityForm = () => {
+    setQuantityForm({ quantity: "", priceMultiplier: "1.0" });
     setIsEditMode(false);
-    setIsProductDialogOpen(true);
+    setSelectedItemId(null);
   };
 
-  const handleEditProduct = (product: Product) => {
-    setProductForm({
-      name: product.name,
-      description: product.description || "",
-      categoryId: product.categoryId,
+  const resetAddonForm = () => {
+    setAddonForm({ name: "", description: "", priceType: "fixed", price: "" });
+    setIsEditMode(false);
+    setSelectedItemId(null);
+  };
+
+  // Toggle product expansion
+  const toggleProduct = (productId: number) => {
+    setExpandedProducts(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(productId)) {
+        newSet.delete(productId);
+      } else {
+        newSet.add(productId);
+      }
+      return newSet;
     });
-    setSelectedProductId(product.id);
-    setIsEditMode(true);
-    setIsProductDialogOpen(true);
   };
 
-  const handleDeleteProduct = (productId: number) => {
-    if (confirm("האם אתה בטוח שברצונך למחוק מוצר זה?")) {
-      deleteProductMutation.mutate({ id: productId });
-    }
-  };
+  // Filter products
+  const filteredProducts = products?.filter((product: Product) => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      product.name.toLowerCase().includes(query) ||
+      product.sizes?.some(s => s.name.toLowerCase().includes(query)) ||
+      product.addons?.some(a => a.name.toLowerCase().includes(query))
+    );
+  }) || [];
 
-  const handleCreateVariant = (productId: number) => {
-    resetVariantForm();
-    setSelectedProductId(productId);
-    setIsEditMode(false);
-    setIsVariantDialogOpen(true);
-  };
-
-  const handleEditVariant = (productId: number, variant: ProductVariant) => {
-    setVariantForm({
-      sku: variant.sku,
-      name: variant.name,
-      price: variant.price?.toString() || "",
-      pricingType: variant.pricingType || "fixed",
-    });
-    setSelectedProductId(productId);
-    setSelectedVariantId(variant.id);
-    setIsEditMode(true);
-    setIsVariantDialogOpen(true);
-  };
-
-  const handleDeleteVariant = (variantId: number) => {
-    if (confirm("האם אתה בטוח שברצונך למחוק וריאנט זה?")) {
-      deleteVariantMutation.mutate({ id: variantId });
-    }
-  };
-
+  // Handle product submit
   const handleProductSubmit = () => {
-    if (!productForm.name.trim()) {
+    if (!productForm.name) {
       toast.error("שם המוצר נדרש");
       return;
     }
@@ -293,78 +359,171 @@ export default function Products() {
     }
   };
 
-  const handleVariantSubmit = () => {
-    if (!variantForm.sku.trim() || !variantForm.name.trim()) {
-      toast.error("מק\"ט ושם הוריאנט נדרשים");
+  // Handle size submit
+  const handleSizeSubmit = () => {
+    if (!sizeForm.name || !sizeForm.basePrice) {
+      toast.error("שם ומחיר בסיס נדרשים");
       return;
     }
 
-    const price = variantForm.price ? parseFloat(variantForm.price) : undefined;
-
-    if (isEditMode && selectedVariantId) {
-      updateVariantMutation.mutate({
-        id: selectedVariantId,
-        sku: variantForm.sku,
-        name: variantForm.name,
-        price,
-        pricingType: variantForm.pricingType,
+    if (isEditMode && selectedItemId) {
+      updateSizeMutation.mutate({
+        id: selectedItemId,
+        name: sizeForm.name,
+        dimensions: sizeForm.dimensions || undefined,
+        basePrice: parseFloat(sizeForm.basePrice),
       });
     } else if (selectedProductId) {
-      createVariantMutation.mutate({
-        baseProductId: selectedProductId,
-        sku: variantForm.sku,
-        name: variantForm.name,
-        price,
-        pricingType: variantForm.pricingType,
+      createSizeMutation.mutate({
+        productId: selectedProductId,
+        name: sizeForm.name,
+        dimensions: sizeForm.dimensions || undefined,
+        basePrice: parseFloat(sizeForm.basePrice),
       });
     }
   };
 
-  const toggleProductExpand = (productId: number) => {
-    const newExpanded = new Set(expandedProducts);
-    if (newExpanded.has(productId)) {
-      newExpanded.delete(productId);
-    } else {
-      newExpanded.add(productId);
+  // Handle quantity submit
+  const handleQuantitySubmit = () => {
+    if (!quantityForm.quantity || !quantityForm.priceMultiplier) {
+      toast.error("כמות ומכפיל מחיר נדרשים");
+      return;
     }
-    setExpandedProducts(newExpanded);
+
+    if (isEditMode && selectedItemId) {
+      updateQuantityMutation.mutate({
+        id: selectedItemId,
+        quantity: parseInt(quantityForm.quantity),
+        priceMultiplier: parseFloat(quantityForm.priceMultiplier),
+      });
+    } else if (selectedProductId) {
+      createQuantityMutation.mutate({
+        productId: selectedProductId,
+        quantity: parseInt(quantityForm.quantity),
+        priceMultiplier: parseFloat(quantityForm.priceMultiplier),
+      });
+    }
   };
 
-  // Filter products by search
-  const filteredProducts = products?.filter((product: Product) => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      product.name.toLowerCase().includes(query) ||
-      product.variants.some(
-        (v) =>
-          v.name.toLowerCase().includes(query) ||
-          v.sku.toLowerCase().includes(query)
-      )
-    );
-  });
+  // Handle addon submit
+  const handleAddonSubmit = () => {
+    if (!addonForm.name || !addonForm.price) {
+      toast.error("שם ומחיר נדרשים");
+      return;
+    }
 
-  // Get current category
-  const currentCategory = categories.find((c: Category) => c.id === selectedCategoryId);
+    if (isEditMode && selectedItemId) {
+      updateAddonMutation.mutate({
+        id: selectedItemId,
+        name: addonForm.name,
+        description: addonForm.description || undefined,
+        priceType: addonForm.priceType,
+        price: parseFloat(addonForm.price),
+      });
+    } else if (selectedProductId) {
+      createAddonMutation.mutate({
+        productId: selectedProductId,
+        name: addonForm.name,
+        description: addonForm.description || undefined,
+        priceType: addonForm.priceType,
+        price: parseFloat(addonForm.price),
+      });
+    }
+  };
+
+  // Open edit dialogs
+  const openEditProduct = (product: Product) => {
+    setProductForm({
+      name: product.name,
+      description: product.description || "",
+      categoryId: product.categoryId,
+      allowCustomQuantity: product.allowCustomQuantity ?? true,
+    });
+    setSelectedProductId(product.id);
+    setIsEditMode(true);
+    setIsProductDialogOpen(true);
+  };
+
+  const openEditSize = (size: ProductSize, productId: number) => {
+    setSizeForm({
+      name: size.name,
+      dimensions: size.dimensions || "",
+      basePrice: size.basePrice,
+    });
+    setSelectedProductId(productId);
+    setSelectedItemId(size.id);
+    setIsEditMode(true);
+    setIsSizeDialogOpen(true);
+  };
+
+  const openEditQuantity = (quantity: ProductQuantity, productId: number) => {
+    setQuantityForm({
+      quantity: quantity.quantity.toString(),
+      priceMultiplier: quantity.priceMultiplier,
+    });
+    setSelectedProductId(productId);
+    setSelectedItemId(quantity.id);
+    setIsEditMode(true);
+    setIsQuantityDialogOpen(true);
+  };
+
+  const openEditAddon = (addon: ProductAddon, productId: number) => {
+    setAddonForm({
+      name: addon.name,
+      description: addon.description || "",
+      priceType: addon.priceType as "fixed" | "percentage" | "per_unit",
+      price: addon.price,
+    });
+    setSelectedProductId(productId);
+    setSelectedItemId(addon.id);
+    setIsEditMode(true);
+    setIsAddonDialogOpen(true);
+  };
+
+  const openAddSize = (productId: number) => {
+    resetSizeForm();
+    setSelectedProductId(productId);
+    setIsSizeDialogOpen(true);
+  };
+
+  const openAddQuantity = (productId: number) => {
+    resetQuantityForm();
+    setSelectedProductId(productId);
+    setIsQuantityDialogOpen(true);
+  };
+
+  const openAddAddon = (productId: number) => {
+    resetAddonForm();
+    setSelectedProductId(productId);
+    setIsAddonDialogOpen(true);
+  };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6 p-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-slate-900">מוצרים</h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            ניהול קטלוג המוצרים והוריאנטים
-          </p>
+          <h1 className="text-2xl font-bold text-slate-900">מוצרים</h1>
+          <p className="text-slate-500 text-sm mt-1">ניהול קטלוג המוצרים, גדלים, כמויות ותוספות</p>
         </div>
-        <Button onClick={handleCreateProduct} className="gap-2">
-          <Plus className="h-4 w-4" />
-          מוצר חדש
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => refetch()}>
+            <RefreshCw className="h-4 w-4 ml-2" />
+            רענון
+          </Button>
+          <Button size="sm" onClick={() => {
+            resetProductForm();
+            setProductForm(prev => ({ ...prev, categoryId: selectedCategoryId }));
+            setIsProductDialogOpen(true);
+          }}>
+            <Plus className="h-4 w-4 ml-2" />
+            מוצר חדש
+          </Button>
+        </div>
       </div>
 
       {/* Category Tabs */}
-      <div className="flex gap-2 overflow-x-auto pb-2 border-b border-slate-200">
+      <div className="flex gap-1 overflow-x-auto pb-2 border-b border-slate-200">
         {categories.map((category: Category) => {
           const IconComponent = categoryIcons[category.icon || ''] || Package;
           const isSelected = selectedCategoryId === category.id;
@@ -374,8 +533,8 @@ export default function Products() {
               onClick={() => setSelectedCategoryId(category.id)}
               className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors shrink-0 ${
                 isSelected
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                  ? 'border-blue-600 text-blue-600 bg-blue-50'
+                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
               }`}
             >
               <IconComponent className="h-4 w-4" />
@@ -386,375 +545,471 @@ export default function Products() {
       </div>
 
       {/* Search */}
-      <Card className="border-0 shadow-sm bg-white">
-        <CardContent className="py-4">
-          <div className="relative">
-            <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <Input
-              placeholder="חיפוש מוצרים, וריאנטים או מק״ט..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pr-10 border-slate-200"
-            />
-          </div>
-        </CardContent>
-      </Card>
+      <div className="relative max-w-md">
+        <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <Input
+          placeholder="חיפוש מוצר, גודל או תוספת..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pr-10"
+        />
+      </div>
 
       {/* Products List */}
-      <Card className="border-0 shadow-sm bg-white">
-        <CardHeader className="pb-2 pt-5 px-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-slate-100 flex items-center justify-center">
-                <Package className="h-4 w-4 text-slate-600" />
-              </div>
-              <div>
-                <CardTitle className="text-sm font-semibold text-slate-900">
-                  {currentCategory ? currentCategory.name : 'כל המוצרים'}
-                </CardTitle>
-                <p className="text-xs text-slate-500">
-                  {currentCategory?.description || 'קטלוג מוצרים מלא'}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {filteredProducts && filteredProducts.length > 0 && (
-                <Badge className="bg-slate-100 text-slate-700 hover:bg-slate-100 border-0">
-                  {filteredProducts.length} מוצרים
-                </Badge>
-              )}
-              <Button variant="ghost" size="icon" onClick={() => refetch()}>
-                <RefreshCw className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="px-5 pb-5">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <RefreshCw className="h-6 w-6 animate-spin text-slate-400" />
-            </div>
-          ) : filteredProducts?.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center mb-3">
-                <Package className="h-6 w-6 text-slate-400" />
-              </div>
-              <h3 className="text-sm font-medium text-slate-900">אין מוצרים</h3>
-              <p className="text-sm text-slate-500 mt-1">
-                התחל על ידי יצירת מוצר חדש
-              </p>
-              <Button onClick={handleCreateProduct} className="mt-4 gap-2">
-                <Plus className="h-4 w-4" />
-                מוצר חדש
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-3 pt-2">
-              {filteredProducts?.map((product: Product) => (
-                <div
-                  key={product.id}
-                  className="border border-slate-200 rounded-lg overflow-hidden"
+      {isLoading ? (
+        <div className="text-center py-12 text-slate-500">טוען מוצרים...</div>
+      ) : filteredProducts.length === 0 ? (
+        <Card className="border-dashed">
+          <CardContent className="py-12 text-center">
+            <Package className="h-12 w-12 mx-auto text-slate-300 mb-4" />
+            <p className="text-slate-500">אין מוצרים בקטגוריה זו</p>
+            <Button 
+              variant="outline" 
+              className="mt-4"
+              onClick={() => {
+                resetProductForm();
+                setProductForm(prev => ({ ...prev, categoryId: selectedCategoryId }));
+                setIsProductDialogOpen(true);
+              }}
+            >
+              <Plus className="h-4 w-4 ml-2" />
+              הוסף מוצר ראשון
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {filteredProducts.map((product: Product) => {
+            const isExpanded = expandedProducts.has(product.id);
+            return (
+              <Card key={product.id} className="overflow-hidden">
+                {/* Product Header */}
+                <div 
+                  className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50 transition-colors"
+                  onClick={() => toggleProduct(product.id)}
                 >
-                  {/* Product Header */}
-                  <div 
-                    className="flex items-center justify-between p-4 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors"
-                    onClick={() => toggleProductExpand(product.id)}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-lg bg-white border border-slate-200 flex items-center justify-center">
-                        <Package className="h-5 w-5 text-slate-600" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-slate-900">{product.name}</span>
-                          {!product.isActive && (
-                            <Badge variant="destructive" className="text-[10px]">לא פעיל</Badge>
-                          )}
-                        </div>
-                        <p className="text-sm text-slate-500">
-                          {product.description || "ללא תיאור"}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Badge variant="outline" className="gap-1 bg-white">
-                        <Layers className="h-3 w-3" />
-                        {product.variantCount} וריאנטים
-                      </Badge>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEditProduct(product); }}>
-                            <Pencil className="ml-2 h-4 w-4" />
-                            עריכה
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleCreateVariant(product.id); }}>
-                            <Plus className="ml-2 h-4 w-4" />
-                            הוסף וריאנט
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={(e) => { e.stopPropagation(); handleDeleteProduct(product.id); }}
-                            className="text-red-600"
-                          >
-                            <Trash2 className="ml-2 h-4 w-4" />
-                            מחיקה
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                      {expandedProducts.has(product.id) ? (
-                        <ChevronUp className="h-5 w-5 text-slate-400" />
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center">
+                      {product.imageUrl ? (
+                        <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover rounded-lg" />
                       ) : (
-                        <ChevronDown className="h-5 w-5 text-slate-400" />
+                        <Package className="h-6 w-6 text-slate-400" />
                       )}
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-slate-900">{product.name}</h3>
+                      <p className="text-sm text-slate-500">{product.description || "ללא תיאור"}</p>
                     </div>
                   </div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex gap-2">
+                      <Badge variant="outline" className="gap-1">
+                        <Ruler className="h-3 w-3" />
+                        {product.sizes?.length || 0} גדלים
+                      </Badge>
+                      <Badge variant="outline" className="gap-1">
+                        <Hash className="h-3 w-3" />
+                        {product.quantities?.length || 0} כמויות
+                      </Badge>
+                      <Badge variant="outline" className="gap-1">
+                        <Sparkles className="h-3 w-3" />
+                        {product.addons?.length || 0} תוספות
+                      </Badge>
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                        <Button variant="ghost" size="icon">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openEditProduct(product); }}>
+                          <Pencil className="h-4 w-4 ml-2" />
+                          עריכת מוצר
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openAddSize(product.id); }}>
+                          <Ruler className="h-4 w-4 ml-2" />
+                          הוסף גודל
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openAddQuantity(product.id); }}>
+                          <Hash className="h-4 w-4 ml-2" />
+                          הוסף כמות
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openAddAddon(product.id); }}>
+                          <Sparkles className="h-4 w-4 ml-2" />
+                          הוסף תוספת
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem 
+                          className="text-red-600"
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            if (confirm("האם למחוק את המוצר?")) {
+                              deleteProductMutation.mutate({ id: product.id });
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4 ml-2" />
+                          מחק מוצר
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                    {isExpanded ? (
+                      <ChevronUp className="h-5 w-5 text-slate-400" />
+                    ) : (
+                      <ChevronDown className="h-5 w-5 text-slate-400" />
+                    )}
+                  </div>
+                </div>
 
-                  {/* Variants Table */}
-                  {expandedProducts.has(product.id) && (
-                    <div className="p-4 border-t border-slate-200">
-                      {product.variants.length === 0 ? (
-                        <div className="text-center py-6 text-slate-500">
-                          <p>אין וריאנטים למוצר זה</p>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="mt-2 gap-2"
-                            onClick={() => handleCreateVariant(product.id)}
-                          >
-                            <Plus className="h-4 w-4" />
-                            הוסף וריאנט
+                {/* Expanded Content */}
+                {isExpanded && (
+                  <div className="border-t bg-slate-50 p-4">
+                    <div className="grid grid-cols-3 gap-6">
+                      {/* Sizes */}
+                      <div>
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="font-medium text-slate-700 flex items-center gap-2">
+                            <Ruler className="h-4 w-4" />
+                            גדלים
+                          </h4>
+                          <Button variant="ghost" size="sm" onClick={() => openAddSize(product.id)}>
+                            <Plus className="h-3 w-3" />
                           </Button>
                         </div>
-                      ) : (
-                        <Table>
-                          <TableHeader>
-                            <TableRow className="hover:bg-transparent">
-                              <TableHead className="text-right text-slate-600">מק״ט</TableHead>
-                              <TableHead className="text-right text-slate-600">שם</TableHead>
-                              <TableHead className="text-right text-slate-600">מחיר</TableHead>
-                              <TableHead className="text-right text-slate-600">תמחור</TableHead>
-                              <TableHead className="text-right text-slate-600">סטטוס</TableHead>
-                              <TableHead className="text-left w-[80px]"></TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {product.variants.map((variant) => (
-                              <TableRow key={variant.id} className="hover:bg-slate-50">
-                                <TableCell className="font-mono text-sm text-slate-600">
-                                  {variant.sku}
-                                </TableCell>
-                                <TableCell className="font-medium text-slate-900">
-                                  {variant.name}
-                                </TableCell>
-                                <TableCell className="text-slate-900">
-                                  {variant.price ? `₪${variant.price}` : '-'}
-                                </TableCell>
-                                <TableCell>
-                                  {variant.pricingType === 'per_sqm' ? (
-                                    <Badge variant="outline" className="gap-1 bg-blue-50 text-blue-700 border-blue-200">
-                                      <Ruler className="h-3 w-3" />
-                                      למ"ר
-                                    </Badge>
-                                  ) : (
-                                    <Badge variant="outline" className="bg-slate-50 text-slate-600 border-slate-200">
-                                      קבוע
-                                    </Badge>
+                        {product.sizes?.length > 0 ? (
+                          <div className="space-y-2">
+                            {product.sizes.map((size) => (
+                              <div key={size.id} className="flex items-center justify-between bg-white p-2 rounded border">
+                                <div>
+                                  <span className="font-medium text-sm">{size.name}</span>
+                                  {size.dimensions && (
+                                    <span className="text-xs text-slate-500 mr-2">({size.dimensions})</span>
                                   )}
-                                </TableCell>
-                                <TableCell>
-                                  {variant.isActive ? (
-                                    <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
-                                      פעיל
-                                    </Badge>
-                                  ) : (
-                                    <Badge variant="destructive">לא פעיל</Badge>
-                                  )}
-                                </TableCell>
-                                <TableCell>
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <Button variant="ghost" size="icon">
-                                        <MoreHorizontal className="h-4 w-4" />
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                      <DropdownMenuItem onClick={() => handleEditVariant(product.id, variant)}>
-                                        <Pencil className="ml-2 h-4 w-4" />
-                                        עריכה
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem
-                                        onClick={() => handleDeleteVariant(variant.id)}
-                                        className="text-red-600"
-                                      >
-                                        <Trash2 className="ml-2 h-4 w-4" />
-                                        מחיקה
-                                      </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                                </TableCell>
-                              </TableRow>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-medium text-green-600">₪{size.basePrice}</span>
+                                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditSize(size, product.id)}>
+                                    <Pencil className="h-3 w-3" />
+                                  </Button>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-6 w-6 text-red-500"
+                                    onClick={() => deleteSizeMutation.mutate({ id: size.id })}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              </div>
                             ))}
-                          </TableBody>
-                        </Table>
-                      )}
-                      <div className="mt-3 pt-3 border-t border-slate-100">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="gap-2"
-                          onClick={() => handleCreateVariant(product.id)}
-                        >
-                          <Plus className="h-4 w-4" />
-                          הוסף וריאנט
-                        </Button>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-slate-400 text-center py-4">אין גדלים</p>
+                        )}
+                      </div>
+
+                      {/* Quantities */}
+                      <div>
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="font-medium text-slate-700 flex items-center gap-2">
+                            <Hash className="h-4 w-4" />
+                            כמויות
+                          </h4>
+                          <Button variant="ghost" size="sm" onClick={() => openAddQuantity(product.id)}>
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        </div>
+                        {product.quantities?.length > 0 ? (
+                          <div className="space-y-2">
+                            {product.quantities.map((qty) => (
+                              <div key={qty.id} className="flex items-center justify-between bg-white p-2 rounded border">
+                                <span className="font-medium text-sm">{qty.quantity} יח'</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm text-slate-500">×{qty.priceMultiplier}</span>
+                                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditQuantity(qty, product.id)}>
+                                    <Pencil className="h-3 w-3" />
+                                  </Button>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-6 w-6 text-red-500"
+                                    onClick={() => deleteQuantityMutation.mutate({ id: qty.id })}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-slate-400 text-center py-4">אין כמויות</p>
+                        )}
+                      </div>
+
+                      {/* Addons */}
+                      <div>
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="font-medium text-slate-700 flex items-center gap-2">
+                            <Sparkles className="h-4 w-4" />
+                            תוספות
+                          </h4>
+                          <Button variant="ghost" size="sm" onClick={() => openAddAddon(product.id)}>
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        </div>
+                        {product.addons?.length > 0 ? (
+                          <div className="space-y-2">
+                            {product.addons.map((addon) => (
+                              <div key={addon.id} className="flex items-center justify-between bg-white p-2 rounded border">
+                                <span className="font-medium text-sm">{addon.name}</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm text-slate-500">
+                                    {addon.priceType === 'fixed' && `+₪${addon.price}`}
+                                    {addon.priceType === 'percentage' && `+${addon.price}%`}
+                                    {addon.priceType === 'per_unit' && `₪${addon.price}/יח'`}
+                                  </span>
+                                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditAddon(addon, product.id)}>
+                                    <Pencil className="h-3 w-3" />
+                                  </Button>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-6 w-6 text-red-500"
+                                    onClick={() => deleteAddonMutation.mutate({ id: addon.id })}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-slate-400 text-center py-4">אין תוספות</p>
+                        )}
                       </div>
                     </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                  </div>
+                )}
+              </Card>
+            );
+          })}
+        </div>
+      )}
 
       {/* Product Dialog */}
       <Dialog open={isProductDialogOpen} onOpenChange={setIsProductDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]" dir="rtl">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>{isEditMode ? "עריכת מוצר" : "מוצר חדש"}</DialogTitle>
             <DialogDescription>
-              {isEditMode ? "עדכן את פרטי המוצר" : "הזן את פרטי המוצר החדש"}
+              {isEditMode ? "עדכן את פרטי המוצר" : "הוסף מוצר חדש לקטלוג"}
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="name">שם המוצר *</Label>
+          <div className="space-y-4">
+            <div>
+              <Label>שם המוצר *</Label>
               <Input
-                id="name"
                 value={productForm.name}
                 onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
                 placeholder="לדוגמה: כרטיסי ביקור"
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="category">תחום</Label>
+            <div>
+              <Label>תיאור</Label>
+              <Textarea
+                value={productForm.description}
+                onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
+                placeholder="תיאור קצר של המוצר"
+              />
+            </div>
+            <div>
+              <Label>תחום</Label>
               <Select
                 value={productForm.categoryId?.toString() || ""}
-                onValueChange={(value) => setProductForm({ ...productForm, categoryId: value ? parseInt(value) : null })}
+                onValueChange={(value) => setProductForm({ ...productForm, categoryId: parseInt(value) })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="בחר תחום" />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories.map((category: Category) => (
-                    <SelectItem key={category.id} value={category.id.toString()}>
-                      {category.name}
+                  {categories.map((cat: Category) => (
+                    <SelectItem key={cat.id} value={cat.id.toString()}>
+                      {cat.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="description">תיאור</Label>
-              <Textarea
-                id="description"
-                value={productForm.description}
-                onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
-                placeholder="תיאור קצר של המוצר..."
-                rows={3}
-              />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsProductDialogOpen(false)}>
               ביטול
             </Button>
-            <Button
-              onClick={handleProductSubmit}
-              disabled={createProductMutation.isPending || updateProductMutation.isPending}
-            >
-              {createProductMutation.isPending || updateProductMutation.isPending
-                ? "שומר..."
-                : isEditMode ? "עדכון" : "יצירה"}
+            <Button onClick={handleProductSubmit}>
+              {isEditMode ? "עדכן" : "צור מוצר"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Variant Dialog */}
-      <Dialog open={isVariantDialogOpen} onOpenChange={setIsVariantDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]" dir="rtl">
+      {/* Size Dialog */}
+      <Dialog open={isSizeDialogOpen} onOpenChange={setIsSizeDialogOpen}>
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>{isEditMode ? "עריכת וריאנט" : "וריאנט חדש"}</DialogTitle>
+            <DialogTitle>{isEditMode ? "עריכת גודל" : "גודל חדש"}</DialogTitle>
             <DialogDescription>
-              {isEditMode ? "עדכן את פרטי הוריאנט" : "הזן את פרטי הוריאנט החדש"}
+              הגדר גודל עם מחיר בסיס
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="sku">מק״ט *</Label>
+          <div className="space-y-4">
+            <div>
+              <Label>שם הגודל *</Label>
               <Input
-                id="sku"
-                value={variantForm.sku}
-                onChange={(e) => setVariantForm({ ...variantForm, sku: e.target.value })}
-                placeholder="לדוגמה: BC-001-A4"
-                className="font-mono"
+                value={sizeForm.name}
+                onChange={(e) => setSizeForm({ ...sizeForm, name: e.target.value })}
+                placeholder="לדוגמה: 9x5 ס״מ"
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="variantName">שם הוריאנט *</Label>
+            <div>
+              <Label>מידות (אופציונלי)</Label>
               <Input
-                id="variantName"
-                value={variantForm.name}
-                onChange={(e) => setVariantForm({ ...variantForm, name: e.target.value })}
-                placeholder="לדוגמה: A4 מבריק 300 גרם"
+                value={sizeForm.dimensions}
+                onChange={(e) => setSizeForm({ ...sizeForm, dimensions: e.target.value })}
+                placeholder="לדוגמה: 90x50 מ״מ"
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="price">מחיר (₪)</Label>
+            <div>
+              <Label>מחיר בסיס (₪) *</Label>
               <Input
-                id="price"
                 type="number"
-                value={variantForm.price}
-                onChange={(e) => setVariantForm({ ...variantForm, price: e.target.value })}
-                placeholder="0.00"
+                value={sizeForm.basePrice}
+                onChange={(e) => setSizeForm({ ...sizeForm, basePrice: e.target.value })}
+                placeholder="0"
               />
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="pricingType">סוג תמחור</Label>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsSizeDialogOpen(false)}>
+              ביטול
+            </Button>
+            <Button onClick={handleSizeSubmit}>
+              {isEditMode ? "עדכן" : "הוסף גודל"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quantity Dialog */}
+      <Dialog open={isQuantityDialogOpen} onOpenChange={setIsQuantityDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{isEditMode ? "עריכת כמות" : "כמות חדשה"}</DialogTitle>
+            <DialogDescription>
+              הגדר כמות עם מכפיל מחיר
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>כמות (יחידות) *</Label>
+              <Input
+                type="number"
+                value={quantityForm.quantity}
+                onChange={(e) => setQuantityForm({ ...quantityForm, quantity: e.target.value })}
+                placeholder="לדוגמה: 100"
+              />
+            </div>
+            <div>
+              <Label>מכפיל מחיר *</Label>
+              <Input
+                type="number"
+                step="0.1"
+                value={quantityForm.priceMultiplier}
+                onChange={(e) => setQuantityForm({ ...quantityForm, priceMultiplier: e.target.value })}
+                placeholder="1.0"
+              />
+              <p className="text-xs text-slate-500 mt-1">
+                מחיר סופי = מחיר בסיס × מכפיל (לדוגמה: 1.8 = 80% תוספת)
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsQuantityDialogOpen(false)}>
+              ביטול
+            </Button>
+            <Button onClick={handleQuantitySubmit}>
+              {isEditMode ? "עדכן" : "הוסף כמות"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Addon Dialog */}
+      <Dialog open={isAddonDialogOpen} onOpenChange={setIsAddonDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{isEditMode ? "עריכת תוספת" : "תוספת חדשה"}</DialogTitle>
+            <DialogDescription>
+              הגדר תוספת אופציונלית למוצר
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>שם התוספת *</Label>
+              <Input
+                value={addonForm.name}
+                onChange={(e) => setAddonForm({ ...addonForm, name: e.target.value })}
+                placeholder="לדוגמה: למינציה"
+              />
+            </div>
+            <div>
+              <Label>תיאור (אופציונלי)</Label>
+              <Textarea
+                value={addonForm.description}
+                onChange={(e) => setAddonForm({ ...addonForm, description: e.target.value })}
+                placeholder="תיאור קצר של התוספת"
+              />
+            </div>
+            <div>
+              <Label>סוג תמחור *</Label>
               <Select
-                value={variantForm.pricingType}
-                onValueChange={(value) => setVariantForm({ ...variantForm, pricingType: value })}
+                value={addonForm.priceType}
+                onValueChange={(value: "fixed" | "percentage" | "per_unit") => 
+                  setAddonForm({ ...addonForm, priceType: value })
+                }
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="fixed">מחיר קבוע</SelectItem>
-                  <SelectItem value="per_sqm">מחיר למטר רבוע</SelectItem>
+                  <SelectItem value="fixed">מחיר קבוע (₪)</SelectItem>
+                  <SelectItem value="percentage">אחוז מהמחיר (%)</SelectItem>
+                  <SelectItem value="per_unit">מחיר ליחידה (₪/יח')</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+            <div>
+              <Label>
+                {addonForm.priceType === 'fixed' && 'מחיר (₪) *'}
+                {addonForm.priceType === 'percentage' && 'אחוז (%) *'}
+                {addonForm.priceType === 'per_unit' && 'מחיר ליחידה (₪) *'}
+              </Label>
+              <Input
+                type="number"
+                step={addonForm.priceType === 'percentage' ? '1' : '0.01'}
+                value={addonForm.price}
+                onChange={(e) => setAddonForm({ ...addonForm, price: e.target.value })}
+                placeholder="0"
+              />
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsVariantDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setIsAddonDialogOpen(false)}>
               ביטול
             </Button>
-            <Button
-              onClick={handleVariantSubmit}
-              disabled={createVariantMutation.isPending || updateVariantMutation.isPending}
-            >
-              {createVariantMutation.isPending || updateVariantMutation.isPending
-                ? "שומר..."
-                : isEditMode ? "עדכון" : "יצירה"}
+            <Button onClick={handleAddonSubmit}>
+              {isEditMode ? "עדכן" : "הוסף תוספת"}
             </Button>
           </DialogFooter>
         </DialogContent>

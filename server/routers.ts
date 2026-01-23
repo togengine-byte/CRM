@@ -40,6 +40,19 @@ import {
   updateVariant,
   deleteVariant,
   getProductCategories,
+  // Product Sizes, Quantities, Addons
+  getProductWithDetails,
+  getProductsWithDetails,
+  createProductSize,
+  updateProductSize,
+  deleteProductSize,
+  createProductQuantity,
+  updateProductQuantity,
+  deleteProductQuantity,
+  createProductAddon,
+  updateProductAddon,
+  deleteProductAddon,
+  calculateProductPrice,
   // Customers API
   getCustomers,
   getCustomerById,
@@ -469,6 +482,172 @@ export const appRouter = router({
           throw new Error("Only employees can delete variants");
         }
         return await deleteVariant(input.id);
+      }),
+
+    // ===== SIZES =====
+    getSizes: protectedProcedure
+      .input(z.object({ productId: z.number() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        const { productSizes } = await import('../drizzle/schema');
+        const { eq, asc } = await import('drizzle-orm');
+        return await db.select().from(productSizes)
+          .where(eq(productSizes.productId, input.productId))
+          .orderBy(asc(productSizes.displayOrder));
+      }),
+
+    createSize: protectedProcedure
+      .input(z.object({
+        productId: z.number(),
+        name: z.string().min(1),
+        dimensions: z.string().optional(),
+        basePrice: z.number(),
+        displayOrder: z.number().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new Error("Not authenticated");
+        return await createProductSize(input);
+      }),
+
+    updateSize: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        name: z.string().optional(),
+        dimensions: z.string().optional(),
+        basePrice: z.number().optional(),
+        displayOrder: z.number().optional(),
+        isActive: z.boolean().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new Error("Not authenticated");
+        return await updateProductSize(input);
+      }),
+
+    deleteSize: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new Error("Not authenticated");
+        return await deleteProductSize(input.id);
+      }),
+
+    // ===== QUANTITIES =====
+    getQuantities: protectedProcedure
+      .input(z.object({ productId: z.number() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        const { productQuantities } = await import('../drizzle/schema');
+        const { eq, asc } = await import('drizzle-orm');
+        return await db.select().from(productQuantities)
+          .where(eq(productQuantities.productId, input.productId))
+          .orderBy(asc(productQuantities.displayOrder));
+      }),
+
+    createQuantity: protectedProcedure
+      .input(z.object({
+        productId: z.number(),
+        quantity: z.number(),
+        priceMultiplier: z.number(),
+        displayOrder: z.number().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new Error("Not authenticated");
+        return await createProductQuantity(input);
+      }),
+
+    updateQuantity: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        quantity: z.number().optional(),
+        priceMultiplier: z.number().optional(),
+        displayOrder: z.number().optional(),
+        isActive: z.boolean().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new Error("Not authenticated");
+        return await updateProductQuantity(input);
+      }),
+
+    deleteQuantity: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new Error("Not authenticated");
+        return await deleteProductQuantity(input.id);
+      }),
+
+    // ===== ADDONS =====
+    getAddons: protectedProcedure
+      .input(z.object({ productId: z.number().optional(), categoryId: z.number().optional() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        const { productAddons } = await import('../drizzle/schema');
+        const { eq, or, isNull, asc } = await import('drizzle-orm');
+        if (input.productId) {
+          return await db.select().from(productAddons)
+            .where(or(eq(productAddons.productId, input.productId), isNull(productAddons.productId)))
+            .orderBy(asc(productAddons.name));
+        }
+        return await db.select().from(productAddons).orderBy(asc(productAddons.name));
+      }),
+
+    createAddon: protectedProcedure
+      .input(z.object({
+        productId: z.number().optional(),
+        categoryId: z.number().optional(),
+        name: z.string().min(1),
+        description: z.string().optional(),
+        priceType: z.enum(['fixed', 'percentage', 'per_unit']),
+        price: z.number(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new Error("Not authenticated");
+        return await createProductAddon(input);
+      }),
+
+    updateAddon: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        name: z.string().optional(),
+        description: z.string().optional(),
+        priceType: z.enum(['fixed', 'percentage', 'per_unit']).optional(),
+        price: z.number().optional(),
+        isActive: z.boolean().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new Error("Not authenticated");
+        return await updateProductAddon(input);
+      }),
+
+    deleteAddon: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new Error("Not authenticated");
+        return await deleteProductAddon(input.id);
+      }),
+
+    // ===== PRICE CALCULATION =====
+    calculatePrice: protectedProcedure
+      .input(z.object({
+        productId: z.number(),
+        sizeId: z.number(),
+        quantityId: z.number().optional(),
+        customQuantity: z.number().optional(),
+        addonIds: z.array(z.number()).optional(),
+      }))
+      .query(async ({ input }) => {
+        return await calculateProductPrice(input);
+      }),
+
+    // ===== GET WITH DETAILS =====
+    getWithDetails: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        return await getProductWithDetails(input.id);
+      }),
+
+    listWithDetails: protectedProcedure
+      .input(z.object({ categoryId: z.number().optional() }).optional())
+      .query(async ({ input }) => {
+        return await getProductsWithDetails(input?.categoryId);
       }),
   }),
 
