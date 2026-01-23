@@ -282,6 +282,15 @@ export const appRouter = router({
     pendingCustomers: protectedProcedure.query(async () => {
       return await getPendingCustomers(5);
     }),
+
+    // New endpoints for pending signups and approvals
+    pendingSignups: protectedProcedure.query(async () => {
+      return await getPendingSignups(5);
+    }),
+
+    pendingApprovals: protectedProcedure.query(async () => {
+      return await getPendingApprovals(5);
+    }),
   }),
 
   // ==================== ACTIVITY LOG API ====================

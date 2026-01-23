@@ -185,6 +185,7 @@ export async function getRecentQuotes(limit: number = 5) {
     return [];
   }
 
+  // Get recent quotes with status 'draft' or 'sent' (pending)
   const recentQuotes = await db.select({
     id: quotes.id,
     status: quotes.status,
@@ -195,12 +196,61 @@ export async function getRecentQuotes(limit: number = 5) {
   })
   .from(quotes)
   .leftJoin(users, eq(quotes.customerId, users.id))
+  .where(
+    or(
+      eq(quotes.status, 'draft'),
+      eq(quotes.status, 'sent')
+    )
+  )
   .orderBy(desc(quotes.createdAt))
   .limit(limit);
 
   return recentQuotes;
 }
 
+// Get pending customer signup requests (new customers waiting in queue)
+export async function getPendingSignups(limit: number = 5) {
+  const db = await getDb();
+  if (!db) {
+    return [];
+  }
+
+  const pending = await db.select({
+    id: customerSignupRequests.id,
+    name: customerSignupRequests.name,
+    email: customerSignupRequests.email,
+    phone: customerSignupRequests.phone,
+    companyName: customerSignupRequests.companyName,
+    description: customerSignupRequests.description,
+    queueNumber: customerSignupRequests.queueNumber,
+    status: customerSignupRequests.status,
+    createdAt: customerSignupRequests.createdAt,
+  })
+    .from(customerSignupRequests)
+    .where(eq(customerSignupRequests.status, "pending"))
+    .orderBy(customerSignupRequests.queueNumber)
+    .limit(limit);
+
+  return pending;
+}
+
+// Get pending customer approvals (existing users waiting for approval)
+export async function getPendingApprovals(limit: number = 5) {
+  const db = await getDb();
+  if (!db) {
+    return [];
+  }
+
+  const pending = await db.select()
+    .from(users)
+    .where(eq(users.status, "pending_approval"))
+    .orderBy(desc(users.createdAt))
+    .limit(limit);
+
+  return pending;
+}
+
+// Legacy function - kept for backwards compatibility
 export async function getPendingCustomers(limit: number = 5) {
   const db = await getDb();
   if (!db) {
