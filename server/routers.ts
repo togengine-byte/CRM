@@ -349,7 +349,7 @@ export const appRouter = router({
 
   // ==================== PRODUCTS API ====================
   products: router({
-    list: protectedProcedure
+    list: publicProcedure
       .input(z.object({
         category: z.string().optional(),
         categoryId: z.number().optional(),
@@ -371,7 +371,7 @@ export const appRouter = router({
         return await getProductCategories();
       }),
 
-    getCategories: protectedProcedure
+    getCategories: publicProcedure
       .query(async () => {
         const db = await getDb();
         const { categories } = await import('../drizzle/schema');
@@ -485,7 +485,7 @@ export const appRouter = router({
       }),
 
     // ===== SIZE QUANTITIES =====
-    getSizeQuantities: protectedProcedure
+    getSizeQuantities: publicProcedure
       .input(z.object({ sizeId: z.number() }))
       .query(async ({ input }) => {
         const db = await getDb();
@@ -559,7 +559,7 @@ export const appRouter = router({
       }),
 
     // ===== SIZES =====
-    getSizes: protectedProcedure
+    getSizes: publicProcedure
       .input(z.object({ productId: z.number() }))
       .query(async ({ input }) => {
         const db = await getDb();
@@ -652,7 +652,7 @@ export const appRouter = router({
       }),
 
     // ===== ADDONS =====
-    getAddons: protectedProcedure
+    getAddons: publicProcedure
       .input(z.object({ productId: z.number().optional(), categoryId: z.number().optional() }))
       .query(async ({ input }) => {
         const db = await getDb();
