@@ -141,7 +141,7 @@ function JobsInProductionCard({ isLoading: parentLoading }: { isLoading: boolean
   const [, navigate] = useLocation();
   const loading = parentLoading || isLoading;
   
-  const inProductionJobs = jobs?.filter((job: any) => job.status === 'in_production').slice(0, 4) || [];
+  const inProductionJobs = jobs?.filter((job: any) => ['pending', 'in_progress', 'in_production'].includes(job.status)).slice(0, 4) || [];
 
   return (
     <Card className="border-0 shadow-sm bg-white">
@@ -197,7 +197,7 @@ function JobsInProductionCard({ isLoading: parentLoading }: { isLoading: boolean
                 <ChevronRight className="h-4 w-4 text-slate-400 group-hover:text-slate-600 transition-colors shrink-0" />
               </div>
             ))}
-            {jobs && jobs.filter((j: any) => j.status === 'in_production').length > 4 && (
+            {jobs && jobs.filter((j: any) => ['pending', 'in_progress', 'in_production'].includes(j.status)).length > 4 && (
               <Button 
                 variant="ghost" 
                 className="w-full text-sm text-slate-600 hover:text-slate-900 mt-1"
