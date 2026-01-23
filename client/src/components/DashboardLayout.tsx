@@ -1,4 +1,5 @@
 import { useAuthContext } from "@/contexts/AuthContext";
+import { trpc } from "@/lib/trpc";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -8,7 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelRight, Users, FileText, Truck, Package, BarChart3, Settings, Menu, X, ShoppingBag, User, Shield, Briefcase } from "lucide-react";
+import { LayoutDashboard, LogOut, PanelRight, Users, FileText, Truck, Package, BarChart3, Settings, Menu, X, ShoppingBag, User, Shield, Briefcase, Bell } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -93,6 +94,13 @@ export default function DashboardLayout({
   const isMobile = useIsMobile();
 
   const currentWidth = isCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH;
+
+  // Fetch pending signups count for notification badge
+  const { data: pendingSignups } = trpc.dashboard.pendingSignups.useQuery(undefined, {
+    enabled: user?.role === 'admin' || user?.role === 'employee',
+    refetchInterval: 30000, // Refresh every 30 seconds
+  });
+  const pendingCount = pendingSignups?.length || 0;
 
   /**
    * Get menu items based on user role
@@ -183,13 +191,28 @@ export default function DashboardLayout({
             {!isCollapsed && (
               <span className="font-semibold text-lg tracking-tight">QuoteFlow</span>
             )}
-            <button
-              onClick={() => setIsCollapsed(!isCollapsed)}
-              className="h-8 w-8 flex items-center justify-center hover:bg-accent rounded-lg transition-colors"
-              aria-label="Toggle sidebar"
-            >
-              <PanelRight className={cn("h-4 w-4 text-muted-foreground transition-transform", isCollapsed && "rotate-180")} />
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Notification Bell */}
+              {pendingCount > 0 && (
+                <button
+                  onClick={() => setLocation('/dashboard')}
+                  className="relative h-8 w-8 flex items-center justify-center hover:bg-accent rounded-lg transition-colors"
+                  aria-label="התראות"
+                >
+                  <Bell className="h-4 w-4 text-muted-foreground" />
+                  <span className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center bg-red-500 text-white text-xs font-bold rounded-full animate-pulse">
+                    {pendingCount}
+                  </span>
+                </button>
+              )}
+              <button
+                onClick={() => setIsCollapsed(!isCollapsed)}
+                className="h-8 w-8 flex items-center justify-center hover:bg-accent rounded-lg transition-colors"
+                aria-label="Toggle sidebar"
+              >
+                <PanelRight className={cn("h-4 w-4 text-muted-foreground transition-transform", isCollapsed && "rotate-180")} />
+              </button>
+            </div>
           </div>
 
           {/* Navigation */}
@@ -271,12 +294,27 @@ export default function DashboardLayout({
       {isMobile && (
         <header className="fixed top-0 right-0 left-0 h-14 bg-background/95 backdrop-blur border-b border-border z-50 flex items-center justify-between px-4">
           <span className="font-semibold">QuoteFlow</span>
-          <button
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="h-9 w-9 flex items-center justify-center hover:bg-accent rounded-lg"
-          >
-            {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Notification Bell - Mobile */}
+            {pendingCount > 0 && (
+              <button
+                onClick={() => { setLocation('/dashboard'); setIsMobileMenuOpen(false); }}
+                className="relative h-9 w-9 flex items-center justify-center hover:bg-accent rounded-lg"
+                aria-label="התראות"
+              >
+                <Bell className="h-5 w-5 text-muted-foreground" />
+                <span className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center bg-red-500 text-white text-xs font-bold rounded-full animate-pulse">
+                  {pendingCount}
+                </span>
+              </button>
+            )}
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="h-9 w-9 flex items-center justify-center hover:bg-accent rounded-lg"
+            >
+              {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
+          </div>
         </header>
       )}
 
