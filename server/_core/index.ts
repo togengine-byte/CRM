@@ -3,7 +3,7 @@ import express from "express";
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { registerClerkRoutes } from "./clerk-auth";
+import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
@@ -30,17 +30,21 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   // Log environment variables for debugging
   console.log('[Server] Environment variables check:');
-  console.log('[Server] CLERK_SECRET_KEY:', process.env.CLERK_SECRET_KEY ? 'SET' : 'NOT SET');
-  console.log('[Server] VITE_CLERK_PUBLISHABLE_KEY:', process.env.VITE_CLERK_PUBLISHABLE_KEY ? 'SET' : 'NOT SET');
+  console.log('[Server] JWT_SECRET:', process.env.JWT_SECRET ? 'SET' : 'NOT SET');
+  console.log('[Server] DATABASE_URL:', process.env.DATABASE_URL ? 'SET' : 'NOT SET');
   console.log('[Server] NODE_ENV:', process.env.NODE_ENV);
   
   const app = express();
   const server = createServer(app);
+  
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
-  // Clerk authentication routes
-  registerClerkRoutes(app);
+  
+  // Our custom OAuth routes (login, logout, me, signup)
+  // This replaces Clerk authentication with our own JWT-based system
+  registerOAuthRoutes(app);
+  
   // tRPC API
   app.use(
     "/api/trpc",
@@ -49,6 +53,7 @@ async function startServer() {
       createContext,
     })
   );
+  
   // development mode uses Vite, production mode uses static files
   if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);
