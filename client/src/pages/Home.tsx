@@ -15,7 +15,8 @@ import {
   Plus,
   ChevronLeft,
   Clock,
-  AlertCircle
+  AlertCircle,
+  Inbox
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -30,6 +31,16 @@ function formatCurrency(value: number): string {
 
 function formatNumber(value: number): string {
   return new Intl.NumberFormat('he-IL').format(value);
+}
+
+function formatDate(dateString: string): string {
+  const date = new Date(dateString);
+  return new Intl.DateTimeFormat('he-IL', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
 }
 
 function OpenJobsCard({ isLoading }: { isLoading: boolean }) {
@@ -164,6 +175,72 @@ function PendingQuotesCard({ quotes, isLoading }: { quotes: any[]; isLoading: bo
   );
 }
 
+// New component for pending quote requests from landing page
+function PendingSignupsCard({ signups, isLoading }: { signups: any[]; isLoading: boolean }) {
+  return (
+    <Card className="animate-slide-up opacity-0 stagger-2">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base font-medium flex items-center gap-2 text-foreground">
+            <Inbox className="h-4 w-4 text-muted-foreground" />
+            בקשות הצעות מחיר חדשות
+          </CardTitle>
+          {signups.length > 0 && (
+            <Badge variant="outline" className="text-[11px] font-normal bg-blue-50 text-blue-700 border-blue-200">
+              {signups.length} חדשות
+            </Badge>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="pt-0">
+        {isLoading ? (
+          <div className="space-y-2">
+            {[...Array(3)].map((_, i) => (
+              <Skeleton key={i} className="h-14 w-full" />
+            ))}
+          </div>
+        ) : signups.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <Inbox className="h-8 w-8 text-muted-foreground/40 mb-2" />
+            <p className="text-sm text-muted-foreground">אין בקשות חדשות</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {signups.slice(0, 4).map((signup) => (
+              <div 
+                key={signup.id} 
+                className="flex items-center justify-between py-2.5 px-3 rounded-lg border border-border hover:bg-accent/30 transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-8 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
+                    <span className="text-xs font-medium text-blue-700">
+                      #{signup.queueNumber || signup.id}
+                    </span>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{signup.name}</p>
+                    <p className="text-xs text-muted-foreground truncate max-w-[160px]">
+                      {signup.companyName || signup.email}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-col items-end gap-1">
+                  <Badge variant="outline" className="text-[11px] font-normal bg-amber-50 text-amber-700 border-amber-200">
+                    ממתין
+                  </Badge>
+                  <span className="text-[10px] text-muted-foreground">
+                    {signup.createdAt ? formatDate(signup.createdAt) : ''}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function PendingApprovalsCard({ customers, isLoading }: { customers: any[]; isLoading: boolean }) {
   return (
     <Card className="animate-slide-up opacity-0 stagger-3">
@@ -273,41 +350,19 @@ const actionTypeLabels: Record<string, string> = {
   customer_approved: "לקוח אושר",
   customer_rejected: "לקוח נדחה",
   customer_updated: "לקוח עודכן",
-  pricelist_assigned: "מחירון הוקצה",
-  pricelist_removed: "מחירון הוסר",
   supplier_created: "ספק נוצר",
   supplier_updated: "ספק עודכן",
-  supplier_price_updated: "מחיר ספק עודכן",
-  supplier_assigned: "ספק הוקצה לעבודה",
-  job_picked_up: "עבודה נאספה",
-  job_delivered: "עבודה נמסרה",
-  note_created: "הערה נוספה",
-  note_deleted: "הערה נמחקה",
-};
-
-const getActionLabel = (actionType: string): string => {
-  return actionTypeLabels[actionType] || actionType.replace(/_/g, " ");
+  supplier_deleted: "ספק נמחק",
+  user_login: "התחברות",
+  user_logout: "התנתקות",
 };
 
 function ActivityFeedCard({ activities, isLoading }: { activities: any[]; isLoading: boolean }) {
-  const getActivityIcon = (type: string) => {
-    if (type.includes('QUOTE')) return FileText;
-    if (type.includes('customer') || type.includes('CUSTOMER')) return Users;
-    if (type.includes('APPROVED') || type.includes('approved')) return CheckCircle2;
-    return Activity;
-  };
-
-  const formatTime = (date: Date) => {
-    const now = new Date();
-    const diff = now.getTime() - new Date(date).getTime();
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-
-    if (minutes < 1) return 'עכשיו';
-    if (minutes < 60) return `לפני ${minutes} דק'`;
-    if (hours < 24) return `לפני ${hours} שע'`;
-    return `לפני ${days} ימים`;
+  const getActivityIcon = (actionType: string) => {
+    if (actionType.includes('QUOTE')) return <FileText className="h-3 w-3" />;
+    if (actionType.includes('customer') || actionType.includes('user')) return <Users className="h-3 w-3" />;
+    if (actionType.includes('product') || actionType.includes('variant')) return <TrendingUp className="h-3 w-3" />;
+    return <Activity className="h-3 w-3" />;
   };
 
   return (
@@ -315,20 +370,26 @@ function ActivityFeedCard({ activities, isLoading }: { activities: any[]; isLoad
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base font-medium flex items-center gap-2 text-foreground">
-            <Clock className="h-4 w-4 text-muted-foreground" />
+            <Activity className="h-4 w-4 text-muted-foreground" />
             פעילות אחרונה
           </CardTitle>
-          <a href="/activity" className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
+          <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground hover:text-foreground" onClick={() => toast.info("בקרוב")}>
             צפה בהכל
-            <ChevronLeft className="h-3 w-3" />
-          </a>
+            <ChevronLeft className="h-3 w-3 mr-1" />
+          </Button>
         </div>
       </CardHeader>
       <CardContent className="pt-0">
         {isLoading ? (
           <div className="space-y-3">
             {[...Array(4)].map((_, i) => (
-              <Skeleton key={i} className="h-10 w-full" />
+              <div key={i} className="flex items-start gap-3">
+                <Skeleton className="h-6 w-6 rounded-full shrink-0" />
+                <div className="flex-1 space-y-1">
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-3 w-1/2" />
+                </div>
+              </div>
             ))}
           </div>
         ) : activities.length === 0 ? (
@@ -338,24 +399,26 @@ function ActivityFeedCard({ activities, isLoading }: { activities: any[]; isLoad
           </div>
         ) : (
           <div className="space-y-3">
-            {activities.slice(0, 5).map((activity) => {
-              const Icon = getActivityIcon(activity.actionType);
-              return (
-                <div key={activity.id} className="flex items-start gap-3">
-                  <div className="h-7 w-7 rounded-full bg-accent flex items-center justify-center shrink-0 mt-0.5">
-                    <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-foreground">
-                      <span className="font-medium">{activity.userName || 'משתמש'}</span>
-                      {' '}
-                      <span className="text-muted-foreground">{getActionLabel(activity.actionType)}</span>
-                    </p>
-                    <p className="text-xs text-muted-foreground">{formatTime(activity.createdAt)}</p>
-                  </div>
+            {activities.slice(0, 5).map((activity, index) => (
+              <div key={activity.id || index} className="flex items-start gap-3">
+                <div className="h-6 w-6 rounded-full bg-accent flex items-center justify-center shrink-0 mt-0.5">
+                  {getActivityIcon(activity.actionType)}
                 </div>
-              );
-            })}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-foreground">
+                    {actionTypeLabels[activity.actionType] || activity.actionType}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {activity.createdAt ? new Date(activity.createdAt).toLocaleString('he-IL', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    }) : ''}
+                  </p>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </CardContent>
@@ -364,32 +427,30 @@ function ActivityFeedCard({ activities, isLoading }: { activities: any[]; isLoad
 }
 
 function QuickActionsCard() {
+  const actions = [
+    { label: "הצעת מחיר חדשה", icon: Plus, onClick: () => toast.info("בקרוב") },
+    { label: "הוסף לקוח", icon: Users, onClick: () => toast.info("בקרוב") },
+    { label: "הוסף מוצר", icon: FileText, onClick: () => toast.info("בקרוב") },
+  ];
+
   return (
-    <Card className="animate-slide-up opacity-0 stagger-5">
+    <Card className="animate-slide-up opacity-0 stagger-2">
       <CardHeader className="pb-3">
-        <CardTitle className="text-base font-medium flex items-center gap-2 text-foreground">
-          <Plus className="h-4 w-4 text-muted-foreground" />
-          פעולות מהירות
-        </CardTitle>
+        <CardTitle className="text-base font-medium text-foreground">פעולות מהירות</CardTitle>
       </CardHeader>
       <CardContent className="pt-0">
-        <div className="grid grid-cols-2 gap-2">
-          <Button variant="outline" size="sm" className="h-auto py-3 flex-col gap-1" onClick={() => toast.info("בקרוב")}>
-            <FileText className="h-4 w-4" />
-            <span className="text-xs">הצעת מחיר</span>
-          </Button>
-          <Button variant="outline" size="sm" className="h-auto py-3 flex-col gap-1" onClick={() => toast.info("בקרוב")}>
-            <Users className="h-4 w-4" />
-            <span className="text-xs">לקוח חדש</span>
-          </Button>
-          <Button variant="outline" size="sm" className="h-auto py-3 flex-col gap-1" onClick={() => toast.info("בקרוב")}>
-            <Truck className="h-4 w-4" />
-            <span className="text-xs">ספק חדש</span>
-          </Button>
-          <Button variant="outline" size="sm" className="h-auto py-3 flex-col gap-1" onClick={() => toast.info("בקרוב")}>
-            <TrendingUp className="h-4 w-4" />
-            <span className="text-xs">דוח מהיר</span>
-          </Button>
+        <div className="grid gap-2">
+          {actions.map((action, index) => (
+            <Button 
+              key={index}
+              variant="outline" 
+              className="justify-start gap-2 h-10"
+              onClick={action.onClick}
+            >
+              <action.icon className="h-4 w-4" />
+              {action.label}
+            </Button>
+          ))}
         </div>
       </CardContent>
     </Card>
@@ -400,6 +461,7 @@ export default function Home() {
   const { data: kpis, isLoading: kpisLoading } = trpc.dashboard.kpis.useQuery();
   const { data: quotes, isLoading: quotesLoading } = trpc.dashboard.recentQuotes.useQuery();
   const { data: customers, isLoading: customersLoading } = trpc.dashboard.pendingCustomers.useQuery();
+  const { data: signups, isLoading: signupsLoading } = trpc.dashboard.pendingSignups.useQuery();
   const { data: activities, isLoading: activitiesLoading } = trpc.dashboard.recentActivity.useQuery();
 
   return (
@@ -455,8 +517,9 @@ export default function Home() {
         <QuickActionsCard />
       </div>
 
-      {/* Secondary Grid */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      {/* Secondary Grid - Now with 4 columns on large screens */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <PendingSignupsCard signups={signups || []} isLoading={signupsLoading} />
         <PendingQuotesCard quotes={quotes || []} isLoading={quotesLoading} />
         <PendingApprovalsCard customers={customers || []} isLoading={customersLoading} />
         <ActivityFeedCard activities={activities || []} isLoading={activitiesLoading} />
