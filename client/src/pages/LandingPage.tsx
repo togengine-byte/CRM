@@ -236,12 +236,33 @@ export default function LandingPage() {
     setShowProductDropdown(false);
   };
 
+  // State for error messages
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitErrorDetails, setSubmitErrorDetails] = useState<string[]>([]);
+
   // Submit
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitError(null);
+    setSubmitErrorDetails([]);
     
-    if (!customerName || !customerPhone) {
-      toast.error("נא למלא שם וטלפון");
+    // Validate required fields
+    const errors: string[] = [];
+    if (!customerName.trim()) {
+      errors.push("שם מלא הוא שדה חובה");
+    }
+    if (!customerPhone.trim()) {
+      errors.push("מספר טלפון הוא שדה חובה");
+    } else if (!/^[0-9\-\+\s]{9,15}$/.test(customerPhone.trim())) {
+      errors.push("מספר טלפון לא תקין");
+    }
+    if (customerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)) {
+      errors.push("כתובת אימייל לא תקינה");
+    }
+    
+    if (errors.length > 0) {
+      setSubmitError("הבקשה לא נשלחה מהסיבות הבאות:");
+      setSubmitErrorDetails(errors);
       return;
     }
 
@@ -249,10 +270,10 @@ export default function LandingPage() {
 
     try {
       const formData = new FormData();
-      formData.append('name', customerName);
-      formData.append('email', customerEmail);
-      formData.append('phone', customerPhone);
-      formData.append('companyName', customerCompany);
+      formData.append('name', customerName.trim());
+      formData.append('email', customerEmail.trim());
+      formData.append('phone', customerPhone.trim());
+      formData.append('companyName', customerCompany.trim());
       
       // Build description with product info
       let fullDescription = "";
@@ -298,15 +319,25 @@ export default function LandingPage() {
 
       if (!response.ok) {
         const data = await response.json();
-        toast.error(data.error || "שגיאה בשליחת הבקשה");
+        const serverErrors: string[] = [];
+        
+        if (data.error) {
+          serverErrors.push(data.error);
+        }
+        if (data.details && Array.isArray(data.details)) {
+          serverErrors.push(...data.details);
+        }
+        
+        setSubmitError("הבקשה לא נשלחה מהסיבות הבאות:");
+        setSubmitErrorDetails(serverErrors.length > 0 ? serverErrors : ["שגיאה בשרת, נסה שוב מאוחר יותר"]);
         return;
       }
 
       setSubmitted(true);
-      toast.success("הבקשה נשלחה בהצלחה!");
     } catch (err) {
-      toast.error("שגיאה בשליחת הבקשה");
       console.error(err);
+      setSubmitError("הבקשה לא נשלחה מהסיבות הבאות:");
+      setSubmitErrorDetails(["שגיאת תקשורת, בדוק את החיבור לאינטרנט ונסה שוב"]);
     } finally {
       setSubmitLoading(false);
     }
@@ -666,6 +697,28 @@ export default function LandingPage() {
                 </div>
               </div>
             </div>
+
+            {/* Error Messages */}
+            {submitError && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center flex-shrink-0">
+                    <X className="h-4 w-4 text-red-600" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-red-800 mb-2">{submitError}</h4>
+                    <ul className="space-y-1">
+                      {submitErrorDetails.map((detail, index) => (
+                        <li key={index} className="text-red-700 text-sm flex items-center gap-2">
+                          <span className="w-1.5 h-1.5 bg-red-400 rounded-full"></span>
+                          {detail}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Submit button */}
             <Button 

@@ -844,6 +844,59 @@ export const appRouter = router({
         }
         return await rateDeal(input.quoteId, input.rating, ctx.user.id);
       }),
+
+    assignSupplier: protectedProcedure
+      .input(z.object({
+        quoteId: z.number(),
+        supplierId: z.number(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new Error("Not authenticated");
+        if (ctx.user.role !== 'admin' && ctx.user.role !== 'employee') {
+          throw new Error("Only employees can assign suppliers");
+        }
+        
+        const db = await getDb();
+        if (!db) throw new Error("Database not available");
+        
+        // Get quote items
+        const quoteItems = await db.execute(sql`
+          SELECT id, "productVariantId", quantity FROM quote_items WHERE "quoteId" = ${input.quoteId}
+        `);
+        
+        if (!quoteItems.rows || quoteItems.rows.length === 0) {
+          throw new Error("No items found in quote");
+        }
+        
+        // Get supplier price for the product
+        const firstItem = quoteItems.rows[0] as { id: number; productVariantId: number; quantity: number };
+        const supplierPrice = await db.execute(sql`
+          SELECT "pricePerUnit", "deliveryDays" FROM supplier_prices 
+          WHERE "supplierId" = ${input.supplierId} AND "productVariantId" = ${firstItem.productVariantId}
+          LIMIT 1
+        `);
+        
+        const pricePerUnit = supplierPrice.rows?.[0]?.pricePerUnit || 100;
+        const deliveryDays = supplierPrice.rows?.[0]?.deliveryDays || 3;
+        
+        // Assign supplier to all quote items
+        for (const item of quoteItems.rows) {
+          const typedItem = item as { id: number; productVariantId: number; quantity: number };
+          await assignSupplierToQuoteItem(
+            typedItem.id,
+            input.supplierId,
+            Number(pricePerUnit),
+            Number(deliveryDays)
+          );
+        }
+        
+        // Update quote status to in_production
+        await db.execute(sql`
+          UPDATE quotes SET status = 'in_production', "updatedAt" = NOW() WHERE id = ${input.quoteId}
+        `);
+        
+        return { success: true };
+      }),
   }),
 
   admin: router({

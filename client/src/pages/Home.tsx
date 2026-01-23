@@ -628,34 +628,23 @@ function PendingSignupsCard({
               
               {/* Action Buttons */}
               <div className="flex flex-col gap-3 pt-4 border-t border-slate-200">
-                <div className="flex gap-3">
-                  <Button 
-                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white" 
-                    onClick={handleApproveCustomer}
-                    disabled={isApproving || isRejecting}
-                  >
-                    {isApproving ? (
-                      <>
-                        <Loader2 className="h-4 w-4 ml-2 animate-spin" />
-                        מאשר...
-                      </>
-                    ) : (
-                      <>
-                        <UserCheck className="h-4 w-4 ml-2" />
-                        אשר לקוח
-                      </>
-                    )}
-                  </Button>
-                  <Button 
-                    variant="outline"
-                    className="flex-1 border-slate-300 text-slate-700 hover:bg-slate-50"
-                    onClick={handleFindSupplier}
-                    disabled={isApproving || isRejecting}
-                  >
-                    <Search className="h-4 w-4 ml-2" />
-                    חפש ספק
-                  </Button>
-                </div>
+                <Button 
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white" 
+                  onClick={handleApproveCustomer}
+                  disabled={isApproving || isRejecting}
+                >
+                  {isApproving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 ml-2 animate-spin" />
+                      מאשר...
+                    </>
+                  ) : (
+                    <>
+                      <UserCheck className="h-4 w-4 ml-2" />
+                      אשר לקוח וצור הצעת מחיר
+                    </>
+                  )}
+                </Button>
                 <Button 
                   variant="outline"
                   className="w-full border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300"

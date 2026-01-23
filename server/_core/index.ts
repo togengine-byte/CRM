@@ -68,9 +68,151 @@ async function runMigrations() {
       }
     }
     
+    // Seed suppliers with prices and job history for rating system
+    await seedSuppliersData(db, sql);
+    
     console.log('[Migration] Migrations completed successfully');
   } catch (error) {
     console.error('[Migration] Error running migrations:', error);
+  }
+}
+
+// Seed suppliers with prices and historical jobs for rating system
+async function seedSuppliersData(db: any, sql: any) {
+  try {
+    // Check if we already have suppliers
+    const existingSuppliers = await db.execute(sql`SELECT COUNT(*) as count FROM users WHERE role = 'supplier'`);
+    const supplierCount = Number(existingSuppliers.rows?.[0]?.count || 0);
+    
+    if (supplierCount >= 9) {
+      console.log('[Seed] Suppliers already exist, skipping seed');
+      return;
+    }
+    
+    console.log('[Seed] Creating suppliers with prices and job history...');
+    
+    // Get categories
+    const categories = await db.execute(sql`SELECT id, name FROM categories ORDER BY id`);
+    if (!categories.rows || categories.rows.length === 0) {
+      console.log('[Seed] No categories found, skipping supplier seed');
+      return;
+    }
+    
+    // Get products with sizes
+    const products = await db.execute(sql`
+      SELECT bp.id as product_id, bp.name as product_name, bp."categoryId", 
+             ps.id as size_id, ps.name as size_name, ps."basePrice"
+      FROM base_products bp
+      LEFT JOIN product_sizes ps ON ps."productId" = bp.id AND ps."isActive" = true
+      WHERE bp."isActive" = true
+    `);
+    
+    // Delete existing suppliers and related data
+    console.log('[Seed] Cleaning existing supplier data...');
+    await db.execute(sql`DELETE FROM supplier_jobs WHERE "supplierId" IN (SELECT id FROM users WHERE role = 'supplier')`);
+    await db.execute(sql`DELETE FROM supplier_prices WHERE "supplierId" IN (SELECT id FROM users WHERE role = 'supplier')`);
+    await db.execute(sql`DELETE FROM users WHERE role = 'supplier'`);
+    
+    // Supplier data per category
+    const suppliersByCategory: Record<string, { name: string; company: string; priceMultiplier: number; deliveryDays: number; rating: number; reliability: number }[]> = {
+      'דפוס': [
+        { name: 'יוסי כהן', company: 'דפוס הצפון', priceMultiplier: 0.85, deliveryDays: 2, rating: 4.8, reliability: 95 },
+        { name: 'מיכאל לוי', company: 'דפוס מהיר', priceMultiplier: 0.95, deliveryDays: 1, rating: 4.5, reliability: 90 },
+        { name: 'דוד אברהם', company: 'דפוס איכות', priceMultiplier: 1.1, deliveryDays: 3, rating: 4.2, reliability: 85 },
+      ],
+      'רוחב': [
+        { name: 'רוני שמש', company: 'רוחב השרון', priceMultiplier: 0.9, deliveryDays: 3, rating: 4.6, reliability: 92 },
+        { name: 'אבי מזרחי', company: 'רוחב הגליל', priceMultiplier: 1.0, deliveryDays: 2, rating: 4.3, reliability: 88 },
+        { name: 'שלמה גולדברג', company: 'רוחב הנגב', priceMultiplier: 0.8, deliveryDays: 4, rating: 4.9, reliability: 98 },
+      ],
+      'שילוט': [
+        { name: 'יעקב פרץ', company: 'שלטים ישראל', priceMultiplier: 0.88, deliveryDays: 5, rating: 4.4, reliability: 87 },
+        { name: 'נורית בן דוד', company: 'שילוט המרכז', priceMultiplier: 1.05, deliveryDays: 3, rating: 4.7, reliability: 93 },
+        { name: 'אלי כהן', company: 'שלטי אלי', priceMultiplier: 0.92, deliveryDays: 4, rating: 4.1, reliability: 82 },
+      ],
+      'מוצרי פרסום': [
+        { name: 'חיים רוזנברג', company: 'פרסום הצפון', priceMultiplier: 0.87, deliveryDays: 2, rating: 4.5, reliability: 91 },
+        { name: 'מירי אדלר', company: 'פרסום מהיר', priceMultiplier: 0.95, deliveryDays: 1, rating: 4.8, reliability: 96 },
+        { name: 'דני שפירא', company: 'פרסום דני', priceMultiplier: 1.15, deliveryDays: 3, rating: 4.0, reliability: 80 },
+      ],
+    };
+    
+    const bcrypt = await import('bcryptjs');
+    const hashedPassword = await bcrypt.hash('supplier123', 10);
+    
+    let supplierNumber = 1000;
+    
+    for (const category of categories.rows) {
+      const categoryName = category.name as string;
+      const suppliers = suppliersByCategory[categoryName] || suppliersByCategory['דפוס'];
+      
+      for (const supplierData of suppliers) {
+        supplierNumber++;
+        const openId = `supplier-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const email = `${supplierData.name.replace(/\s/g, '.').toLowerCase()}@supplier.com`;
+        
+        // Create supplier
+        const supplierResult = await db.execute(sql`
+          INSERT INTO users ("openId", name, email, phone, "companyName", role, status, "passwordHash", "supplierNumber")
+          VALUES (${openId}, ${supplierData.name}, ${email}, '050-${supplierNumber}', ${supplierData.company}, 'supplier', 'active', ${hashedPassword}, ${supplierNumber})
+          RETURNING id
+        `);
+        
+        const supplierId = supplierResult.rows[0].id;
+        console.log(`[Seed] Created supplier: ${supplierData.name} (ID: ${supplierId})`);
+        
+        // Get products for this category
+        const categoryProducts = products.rows.filter((p: any) => p.categoryId === category.id);
+        
+        // Add prices for each product size
+        for (const product of categoryProducts) {
+          if (product.size_id) {
+            const basePrice = Number(product.basePrice) || 100;
+            const supplierPrice = Math.round(basePrice * supplierData.priceMultiplier * 100) / 100;
+            
+            await db.execute(sql`
+              INSERT INTO supplier_prices ("supplierId", "productVariantId", "pricePerUnit", "deliveryDays", "minQuantity", "isPreferred")
+              VALUES (${supplierId}, ${product.size_id}, ${supplierPrice}, ${supplierData.deliveryDays}, 1, false)
+              ON CONFLICT DO NOTHING
+            `);
+          }
+        }
+        
+        // Create historical jobs for rating calculation
+        const numJobs = Math.floor(Math.random() * 10) + 5; // 5-15 jobs per supplier
+        for (let i = 0; i < numJobs; i++) {
+          const daysAgo = Math.floor(Math.random() * 90) + 1; // Last 90 days
+          const createdAt = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000);
+          const readyAt = new Date(createdAt.getTime() + supplierData.deliveryDays * 24 * 60 * 60 * 1000);
+          
+          // Random reliability based on supplier's reliability score
+          const isReliable = Math.random() * 100 < supplierData.reliability;
+          const rating = isReliable 
+            ? Math.min(5, supplierData.rating + (Math.random() - 0.5))
+            : Math.max(1, supplierData.rating - 1 - Math.random());
+          
+          await db.execute(sql`
+            INSERT INTO supplier_jobs (
+              "supplierId", "customerId", "productVariantId", quantity, "pricePerUnit", status,
+              "supplierMarkedReady", "supplierReadyAt", "courierConfirmedReady", "supplierRating",
+              "createdAt", "updatedAt"
+            )
+            VALUES (
+              ${supplierId}, 1, 1, ${Math.floor(Math.random() * 500) + 100}, 
+              ${Math.round(100 * supplierData.priceMultiplier)}, 'delivered',
+              true, ${readyAt.toISOString()}, ${isReliable}, ${Math.round(rating * 10) / 10},
+              ${createdAt.toISOString()}, ${readyAt.toISOString()}
+            )
+          `);
+        }
+        
+        console.log(`[Seed] Added ${numJobs} historical jobs for ${supplierData.name}`);
+      }
+    }
+    
+    console.log('[Seed] Suppliers seeding completed!');
+  } catch (error) {
+    console.error('[Seed] Error seeding suppliers:', error);
   }
 }
 
