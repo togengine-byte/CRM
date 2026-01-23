@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -108,6 +108,7 @@ interface VariantFormData {
 
 export default function Products() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [initialCategorySet, setInitialCategorySet] = useState(false);
   const [expandedProducts, setExpandedProducts] = useState<Set<number>>(new Set());
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
   const [isVariantDialogOpen, setIsVariantDialogOpen] = useState(false);
@@ -135,10 +136,19 @@ export default function Products() {
   const { data: categoriesData } = trpc.products.getCategories.useQuery();
   const categories = categoriesData || [];
 
-  // Fetch products
-  const { data: products, isLoading, refetch } = trpc.products.list.useQuery({
-    categoryId: selectedCategoryId || undefined,
-  });
+  // Set first category as default when categories load
+  useEffect(() => {
+    if (categories.length > 0 && !initialCategorySet) {
+      setSelectedCategoryId(categories[0].id);
+      setInitialCategorySet(true);
+    }
+  }, [categories, initialCategorySet]);
+
+  // Fetch products only when a category is selected
+  const { data: products, isLoading, refetch } = trpc.products.list.useQuery(
+    { categoryId: selectedCategoryId || undefined },
+    { enabled: selectedCategoryId !== null }
+  );
 
   // Mutations
   const createProductMutation = trpc.products.create.useMutation({
@@ -354,35 +364,23 @@ export default function Products() {
       </div>
 
       {/* Category Tabs */}
-      <div className="flex gap-2 overflow-x-auto pb-2">
-        <Button
-          variant={selectedCategoryId === null ? "default" : "outline"}
-          size="sm"
-          onClick={() => setSelectedCategoryId(null)}
-          className="shrink-0"
-        >
-          הכל
-          <Badge variant="secondary" className="mr-2 bg-white/20">
-            {products?.length || 0}
-          </Badge>
-        </Button>
+      <div className="flex gap-2 overflow-x-auto pb-2 border-b border-slate-200">
         {categories.map((category: Category) => {
           const IconComponent = categoryIcons[category.icon || ''] || Package;
-          const categoryProducts = products?.filter((p: Product) => p.categoryId === category.id) || [];
+          const isSelected = selectedCategoryId === category.id;
           return (
-            <Button
+            <button
               key={category.id}
-              variant={selectedCategoryId === category.id ? "default" : "outline"}
-              size="sm"
               onClick={() => setSelectedCategoryId(category.id)}
-              className="shrink-0 gap-2"
+              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors shrink-0 ${
+                isSelected
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+              }`}
             >
               <IconComponent className="h-4 w-4" />
               {category.name}
-              <Badge variant="secondary" className={selectedCategoryId === category.id ? "bg-white/20" : ""}>
-                {categoryProducts.length}
-              </Badge>
-            </Button>
+            </button>
           );
         })}
       </div>
