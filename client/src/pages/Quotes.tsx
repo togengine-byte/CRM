@@ -663,20 +663,18 @@ export default function Quotes() {
                           )}
 
                           {/* Recommend Supplier Button */}
-                          {(quote.status === 'approved' || quote.status === 'sent' || quote.status === 'draft') && (
-                            <div className="pt-4 border-t">
-                              <Button
-                                className="w-full bg-purple-600 hover:bg-purple-700 text-white"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleFindSupplier(quote.id);
-                                }}
-                              >
-                                <Search className="ml-2 h-4 w-4" />
-                                המלץ על ספק
-                              </Button>
-                            </div>
-                          )}
+                          <div className="pt-4 border-t">
+                            <Button
+                              className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleFindSupplier(quote.id);
+                              }}
+                            >
+                              <Search className="ml-2 h-4 w-4" />
+                              המלץ על ספק
+                            </Button>
+                          </div>
 
                           {/* History Toggle */}
                           <div className="pt-2 border-t">
