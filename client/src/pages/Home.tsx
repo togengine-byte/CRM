@@ -75,6 +75,72 @@ function formatFullDate(dateString: string): string {
   }).format(date);
 }
 
+// Courier Pickup Card - עבודות מוכנות לאיסוף
+function CourierPickupCard({ isLoading }: { isLoading: boolean }) {
+  const mockPickups = [
+    { id: 1, supplier: "דפוס הצפון", customer: "חברת ABC", product: "כרטיסי ביקור", readyAt: "10:30" },
+    { id: 2, supplier: "פרינט פלוס", customer: "משרד XYZ", product: "ברושורים", readyAt: "11:00" },
+  ];
+
+  return (
+    <Card className="animate-slide-up opacity-0 stagger-3">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base font-medium flex items-center gap-2 text-foreground">
+            <Truck className="h-4 w-4 text-muted-foreground" />
+            איסוף לשליח
+          </CardTitle>
+          {mockPickups.length > 0 && (
+            <Badge variant="outline" className="text-[11px] font-normal bg-green-50 text-green-700 border-green-200">
+              {mockPickups.length} מוכנים
+            </Badge>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="pt-0">
+        {isLoading ? (
+          <div className="space-y-2">
+            {[...Array(2)].map((_, i) => (
+              <Skeleton key={i} className="h-14 w-full" />
+            ))}
+          </div>
+        ) : mockPickups.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <CheckCircle2 className="h-8 w-8 text-muted-foreground/40 mb-2" />
+            <p className="text-sm text-muted-foreground">אין עבודות ממתינות לאיסוף</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {mockPickups.map((pickup) => (
+              <div 
+                key={pickup.id}
+                className="flex items-center justify-between p-3 rounded-lg border border-green-200 bg-green-50/50 hover:bg-green-50 transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
+                    <Package className="h-4 w-4 text-green-600" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-foreground">{pickup.product}</span>
+                    <span className="text-xs text-muted-foreground">
+                      <span className="text-green-600 font-medium">{pickup.supplier}</span> → {pickup.customer}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-[11px] font-normal bg-green-100 text-green-700 border-green-300">
+                    מוכן {pickup.readyAt}
+                  </Badge>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function OpenJobsCard({ isLoading }: { isLoading: boolean }) {
   const mockJobs = [
     { id: 1, supplier: "דפוס הצפון", product: "כרטיסי ביקור", quantity: 500, status: "בהדפסה", dueDate: "03/01" },
@@ -1006,8 +1072,8 @@ export default function Home() {
         {/* Open Jobs - Large Card */}
         <OpenJobsCard isLoading={kpisLoading} />
         
-        {/* Quick Actions */}
-        <QuickActionsCard />
+        {/* Courier Pickup */}
+        <CourierPickupCard isLoading={kpisLoading} />
       </div>
 
       {/* Secondary Grid */}

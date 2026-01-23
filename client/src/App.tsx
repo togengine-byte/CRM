@@ -13,6 +13,7 @@ import Products from "./pages/Products";
 import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
 import Activity from "./pages/Activity";
+import Jobs from "./pages/Jobs";
 import LandingPage from "./pages/LandingPage";
 import SupplierPortal from "./pages/SupplierPortal";
 import CustomerPortal from "./pages/CustomerPortal";
@@ -80,6 +81,15 @@ function Router() {
         <ProtectedRoute requiredRole={['admin', 'employee']}>
           <DashboardLayout>
             <Products />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
+      
+      {/* Jobs - עבודות בביצוע - זמין לאדמין ועובדים */}
+      <Route path="/jobs">
+        <ProtectedRoute requiredRole={['admin', 'employee']}>
+          <DashboardLayout>
+            <Jobs />
           </DashboardLayout>
         </ProtectedRoute>
       </Route>

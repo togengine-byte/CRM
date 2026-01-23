@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelRight, Users, FileText, Truck, Package, BarChart3, Settings, Menu, X, ShoppingBag, User, Shield } from "lucide-react";
+import { LayoutDashboard, LogOut, PanelRight, Users, FileText, Truck, Package, BarChart3, Settings, Menu, X, ShoppingBag, User, Shield, Briefcase } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -20,6 +20,7 @@ import { Badge } from "./ui/badge";
 const adminMenuItems = [
   { icon: LayoutDashboard, label: "לוח בקרה", path: "/dashboard" },
   { icon: FileText, label: "הצעות מחיר", path: "/quotes" },
+  { icon: Briefcase, label: "עבודות בביצוע", path: "/jobs" },
   { icon: Users, label: "לקוחות", path: "/customers" },
   { icon: Truck, label: "ספקים", path: "/suppliers" },
   { icon: Package, label: "מוצרים", path: "/products" },
@@ -31,6 +32,7 @@ const adminMenuItems = [
 const employeeMenuItems = [
   { icon: LayoutDashboard, label: "לוח בקרה", path: "/dashboard" },
   { icon: FileText, label: "הצעות מחיר", path: "/quotes" },
+  { icon: Briefcase, label: "עבודות בביצוע", path: "/jobs" },
   { icon: Users, label: "לקוחות", path: "/customers" },
   { icon: Truck, label: "ספקים", path: "/suppliers" },
   { icon: Package, label: "מוצרים", path: "/products" },
