@@ -462,7 +462,23 @@ function StaffManagementSettings() {
       setIsCreateDialogOpen(false);
       resetForm();
     },
-    onError: (error) => toast.error("שגיאה: " + error.message),
+    onError: (error) => {
+      // הודעות שגיאה ברורות למשתמש
+      const errorMessage = error.message;
+      if (errorMessage.includes("מייל") && errorMessage.includes("קיימת")) {
+        toast.error("כתובת המייל כבר רשומה במערכת. אנא השתמש בכתובת מייל אחרת.", {
+          duration: 5000,
+        });
+      } else if (errorMessage.includes("סיסמה")) {
+        toast.error("הסיסמה חייבת להכיל לפחות 4 תווים", {
+          duration: 4000,
+        });
+      } else {
+        toast.error(errorMessage || "שגיאה בהוספת העובד. אנא נסה שוב.", {
+          duration: 4000,
+        });
+      }
+    },
   });
 
   const updateStaffMutation = trpc.staff.update.useMutation({
