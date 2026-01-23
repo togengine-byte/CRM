@@ -29,6 +29,7 @@ import {
   Mail,
   Building2,
   Calendar,
+  UserCheck,
   X
 } from "lucide-react";
 import { toast } from "sonner";
@@ -311,59 +312,187 @@ function PendingSignupsCard({ signups, isLoading }: { signups: any[]; isLoading:
   );
 }
 
-function PendingApprovalsCard({ customers, isLoading }: { customers: any[]; isLoading: boolean }) {
+// Component for pending customer approvals with modal and approve function
+function PendingApprovalsCard({ customers, isLoading, onRefresh }: { customers: any[]; isLoading: boolean; onRefresh: () => void }) {
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+  const [isApproving, setIsApproving] = useState(false);
+  
+  const approveCustomerMutation = trpc.admin.approveCustomer.useMutation({
+    onSuccess: () => {
+      toast.success("הלקוח אושר בהצלחה ונוסף לרשימת הלקוחות");
+      setSelectedCustomer(null);
+      onRefresh();
+    },
+    onError: (error) => {
+      toast.error("שגיאה באישור הלקוח: " + error.message);
+    },
+  });
+
+  const handleApprove = async (customerId: number, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    setIsApproving(true);
+    try {
+      await approveCustomerMutation.mutateAsync({ customerId });
+    } finally {
+      setIsApproving(false);
+    }
+  };
+
   return (
-    <Card className="animate-slide-up opacity-0 stagger-3">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base font-medium flex items-center gap-2 text-foreground">
-            <Users className="h-4 w-4 text-muted-foreground" />
-            לקוחות ממתינים לאישור
-          </CardTitle>
-          {customers.length > 0 && (
-            <Badge variant="outline" className="text-[11px] font-normal bg-amber-50 text-amber-700 border-amber-200">
-              {customers.length}
-            </Badge>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent className="pt-0">
-        {isLoading ? (
-          <div className="space-y-2">
-            {[...Array(3)].map((_, i) => (
-              <Skeleton key={i} className="h-12 w-full" />
-            ))}
+    <>
+      <Card className="animate-slide-up opacity-0 stagger-3">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base font-medium flex items-center gap-2 text-foreground">
+              <Users className="h-4 w-4 text-muted-foreground" />
+              לקוחות ממתינים לאישור
+            </CardTitle>
+            {customers.length > 0 && (
+              <Badge variant="outline" className="text-[11px] font-normal bg-amber-50 text-amber-700 border-amber-200">
+                {customers.length}
+              </Badge>
+            )}
           </div>
-        ) : customers.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <CheckCircle2 className="h-8 w-8 text-muted-foreground/40 mb-2" />
-            <p className="text-sm text-muted-foreground">אין לקוחות ממתינים</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {customers.slice(0, 4).map((customer) => (
-              <div 
-                key={customer.id} 
-                className="flex items-center justify-between py-2.5 px-3 rounded-lg border border-border hover:bg-accent/30 transition-colors cursor-pointer"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-full bg-amber-50 flex items-center justify-center shrink-0">
-                    <Clock className="h-4 w-4 text-amber-600" />
+        </CardHeader>
+        <CardContent className="pt-0">
+          {isLoading ? (
+            <div className="space-y-2">
+              {[...Array(3)].map((_, i) => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
+            </div>
+          ) : customers.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <CheckCircle2 className="h-8 w-8 text-muted-foreground/40 mb-2" />
+              <p className="text-sm text-muted-foreground">אין לקוחות ממתינים</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {customers.slice(0, 4).map((customer) => (
+                <div 
+                  key={customer.id} 
+                  className="flex items-center justify-between py-2.5 px-3 rounded-lg border border-border hover:bg-accent/30 transition-colors cursor-pointer"
+                  onClick={() => setSelectedCustomer(customer)}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-full bg-amber-50 flex items-center justify-center shrink-0">
+                      <Clock className="h-4 w-4 text-amber-600" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{customer.name || 'לקוח חדש'}</p>
+                      <p className="text-xs text-muted-foreground truncate max-w-[160px]">{customer.email}</p>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{customer.name || 'לקוח חדש'}</p>
-                    <p className="text-xs text-muted-foreground truncate max-w-[160px]">{customer.email}</p>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-7 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                    onClick={(e) => handleApprove(customer.id, e)}
+                    disabled={isApproving}
+                  >
+                    <UserCheck className="h-3 w-3 ml-1" />
+                    אשר
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Modal for viewing customer details */}
+      <Dialog open={!!selectedCustomer} onOpenChange={() => setSelectedCustomer(null)}>
+        <DialogContent className="sm:max-w-lg" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-full bg-amber-50 flex items-center justify-center">
+                <Clock className="h-4 w-4 text-amber-600" />
+              </div>
+              לקוח ממתין לאישור
+            </DialogTitle>
+            <DialogDescription>
+              פרטי הלקוח שממתין לאישור כניסה למערכת
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedCustomer && (
+            <div className="space-y-4 mt-4">
+              {/* Customer Info */}
+              <div className="grid gap-3">
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-accent/30">
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">שם מלא</p>
+                    <p className="text-sm font-medium">{selectedCustomer.name || 'לא צוין'}</p>
                   </div>
                 </div>
-                <Button variant="ghost" size="sm" className="h-7 text-xs">
-                  אשר
+                
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-accent/30">
+                  <Mail className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">אימייל</p>
+                    <p className="text-sm font-medium" dir="ltr">{selectedCustomer.email}</p>
+                  </div>
+                </div>
+                
+                {selectedCustomer.phone && (
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-accent/30">
+                    <Phone className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">טלפון</p>
+                      <p className="text-sm font-medium" dir="ltr">{selectedCustomer.phone}</p>
+                    </div>
+                  </div>
+                )}
+                
+                {selectedCustomer.companyName && (
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-accent/30">
+                    <Building2 className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">שם החברה</p>
+                      <p className="text-sm font-medium">{selectedCustomer.companyName}</p>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-accent/30">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">תאריך הרשמה</p>
+                    <p className="text-sm font-medium">{selectedCustomer.createdAt ? formatFullDate(selectedCustomer.createdAt) : 'לא זמין'}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-amber-50 border border-amber-200">
+                  <AlertCircle className="h-4 w-4 text-amber-600" />
+                  <div>
+                    <p className="text-xs text-amber-600">סטטוס</p>
+                    <p className="text-sm font-medium text-amber-700">ממתין לאישור</p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Action Buttons */}
+              <div className="flex gap-2 pt-4 border-t">
+                <Button 
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700" 
+                  onClick={() => handleApprove(selectedCustomer.id)}
+                  disabled={isApproving}
+                >
+                  <UserCheck className="h-4 w-4 ml-2" />
+                  {isApproving ? 'מאשר...' : 'אשר לקוח'}
+                </Button>
+                <Button variant="outline" onClick={() => setSelectedCustomer(null)}>
+                  סגור
                 </Button>
               </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -502,9 +631,14 @@ function QuickActionsCard() {
 
 export default function Home() {
   const { data: kpis, isLoading: kpisLoading } = trpc.dashboard.kpis.useQuery();
-  const { data: customers, isLoading: customersLoading } = trpc.dashboard.pendingCustomers.useQuery();
+  const { data: customers, isLoading: customersLoading, refetch: refetchCustomers } = trpc.dashboard.pendingCustomers.useQuery();
   const { data: signups, isLoading: signupsLoading } = trpc.dashboard.pendingSignups.useQuery();
-  const { data: activities, isLoading: activitiesLoading } = trpc.dashboard.recentActivity.useQuery();
+  const { data: activities, isLoading: activitiesLoading, refetch: refetchActivities } = trpc.dashboard.recentActivity.useQuery();
+
+  const handleCustomerRefresh = () => {
+    refetchCustomers();
+    refetchActivities();
+  };
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -562,7 +696,7 @@ export default function Home() {
       {/* Secondary Grid - Now with 3 columns on large screens */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <PendingSignupsCard signups={signups || []} isLoading={signupsLoading} />
-        <PendingApprovalsCard customers={customers || []} isLoading={customersLoading} />
+        <PendingApprovalsCard customers={customers || []} isLoading={customersLoading} onRefresh={handleCustomerRefresh} />
         <ActivityFeedCard activities={activities || []} isLoading={activitiesLoading} />
       </div>
     </div>
