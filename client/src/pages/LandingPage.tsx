@@ -24,6 +24,7 @@ import {
   Mail
 } from "lucide-react";
 import { toast } from "sonner";
+import { DebugPanel } from "@/components/DebugPanel";
 
 // Allowed file types for security
 const ALLOWED_FILE_TYPES = [
@@ -469,6 +470,9 @@ export default function LandingPage() {
       <footer className="relative z-10 text-center py-8 text-gray-500 text-sm">
         <p>© 2024 QuoteFlow. כל הזכויות שמורות.</p>
       </footer>
+
+      {/* Debug Panel */}
+      <DebugPanel />
     </div>
   );
 }
