@@ -236,6 +236,7 @@ export const customerSignupRequests = pgTable("customer_signup_requests", {
   companyName: text("companyName"),
   description: text("description").notNull(),
   status: varchar("status", { length: 20 }).default("pending").notNull(), // pending, approved, rejected
+  queueNumber: serial("queueNumber").notNull(), // מספר המתנה
   files: jsonb("files").default('[]'),
   processedAt: timestamp("processedAt"),
   processedBy: integer("processedBy"),
@@ -246,6 +247,10 @@ export const customerSignupRequests = pgTable("customer_signup_requests", {
 
 export type CustomerSignupRequest = typeof customerSignupRequests.$inferSelect;
 export type InsertCustomerSignupRequest = typeof customerSignupRequests.$inferInsert;
+
+// Create index on queueNumber for faster queries
+export const customerSignupRequestsQueueIndex = pgTable.index('idx_customer_signup_requests_queue')
+  .on(customerSignupRequests.queueNumber);
 
 // Developer logs table for debugging and monitoring
 export const developerLogs = pgTable("developer_logs", {

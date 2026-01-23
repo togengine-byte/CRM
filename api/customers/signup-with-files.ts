@@ -2,7 +2,7 @@
  * Vercel Serverless Function for Customer Signup with Files
  * 
  * Handles POST /api/customers/signup-with-files requests
- * Creates a new customer and associated quote with uploaded files
+ * Creates a new customer signup request with uploaded files
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -36,60 +36,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'שם ואימייל נדרשים' });
     }
 
-    // Check if customer already exists
-    const existingCustomer = await db.getUserByEmail(email.toLowerCase());
+    // Create customer signup request
+    const requestId = uuidv4();
     
-    let customerId: number;
-
-    if (existingCustomer) {
-      customerId = existingCustomer.id;
-    } else {
-      // Create new customer user
-      const openId = `customer-${uuidv4()}`;
-      
-      await db.upsertUser({
-        openId,
-        name,
-        email: email.toLowerCase(),
-        phone,
-        companyName,
-        role: 'customer',
-        status: 'pending_approval',
-        permissions: {},
-      });
-
-      // Get the created user
-      const newCustomer = await db.getUserByOpenId(openId);
-      if (!newCustomer) {
-        throw new Error('Failed to create customer');
-      }
-      customerId = newCustomer.id;
-    }
-
-    // Create a quote for the customer
-    const quoteResult = await db.createQuoteRequest({
-      customerId,
-      items: [],
+    const signupRequest = await db.createCustomerSignupRequest({
+      name,
+      email: email.toLowerCase(),
+      phone: phone || '',
+      companyName: companyName || null,
+      description: description || '',
+      requestId,
+      files: [],
     });
-
-    // Log the activity
-    await db.logActivity(
-      customerId,
-      'CUSTOMER_SIGNUP',
-      {
-        name,
-        email,
-        phone,
-        companyName,
-        description,
-      }
-    );
 
     return res.status(200).json({
       success: true,
       message: 'הבקשה נקלטה בהצלחה',
-      customerId,
-      quoteId: quoteResult.id,
+      requestId: signupRequest.id,
+      queueNumber: signupRequest.queueNumber,
+      status: 'pending',
     });
   } catch (error) {
     console.error('[Customers] Signup failed:', error);
