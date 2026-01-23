@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -38,7 +37,7 @@ import {
   Search,
   RefreshCw,
   ChevronDown,
-  ChevronUp,
+  ChevronLeft,
   Printer,
   Maximize,
   SignpostBig,
@@ -47,7 +46,7 @@ import {
   Ruler,
   Hash,
   Sparkles,
-  Image as ImageIcon,
+  DollarSign,
 } from "lucide-react";
 
 // Icon mapping for categories
@@ -67,6 +66,15 @@ interface Category {
   displayOrder: number;
 }
 
+interface SizeQuantity {
+  id: number;
+  sizeId: number;
+  quantity: number;
+  price: string;
+  displayOrder: number;
+  isActive: boolean;
+}
+
 interface ProductSize {
   id: number;
   productId: number;
@@ -75,15 +83,7 @@ interface ProductSize {
   basePrice: string;
   displayOrder: number;
   isActive: boolean;
-}
-
-interface ProductQuantity {
-  id: number;
-  productId: number;
-  quantity: number;
-  priceMultiplier: string;
-  displayOrder: number;
-  isActive: boolean;
+  quantities?: SizeQuantity[];
 }
 
 interface ProductAddon {
@@ -106,14 +106,14 @@ interface Product {
   allowCustomQuantity: boolean;
   isActive: boolean;
   sizes: ProductSize[];
-  quantities: ProductQuantity[];
   addons: ProductAddon[];
 }
 
 export default function Products() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [initialCategorySet, setInitialCategorySet] = useState(false);
-  const [expandedProducts, setExpandedProducts] = useState<Set<number>>(new Set());
+  const [expandedProductId, setExpandedProductId] = useState<number | null>(null);
+  const [expandedSizeId, setExpandedSizeId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   
   // Dialog states
@@ -123,6 +123,7 @@ export default function Products() {
   const [isAddonDialogOpen, setIsAddonDialogOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
+  const [selectedSizeId, setSelectedSizeId] = useState<number | null>(null);
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
 
   // Form states
@@ -136,12 +137,11 @@ export default function Products() {
   const [sizeForm, setSizeForm] = useState({
     name: "",
     dimensions: "",
-    basePrice: "",
   });
 
   const [quantityForm, setQuantityForm] = useState({
     quantity: "",
-    priceMultiplier: "1.0",
+    price: "",
   });
 
   const [addonForm, setAddonForm] = useState({
@@ -150,8 +150,6 @@ export default function Products() {
     priceType: "fixed" as "fixed" | "percentage" | "per_unit",
     price: "",
   });
-
-  const utils = trpc.useUtils();
 
   // Fetch categories
   const { data: categoriesData } = trpc.products.getCategories.useQuery();
@@ -169,6 +167,24 @@ export default function Products() {
   const { data: products, isLoading, refetch } = trpc.products.listWithDetails.useQuery(
     { categoryId: selectedCategoryId || undefined },
     { enabled: selectedCategoryId !== null }
+  );
+
+  // Fetch sizes for expanded product
+  const { data: sizesData, refetch: refetchSizes } = trpc.products.getSizes.useQuery(
+    { productId: expandedProductId! },
+    { enabled: expandedProductId !== null }
+  );
+
+  // Fetch quantities for expanded size
+  const { data: quantitiesData, refetch: refetchQuantities } = trpc.products.getSizeQuantities.useQuery(
+    { sizeId: expandedSizeId! },
+    { enabled: expandedSizeId !== null }
+  );
+
+  // Fetch addons for expanded product
+  const { data: addonsData, refetch: refetchAddons } = trpc.products.getAddons.useQuery(
+    { productId: expandedProductId! },
+    { enabled: expandedProductId !== null }
   );
 
   // Mutations
@@ -195,6 +211,7 @@ export default function Products() {
   const deleteProductMutation = trpc.products.delete.useMutation({
     onSuccess: () => {
       toast.success("המוצר נמחק בהצלחה");
+      setExpandedProductId(null);
       refetch();
     },
     onError: (error) => toast.error(error.message),
@@ -206,6 +223,7 @@ export default function Products() {
       toast.success("הגודל נוסף בהצלחה");
       setIsSizeDialogOpen(false);
       resetSizeForm();
+      refetchSizes();
       refetch();
     },
     onError: (error) => toast.error(error.message),
@@ -216,6 +234,7 @@ export default function Products() {
       toast.success("הגודל עודכן בהצלחה");
       setIsSizeDialogOpen(false);
       resetSizeForm();
+      refetchSizes();
       refetch();
     },
     onError: (error) => toast.error(error.message),
@@ -224,36 +243,38 @@ export default function Products() {
   const deleteSizeMutation = trpc.products.deleteSize.useMutation({
     onSuccess: () => {
       toast.success("הגודל נמחק בהצלחה");
+      setExpandedSizeId(null);
+      refetchSizes();
       refetch();
     },
     onError: (error) => toast.error(error.message),
   });
 
   // Quantity mutations
-  const createQuantityMutation = trpc.products.createQuantity.useMutation({
+  const createQuantityMutation = trpc.products.createSizeQuantity.useMutation({
     onSuccess: () => {
       toast.success("הכמות נוספה בהצלחה");
       setIsQuantityDialogOpen(false);
       resetQuantityForm();
-      refetch();
+      refetchQuantities();
     },
     onError: (error) => toast.error(error.message),
   });
 
-  const updateQuantityMutation = trpc.products.updateQuantity.useMutation({
+  const updateQuantityMutation = trpc.products.updateSizeQuantity.useMutation({
     onSuccess: () => {
       toast.success("הכמות עודכנה בהצלחה");
       setIsQuantityDialogOpen(false);
       resetQuantityForm();
-      refetch();
+      refetchQuantities();
     },
     onError: (error) => toast.error(error.message),
   });
 
-  const deleteQuantityMutation = trpc.products.deleteQuantity.useMutation({
+  const deleteQuantityMutation = trpc.products.deleteSizeQuantity.useMutation({
     onSuccess: () => {
       toast.success("הכמות נמחקה בהצלחה");
-      refetch();
+      refetchQuantities();
     },
     onError: (error) => toast.error(error.message),
   });
@@ -264,6 +285,7 @@ export default function Products() {
       toast.success("התוספת נוספה בהצלחה");
       setIsAddonDialogOpen(false);
       resetAddonForm();
+      refetchAddons();
       refetch();
     },
     onError: (error) => toast.error(error.message),
@@ -274,6 +296,7 @@ export default function Products() {
       toast.success("התוספת עודכנה בהצלחה");
       setIsAddonDialogOpen(false);
       resetAddonForm();
+      refetchAddons();
       refetch();
     },
     onError: (error) => toast.error(error.message),
@@ -282,6 +305,7 @@ export default function Products() {
   const deleteAddonMutation = trpc.products.deleteAddon.useMutation({
     onSuccess: () => {
       toast.success("התוספת נמחקה בהצלחה");
+      refetchAddons();
       refetch();
     },
     onError: (error) => toast.error(error.message),
@@ -295,13 +319,13 @@ export default function Products() {
   };
 
   const resetSizeForm = () => {
-    setSizeForm({ name: "", dimensions: "", basePrice: "" });
+    setSizeForm({ name: "", dimensions: "" });
     setIsEditMode(false);
     setSelectedItemId(null);
   };
 
   const resetQuantityForm = () => {
-    setQuantityForm({ quantity: "", priceMultiplier: "1.0" });
+    setQuantityForm({ quantity: "", price: "" });
     setIsEditMode(false);
     setSelectedItemId(null);
   };
@@ -314,15 +338,22 @@ export default function Products() {
 
   // Toggle product expansion
   const toggleProduct = (productId: number) => {
-    setExpandedProducts(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(productId)) {
-        newSet.delete(productId);
-      } else {
-        newSet.add(productId);
-      }
-      return newSet;
-    });
+    if (expandedProductId === productId) {
+      setExpandedProductId(null);
+      setExpandedSizeId(null);
+    } else {
+      setExpandedProductId(productId);
+      setExpandedSizeId(null);
+    }
+  };
+
+  // Toggle size expansion
+  const toggleSize = (sizeId: number) => {
+    if (expandedSizeId === sizeId) {
+      setExpandedSizeId(null);
+    } else {
+      setExpandedSizeId(sizeId);
+    }
   };
 
   // Filter products
@@ -361,8 +392,8 @@ export default function Products() {
 
   // Handle size submit
   const handleSizeSubmit = () => {
-    if (!sizeForm.name || !sizeForm.basePrice) {
-      toast.error("שם ומחיר בסיס נדרשים");
+    if (!sizeForm.name) {
+      toast.error("שם הגודל נדרש");
       return;
     }
 
@@ -371,22 +402,22 @@ export default function Products() {
         id: selectedItemId,
         name: sizeForm.name,
         dimensions: sizeForm.dimensions || undefined,
-        basePrice: parseFloat(sizeForm.basePrice),
+        basePrice: 0, // Not used anymore
       });
     } else if (selectedProductId) {
       createSizeMutation.mutate({
         productId: selectedProductId,
         name: sizeForm.name,
         dimensions: sizeForm.dimensions || undefined,
-        basePrice: parseFloat(sizeForm.basePrice),
+        basePrice: 0, // Not used anymore
       });
     }
   };
 
   // Handle quantity submit
   const handleQuantitySubmit = () => {
-    if (!quantityForm.quantity || !quantityForm.priceMultiplier) {
-      toast.error("כמות ומכפיל מחיר נדרשים");
+    if (!quantityForm.quantity || !quantityForm.price) {
+      toast.error("כמות ומחיר נדרשים");
       return;
     }
 
@@ -394,13 +425,13 @@ export default function Products() {
       updateQuantityMutation.mutate({
         id: selectedItemId,
         quantity: parseInt(quantityForm.quantity),
-        priceMultiplier: parseFloat(quantityForm.priceMultiplier),
+        price: parseFloat(quantityForm.price),
       });
-    } else if (selectedProductId) {
+    } else if (selectedSizeId) {
       createQuantityMutation.mutate({
-        productId: selectedProductId,
+        sizeId: selectedSizeId,
         quantity: parseInt(quantityForm.quantity),
-        priceMultiplier: parseFloat(quantityForm.priceMultiplier),
+        price: parseFloat(quantityForm.price),
       });
     }
   };
@@ -448,7 +479,6 @@ export default function Products() {
     setSizeForm({
       name: size.name,
       dimensions: size.dimensions || "",
-      basePrice: size.basePrice,
     });
     setSelectedProductId(productId);
     setSelectedItemId(size.id);
@@ -456,12 +486,11 @@ export default function Products() {
     setIsSizeDialogOpen(true);
   };
 
-  const openEditQuantity = (quantity: ProductQuantity, productId: number) => {
+  const openEditQuantity = (quantity: SizeQuantity) => {
     setQuantityForm({
       quantity: quantity.quantity.toString(),
-      priceMultiplier: quantity.priceMultiplier,
+      price: quantity.price,
     });
-    setSelectedProductId(productId);
     setSelectedItemId(quantity.id);
     setIsEditMode(true);
     setIsQuantityDialogOpen(true);
@@ -486,9 +515,9 @@ export default function Products() {
     setIsSizeDialogOpen(true);
   };
 
-  const openAddQuantity = (productId: number) => {
+  const openAddQuantity = (sizeId: number) => {
     resetQuantityForm();
-    setSelectedProductId(productId);
+    setSelectedSizeId(sizeId);
     setIsQuantityDialogOpen(true);
   };
 
@@ -504,7 +533,7 @@ export default function Products() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">מוצרים</h1>
-          <p className="text-slate-500 text-sm mt-1">ניהול קטלוג המוצרים, גדלים, כמויות ותוספות</p>
+          <p className="text-slate-500 text-sm mt-1">ניהול קטלוג המוצרים - לחץ על מוצר להרחבת גדלים, לחץ על גודל להצגת כמויות ומחירים</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => refetch()}>
@@ -530,7 +559,11 @@ export default function Products() {
           return (
             <button
               key={category.id}
-              onClick={() => setSelectedCategoryId(category.id)}
+              onClick={() => {
+                setSelectedCategoryId(category.id);
+                setExpandedProductId(null);
+                setExpandedSizeId(null);
+              }}
               className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors shrink-0 ${
                 isSelected
                   ? 'border-blue-600 text-blue-600 bg-blue-50'
@@ -548,7 +581,7 @@ export default function Products() {
       <div className="relative max-w-md">
         <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <Input
-          placeholder="חיפוש מוצר, גודל או תוספת..."
+          placeholder="חיפוש מוצר..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="pr-10"
@@ -578,44 +611,36 @@ export default function Products() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {filteredProducts.map((product: Product) => {
-            const isExpanded = expandedProducts.has(product.id);
+            const isExpanded = expandedProductId === product.id;
             return (
               <Card key={product.id} className="overflow-hidden">
-                {/* Product Header */}
+                {/* Product Header - Level 1 */}
                 <div 
-                  className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50 transition-colors"
+                  className={`flex items-center justify-between p-4 cursor-pointer transition-colors ${
+                    isExpanded ? 'bg-blue-50' : 'hover:bg-slate-50'
+                  }`}
                   onClick={() => toggleProduct(product.id)}
                 >
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center">
-                      {product.imageUrl ? (
-                        <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover rounded-lg" />
-                      ) : (
-                        <Package className="h-6 w-6 text-slate-400" />
-                      )}
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                      isExpanded ? 'bg-blue-100' : 'bg-slate-100'
+                    }`}>
+                      <Package className={`h-5 w-5 ${isExpanded ? 'text-blue-600' : 'text-slate-400'}`} />
                     </div>
                     <div>
                       <h3 className="font-semibold text-slate-900">{product.name}</h3>
-                      <p className="text-sm text-slate-500">{product.description || "ללא תיאור"}</p>
+                      {product.description && (
+                        <p className="text-sm text-slate-500">{product.description}</p>
+                      )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <div className="flex gap-2">
-                      <Badge variant="outline" className="gap-1">
-                        <Ruler className="h-3 w-3" />
-                        {product.sizes?.length || 0} גדלים
-                      </Badge>
-                      <Badge variant="outline" className="gap-1">
-                        <Hash className="h-3 w-3" />
-                        {product.quantities?.length || 0} כמויות
-                      </Badge>
-                      <Badge variant="outline" className="gap-1">
-                        <Sparkles className="h-3 w-3" />
-                        {product.addons?.length || 0} תוספות
-                      </Badge>
-                    </div>
+                  <div className="flex items-center gap-3">
+                    <Badge variant="outline" className="gap-1">
+                      <Ruler className="h-3 w-3" />
+                      {product.sizes?.length || 0} גדלים
+                    </Badge>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                         <Button variant="ghost" size="icon">
@@ -626,19 +651,6 @@ export default function Products() {
                         <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openEditProduct(product); }}>
                           <Pencil className="h-4 w-4 ml-2" />
                           עריכת מוצר
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openAddSize(product.id); }}>
-                          <Ruler className="h-4 w-4 ml-2" />
-                          הוסף גודל
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openAddQuantity(product.id); }}>
-                          <Hash className="h-4 w-4 ml-2" />
-                          הוסף כמות
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openAddAddon(product.id); }}>
-                          <Sparkles className="h-4 w-4 ml-2" />
-                          הוסף תוספת
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem 
@@ -656,128 +668,196 @@ export default function Products() {
                       </DropdownMenuContent>
                     </DropdownMenu>
                     {isExpanded ? (
-                      <ChevronUp className="h-5 w-5 text-slate-400" />
-                    ) : (
                       <ChevronDown className="h-5 w-5 text-slate-400" />
+                    ) : (
+                      <ChevronLeft className="h-5 w-5 text-slate-400" />
                     )}
                   </div>
                 </div>
 
-                {/* Expanded Content */}
+                {/* Expanded: Sizes - Level 2 */}
                 {isExpanded && (
-                  <div className="border-t bg-slate-50 p-4">
-                    <div className="grid grid-cols-3 gap-6">
-                      {/* Sizes */}
-                      <div>
-                        <div className="flex items-center justify-between mb-3">
-                          <h4 className="font-medium text-slate-700 flex items-center gap-2">
-                            <Ruler className="h-4 w-4" />
-                            גדלים
-                          </h4>
-                          <Button variant="ghost" size="sm" onClick={() => openAddSize(product.id)}>
-                            <Plus className="h-3 w-3" />
-                          </Button>
+                  <div className="border-t border-slate-200 bg-slate-50">
+                    {/* Sizes Header */}
+                    <div className="flex items-center justify-between px-4 py-3 bg-slate-100">
+                      <div className="flex items-center gap-2 text-sm font-medium text-slate-600">
+                        <Ruler className="h-4 w-4" />
+                        גדלים
+                      </div>
+                      <Button size="sm" variant="outline" onClick={() => openAddSize(product.id)} className="gap-1">
+                        <Plus className="h-3 w-3" />
+                        גודל חדש
+                      </Button>
+                    </div>
+
+                    {/* Sizes List */}
+                    <div className="divide-y divide-slate-200">
+                      {!sizesData || sizesData.length === 0 ? (
+                        <div className="p-4 text-center text-slate-400 text-sm">
+                          אין גדלים למוצר זה. לחץ על "גודל חדש" להוספה.
                         </div>
-                        {product.sizes?.length > 0 ? (
-                          <div className="space-y-2">
-                            {product.sizes.map((size) => (
-                              <div key={size.id} className="flex items-center justify-between bg-white p-2 rounded border">
-                                <div>
-                                  <span className="font-medium text-sm">{size.name}</span>
+                      ) : (
+                        sizesData.map((size: any) => {
+                          const isSizeExpanded = expandedSizeId === size.id;
+                          return (
+                            <div key={size.id}>
+                              {/* Size Row */}
+                              <div
+                                className={`flex items-center justify-between px-4 py-3 cursor-pointer transition-colors ${
+                                  isSizeExpanded ? 'bg-blue-50' : 'hover:bg-white'
+                                }`}
+                                onClick={() => toggleSize(size.id)}
+                              >
+                                <div className="flex items-center gap-3 mr-4">
+                                  <div className="font-medium text-slate-700">{size.name}</div>
                                   {size.dimensions && (
-                                    <span className="text-xs text-slate-500 mr-2">({size.dimensions})</span>
+                                    <span className="text-sm text-slate-400">({size.dimensions})</span>
                                   )}
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <span className="text-sm font-medium text-green-600">₪{size.basePrice}</span>
-                                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditSize(size, product.id)}>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openEditSize(size, product.id);
+                                    }}
+                                  >
                                     <Pencil className="h-3 w-3" />
                                   </Button>
-                                  <Button 
-                                    variant="ghost" 
-                                    size="icon" 
-                                    className="h-6 w-6 text-red-500"
-                                    onClick={() => deleteSizeMutation.mutate({ id: size.id })}
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (confirm("האם למחוק את הגודל?")) {
+                                        deleteSizeMutation.mutate({ id: size.id });
+                                      }
+                                    }}
+                                    className="text-red-500 hover:text-red-600 hover:bg-red-50"
                                   >
                                     <Trash2 className="h-3 w-3" />
                                   </Button>
+                                  {isSizeExpanded ? (
+                                    <ChevronDown className="h-4 w-4 text-slate-400" />
+                                  ) : (
+                                    <ChevronLeft className="h-4 w-4 text-slate-400" />
+                                  )}
                                 </div>
                               </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-sm text-slate-400 text-center py-4">אין גדלים</p>
-                        )}
-                      </div>
 
-                      {/* Quantities */}
-                      <div>
-                        <div className="flex items-center justify-between mb-3">
-                          <h4 className="font-medium text-slate-700 flex items-center gap-2">
-                            <Hash className="h-4 w-4" />
-                            כמויות
-                          </h4>
-                          <Button variant="ghost" size="sm" onClick={() => openAddQuantity(product.id)}>
-                            <Plus className="h-3 w-3" />
-                          </Button>
-                        </div>
-                        {product.quantities?.length > 0 ? (
-                          <div className="space-y-2">
-                            {product.quantities.map((qty) => (
-                              <div key={qty.id} className="flex items-center justify-between bg-white p-2 rounded border">
-                                <span className="font-medium text-sm">{qty.quantity} יח'</span>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-sm text-slate-500">×{qty.priceMultiplier}</span>
-                                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditQuantity(qty, product.id)}>
-                                    <Pencil className="h-3 w-3" />
-                                  </Button>
-                                  <Button 
-                                    variant="ghost" 
-                                    size="icon" 
-                                    className="h-6 w-6 text-red-500"
-                                    onClick={() => deleteQuantityMutation.mutate({ id: qty.id })}
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
+                              {/* Expanded: Quantities - Level 3 */}
+                              {isSizeExpanded && (
+                                <div className="bg-white border-t border-slate-100">
+                                  {/* Quantities Section */}
+                                  <div className="px-6 py-3">
+                                    <div className="flex items-center justify-between mb-3">
+                                      <div className="flex items-center gap-2 text-sm font-medium text-slate-600">
+                                        <DollarSign className="h-4 w-4" />
+                                        כמויות ומחירים
+                                      </div>
+                                      <Button size="sm" variant="outline" onClick={() => openAddQuantity(size.id)} className="gap-1 h-7 text-xs">
+                                        <Plus className="h-3 w-3" />
+                                        כמות חדשה
+                                      </Button>
+                                    </div>
+                                    
+                                    {!quantitiesData || quantitiesData.length === 0 ? (
+                                      <div className="text-center text-slate-400 text-sm py-2">
+                                        אין כמויות מוגדרות. לחץ על "כמות חדשה" להוספה.
+                                      </div>
+                                    ) : (
+                                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                        {quantitiesData.map((sq: SizeQuantity) => (
+                                          <div
+                                            key={sq.id}
+                                            className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2 group"
+                                          >
+                                            <div>
+                                              <div className="font-medium text-slate-700">{sq.quantity} יח'</div>
+                                              <div className="text-green-600 font-semibold">₪{parseFloat(sq.price).toFixed(0)}</div>
+                                            </div>
+                                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-6 w-6 p-0"
+                                                onClick={() => openEditQuantity(sq)}
+                                              >
+                                                <Pencil className="h-3 w-3" />
+                                              </Button>
+                                              <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-6 w-6 p-0 text-red-500"
+                                                onClick={() => {
+                                                  if (confirm("האם למחוק?")) {
+                                                    deleteQuantityMutation.mutate({ id: sq.id });
+                                                  }
+                                                }}
+                                              >
+                                                <Trash2 className="h-3 w-3" />
+                                              </Button>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-sm text-slate-400 text-center py-4">אין כמויות</p>
-                        )}
-                      </div>
+                              )}
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
 
-                      {/* Addons */}
-                      <div>
-                        <div className="flex items-center justify-between mb-3">
-                          <h4 className="font-medium text-slate-700 flex items-center gap-2">
-                            <Sparkles className="h-4 w-4" />
-                            תוספות
-                          </h4>
-                          <Button variant="ghost" size="sm" onClick={() => openAddAddon(product.id)}>
-                            <Plus className="h-3 w-3" />
-                          </Button>
+                    {/* Addons Section */}
+                    <div className="border-t border-slate-200 bg-slate-100">
+                      <div className="flex items-center justify-between px-4 py-3">
+                        <div className="flex items-center gap-2 text-sm font-medium text-slate-600">
+                          <Sparkles className="h-4 w-4" />
+                          תוספות למוצר
                         </div>
-                        {product.addons?.length > 0 ? (
-                          <div className="space-y-2">
-                            {product.addons.map((addon) => (
-                              <div key={addon.id} className="flex items-center justify-between bg-white p-2 rounded border">
-                                <span className="font-medium text-sm">{addon.name}</span>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-sm text-slate-500">
-                                    {addon.priceType === 'fixed' && `+₪${addon.price}`}
-                                    {addon.priceType === 'percentage' && `+${addon.price}%`}
-                                    {addon.priceType === 'per_unit' && `₪${addon.price}/יח'`}
-                                  </span>
-                                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEditAddon(addon, product.id)}>
+                        <Button size="sm" variant="outline" onClick={() => openAddAddon(product.id)} className="gap-1">
+                          <Plus className="h-3 w-3" />
+                          תוספת חדשה
+                        </Button>
+                      </div>
+                      <div className="px-4 pb-4">
+                        {!addonsData || addonsData.length === 0 ? (
+                          <div className="text-center text-slate-400 text-sm py-2">
+                            אין תוספות למוצר זה
+                          </div>
+                        ) : (
+                          <div className="flex flex-wrap gap-2">
+                            {addonsData.map((addon: any) => (
+                              <div
+                                key={addon.id}
+                                className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5 group"
+                              >
+                                <span className="text-sm text-slate-700">{addon.name}</span>
+                                <span className="text-sm font-medium text-amber-600">
+                                  {addon.price_type === "percentage" ? `+${addon.price}%` : `+₪${addon.price}`}
+                                </span>
+                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-5 w-5 p-0"
+                                    onClick={() => openEditAddon(addon, product.id)}
+                                  >
                                     <Pencil className="h-3 w-3" />
                                   </Button>
-                                  <Button 
-                                    variant="ghost" 
-                                    size="icon" 
-                                    className="h-6 w-6 text-red-500"
-                                    onClick={() => deleteAddonMutation.mutate({ id: addon.id })}
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-5 w-5 p-0 text-red-500"
+                                    onClick={() => {
+                                      if (confirm("האם למחוק?")) {
+                                        deleteAddonMutation.mutate({ id: addon.id });
+                                      }
+                                    }}
                                   >
                                     <Trash2 className="h-3 w-3" />
                                   </Button>
@@ -785,8 +865,6 @@ export default function Products() {
                               </div>
                             ))}
                           </div>
-                        ) : (
-                          <p className="text-sm text-slate-400 text-center py-4">אין תוספות</p>
                         )}
                       </div>
                     </div>
@@ -812,26 +890,26 @@ export default function Products() {
               <Label>שם המוצר *</Label>
               <Input
                 value={productForm.name}
-                onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
+                onChange={(e) => setProductForm(prev => ({ ...prev, name: e.target.value }))}
                 placeholder="לדוגמה: כרטיסי ביקור"
               />
             </div>
             <div>
               <Label>תיאור</Label>
-              <Textarea
+              <Input
                 value={productForm.description}
-                onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
+                onChange={(e) => setProductForm(prev => ({ ...prev, description: e.target.value }))}
                 placeholder="תיאור קצר של המוצר"
               />
             </div>
             <div>
-              <Label>תחום</Label>
+              <Label>קטגוריה</Label>
               <Select
                 value={productForm.categoryId?.toString() || ""}
-                onValueChange={(value) => setProductForm({ ...productForm, categoryId: parseInt(value) })}
+                onValueChange={(value) => setProductForm(prev => ({ ...prev, categoryId: parseInt(value) }))}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="בחר תחום" />
+                  <SelectValue placeholder="בחר קטגוריה" />
                 </SelectTrigger>
                 <SelectContent>
                   {categories.map((cat: Category) => (
@@ -844,11 +922,9 @@ export default function Products() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsProductDialogOpen(false)}>
-              ביטול
-            </Button>
+            <Button variant="outline" onClick={() => setIsProductDialogOpen(false)}>ביטול</Button>
             <Button onClick={handleProductSubmit}>
-              {isEditMode ? "עדכן" : "צור מוצר"}
+              {isEditMode ? "עדכן" : "צור"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -860,7 +936,7 @@ export default function Products() {
           <DialogHeader>
             <DialogTitle>{isEditMode ? "עריכת גודל" : "גודל חדש"}</DialogTitle>
             <DialogDescription>
-              הגדר גודל עם מחיר בסיס
+              הגדר את שם הגודל והמידות
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -868,34 +944,23 @@ export default function Products() {
               <Label>שם הגודל *</Label>
               <Input
                 value={sizeForm.name}
-                onChange={(e) => setSizeForm({ ...sizeForm, name: e.target.value })}
-                placeholder="לדוגמה: 9x5 ס״מ"
+                onChange={(e) => setSizeForm(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="לדוגמה: A4, סטנדרט 9x5"
               />
             </div>
             <div>
               <Label>מידות (אופציונלי)</Label>
               <Input
                 value={sizeForm.dimensions}
-                onChange={(e) => setSizeForm({ ...sizeForm, dimensions: e.target.value })}
-                placeholder="לדוגמה: 90x50 מ״מ"
-              />
-            </div>
-            <div>
-              <Label>מחיר בסיס (₪) *</Label>
-              <Input
-                type="number"
-                value={sizeForm.basePrice}
-                onChange={(e) => setSizeForm({ ...sizeForm, basePrice: e.target.value })}
-                placeholder="0"
+                onChange={(e) => setSizeForm(prev => ({ ...prev, dimensions: e.target.value }))}
+                placeholder="לדוגמה: 21x29.7 ס״מ"
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsSizeDialogOpen(false)}>
-              ביטול
-            </Button>
+            <Button variant="outline" onClick={() => setIsSizeDialogOpen(false)}>ביטול</Button>
             <Button onClick={handleSizeSubmit}>
-              {isEditMode ? "עדכן" : "הוסף גודל"}
+              {isEditMode ? "עדכן" : "צור"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -907,39 +972,34 @@ export default function Products() {
           <DialogHeader>
             <DialogTitle>{isEditMode ? "עריכת כמות" : "כמות חדשה"}</DialogTitle>
             <DialogDescription>
-              הגדר כמות עם מכפיל מחיר
+              הגדר כמות ומחיר ספציפי לגודל זה
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label>כמות (יחידות) *</Label>
+              <Label>כמות *</Label>
               <Input
                 type="number"
                 value={quantityForm.quantity}
-                onChange={(e) => setQuantityForm({ ...quantityForm, quantity: e.target.value })}
-                placeholder="לדוגמה: 100"
+                onChange={(e) => setQuantityForm(prev => ({ ...prev, quantity: e.target.value }))}
+                placeholder="לדוגמה: 100, 250, 500"
               />
             </div>
             <div>
-              <Label>מכפיל מחיר *</Label>
+              <Label>מחיר (₪) *</Label>
               <Input
                 type="number"
-                step="0.1"
-                value={quantityForm.priceMultiplier}
-                onChange={(e) => setQuantityForm({ ...quantityForm, priceMultiplier: e.target.value })}
-                placeholder="1.0"
+                step="0.01"
+                value={quantityForm.price}
+                onChange={(e) => setQuantityForm(prev => ({ ...prev, price: e.target.value }))}
+                placeholder="לדוגמה: 150.00"
               />
-              <p className="text-xs text-slate-500 mt-1">
-                מחיר סופי = מחיר בסיס × מכפיל (לדוגמה: 1.8 = 80% תוספת)
-              </p>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsQuantityDialogOpen(false)}>
-              ביטול
-            </Button>
+            <Button variant="outline" onClick={() => setIsQuantityDialogOpen(false)}>ביטול</Button>
             <Button onClick={handleQuantitySubmit}>
-              {isEditMode ? "עדכן" : "הוסף כמות"}
+              {isEditMode ? "עדכן" : "צור"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -951,7 +1011,7 @@ export default function Products() {
           <DialogHeader>
             <DialogTitle>{isEditMode ? "עריכת תוספת" : "תוספת חדשה"}</DialogTitle>
             <DialogDescription>
-              הגדר תוספת אופציונלית למוצר
+              הגדר תוספת למוצר (למינציה, הבלטה וכו')
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -959,57 +1019,45 @@ export default function Products() {
               <Label>שם התוספת *</Label>
               <Input
                 value={addonForm.name}
-                onChange={(e) => setAddonForm({ ...addonForm, name: e.target.value })}
-                placeholder="לדוגמה: למינציה"
+                onChange={(e) => setAddonForm(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="לדוגמה: למינציה מט"
               />
             </div>
             <div>
-              <Label>תיאור (אופציונלי)</Label>
-              <Textarea
-                value={addonForm.description}
-                onChange={(e) => setAddonForm({ ...addonForm, description: e.target.value })}
-                placeholder="תיאור קצר של התוספת"
-              />
-            </div>
-            <div>
-              <Label>סוג תמחור *</Label>
+              <Label>סוג תמחור</Label>
               <Select
                 value={addonForm.priceType}
                 onValueChange={(value: "fixed" | "percentage" | "per_unit") => 
-                  setAddonForm({ ...addonForm, priceType: value })
+                  setAddonForm(prev => ({ ...prev, priceType: value }))
                 }
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="fixed">מחיר קבוע (₪)</SelectItem>
+                  <SelectItem value="fixed">סכום קבוע (₪)</SelectItem>
                   <SelectItem value="percentage">אחוז מהמחיר (%)</SelectItem>
-                  <SelectItem value="per_unit">מחיר ליחידה (₪/יח')</SelectItem>
+                  <SelectItem value="per_unit">מחיר ליחידה (₪)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div>
               <Label>
-                {addonForm.priceType === 'fixed' && 'מחיר (₪) *'}
-                {addonForm.priceType === 'percentage' && 'אחוז (%) *'}
-                {addonForm.priceType === 'per_unit' && 'מחיר ליחידה (₪) *'}
+                {addonForm.priceType === "percentage" ? "אחוז" : "מחיר (₪)"} *
               </Label>
               <Input
                 type="number"
-                step={addonForm.priceType === 'percentage' ? '1' : '0.01'}
+                step="0.01"
                 value={addonForm.price}
-                onChange={(e) => setAddonForm({ ...addonForm, price: e.target.value })}
-                placeholder="0"
+                onChange={(e) => setAddonForm(prev => ({ ...prev, price: e.target.value }))}
+                placeholder={addonForm.priceType === "percentage" ? "לדוגמה: 50" : "לדוגמה: 40.00"}
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddonDialogOpen(false)}>
-              ביטול
-            </Button>
+            <Button variant="outline" onClick={() => setIsAddonDialogOpen(false)}>ביטול</Button>
             <Button onClick={handleAddonSubmit}>
-              {isEditMode ? "עדכן" : "הוסף תוספת"}
+              {isEditMode ? "עדכן" : "צור"}
             </Button>
           </DialogFooter>
         </DialogContent>

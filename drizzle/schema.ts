@@ -81,6 +81,17 @@ export const productQuantities = pgTable("product_quantities", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Size Quantities - מחירים לכל שילוב גודל+כמות
+export const sizeQuantities = pgTable("size_quantities", {
+  id: serial("id").primaryKey(),
+  sizeId: integer("size_id").notNull(),
+  quantity: integer("quantity").notNull(),
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  displayOrder: integer("display_order").default(0),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Product addons table
 export const productAddons = pgTable("product_addons", {
   id: serial("id").primaryKey(),

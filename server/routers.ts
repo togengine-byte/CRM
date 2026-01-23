@@ -484,6 +484,74 @@ export const appRouter = router({
         return await deleteVariant(input.id);
       }),
 
+    // ===== SIZE QUANTITIES =====
+    getSizeQuantities: protectedProcedure
+      .input(z.object({ sizeId: z.number() }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        const { sizeQuantities } = await import('../drizzle/schema');
+        const { eq, asc } = await import('drizzle-orm');
+        return await db.select().from(sizeQuantities)
+          .where(eq(sizeQuantities.sizeId, input.sizeId))
+          .orderBy(asc(sizeQuantities.displayOrder));
+      }),
+
+    createSizeQuantity: protectedProcedure
+      .input(z.object({
+        sizeId: z.number(),
+        quantity: z.number(),
+        price: z.number(),
+        displayOrder: z.number().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new Error("Not authenticated");
+        const db = await getDb();
+        const { sizeQuantities } = await import('../drizzle/schema');
+        const result = await db.insert(sizeQuantities).values({
+          sizeId: input.sizeId,
+          quantity: input.quantity,
+          price: input.price.toString(),
+          displayOrder: input.displayOrder || 0,
+        }).returning();
+        return result[0];
+      }),
+
+    updateSizeQuantity: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        quantity: z.number().optional(),
+        price: z.number().optional(),
+        displayOrder: z.number().optional(),
+        isActive: z.boolean().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new Error("Not authenticated");
+        const db = await getDb();
+        const { sizeQuantities } = await import('../drizzle/schema');
+        const { eq } = await import('drizzle-orm');
+        const updateData: any = {};
+        if (input.quantity !== undefined) updateData.quantity = input.quantity;
+        if (input.price !== undefined) updateData.price = input.price.toString();
+        if (input.displayOrder !== undefined) updateData.displayOrder = input.displayOrder;
+        if (input.isActive !== undefined) updateData.isActive = input.isActive;
+        const result = await db.update(sizeQuantities)
+          .set(updateData)
+          .where(eq(sizeQuantities.id, input.id))
+          .returning();
+        return result[0];
+      }),
+
+    deleteSizeQuantity: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new Error("Not authenticated");
+        const db = await getDb();
+        const { sizeQuantities } = await import('../drizzle/schema');
+        const { eq } = await import('drizzle-orm');
+        await db.delete(sizeQuantities).where(eq(sizeQuantities.id, input.id));
+        return { success: true };
+      }),
+
     // ===== SIZES =====
     getSizes: protectedProcedure
       .input(z.object({ productId: z.number() }))
