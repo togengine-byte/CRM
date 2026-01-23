@@ -13,6 +13,7 @@ import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
+import { DebugPanel } from "./DebugPanel";
 
 const adminMenuItems = [
   { icon: LayoutDashboard, label: "לוח בקרה", path: "/dashboard" },
@@ -285,6 +286,9 @@ export default function DashboardLayout({
           {children}
         </div>
       </main>
+
+      {/* Debug Panel */}
+      <DebugPanel />
     </div>
   );
 }
