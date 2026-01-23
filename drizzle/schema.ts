@@ -49,6 +49,7 @@ export const baseProducts = pgTable("base_products", {
   productNumber: integer("productNumber"), // Auto-generated product number starting at 1001
   category: varchar("category", { length: 100 }),
   categoryId: integer("categoryId"), // Reference to categories table
+  imageUrl: text("image_url"), // Product image URL
   isActive: boolean("isActive").default(true),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),

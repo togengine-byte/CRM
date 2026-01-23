@@ -361,9 +361,8 @@ export const appRouter = router({
     getCategories: protectedProcedure
       .query(async () => {
         const db = await getDb();
-        return await db.query.categories.findMany({
-          orderBy: (categories, { asc }) => [asc(categories.displayOrder)],
-        });
+        const { categories } = await import('../drizzle/schema');
+        return await db.select().from(categories).orderBy(categories.displayOrder);
       }),
 
     create: protectedProcedure
