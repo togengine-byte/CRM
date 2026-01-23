@@ -246,3 +246,22 @@ export const customerSignupRequests = pgTable("customer_signup_requests", {
 
 export type CustomerSignupRequest = typeof customerSignupRequests.$inferSelect;
 export type InsertCustomerSignupRequest = typeof customerSignupRequests.$inferInsert;
+
+// Developer logs table for debugging and monitoring
+export const developerLogs = pgTable("developer_logs", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId"),
+  level: varchar("level", { length: 20 }).default("info").notNull(),
+  category: varchar("category", { length: 100 }).notNull(),
+  action: varchar("action", { length: 255 }).notNull(),
+  message: text("message"),
+  details: jsonb("details").default('{}'),
+  stackTrace: text("stackTrace"),
+  url: text("url"),
+  userAgent: text("userAgent"),
+  ipAddress: varchar("ipAddress", { length: 45 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type DeveloperLog = typeof developerLogs.$inferSelect;
+export type InsertDeveloperLog = typeof developerLogs.$inferInsert;

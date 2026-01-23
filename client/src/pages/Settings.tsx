@@ -923,7 +923,7 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="staff" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5 lg:w-[650px]">
+        <TabsList className="grid w-full grid-cols-6 lg:w-[750px]">
           <TabsTrigger value="staff" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             עובדים
@@ -943,6 +943,10 @@ export default function Settings() {
           <TabsTrigger value="security" className="flex items-center gap-2">
             <Shield className="h-4 w-4" />
             אבטחה
+          </TabsTrigger>
+          <TabsTrigger value="developers" className="flex items-center gap-2">
+            <Key className="h-4 w-4" />
+            מפתחים
           </TabsTrigger>
         </TabsList>
 
@@ -1263,6 +1267,21 @@ export default function Settings() {
               <div className="text-center py-8 text-gray-500">
                 <Shield className="h-12 w-12 mx-auto mb-4 text-gray-300" />
                 <p>הגדרות אבטחה יתווספו בקרוב</p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="developers">
+          <Card>
+            <CardHeader>
+              <CardTitle>Developer Logs</CardTitle>
+              <CardDescription>רישום פעולות ואירועים במערכת</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-12 text-gray-500">
+                <Key className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                <p>מסך Developer Logs יטוען בקרוב</p>
               </div>
             </CardContent>
           </Card>
