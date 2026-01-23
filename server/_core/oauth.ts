@@ -202,7 +202,8 @@ export function registerOAuthRoutes(app: Express) {
     try {
       const { name, email, phone, companyName, description } = req.body;
       const files = req.files as Express.Multer.File[];
-      const requestId = (req as any).requestId;
+      // Generate requestId if not created by multer (when no files uploaded)
+      const requestId = (req as any).requestId || crypto.randomUUID();
 
       // Validate required fields
       if (!name || !email || !phone || !description) {
@@ -238,6 +239,7 @@ export function registerOAuthRoutes(app: Express) {
         success: true, 
         message: "הבקשה נשלחה בהצלחה",
         requestId: customerRequest.id,
+        queueNumber: customerRequest.queueNumber,
         filesUploaded: files?.length || 0,
       });
     } catch (error) {
