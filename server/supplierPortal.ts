@@ -1,12 +1,12 @@
 import { z } from "zod";
 import { protectedProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
-import { supplierPrices, productVariants, baseProducts } from "../drizzle/schema";
+import { supplierPrices, productSizes, sizeQuantities, baseProducts } from "../drizzle/schema";
 import { eq, and, desc } from "drizzle-orm";
 
 /**
  * Supplier Portal Router
- * Endpoints for suppliers to manage their prices, delivery times, and notes
+ * Endpoints for suppliers to manage their prices by size+quantity combinations
  * Only suppliers can access their own data
  */
 
@@ -70,27 +70,32 @@ export const supplierPortalRouter = router({
 
       const offset = (input.page - 1) * input.limit;
 
-      // Get all prices first
+      // Get all prices with size+quantity info
       const allPrices = await db
         .select({
           id: supplierPrices.id,
           price: supplierPrices.pricePerUnit,
           deliveryDays: supplierPrices.deliveryDays,
-          minimumQuantity: supplierPrices.minQuantity,
           updatedAt: supplierPrices.updatedAt,
-          variantId: supplierPrices.productVariantId,
-          variantSku: productVariants.sku,
-          attributes: productVariants.attributes,
+          sizeQuantityId: supplierPrices.sizeQuantityId,
+          quantity: sizeQuantities.quantity,
+          sizeName: productSizes.name,
+          dimensions: productSizes.dimensions,
           productName: baseProducts.name,
+          productId: baseProducts.id,
         })
         .from(supplierPrices)
         .innerJoin(
-          productVariants,
-          eq(supplierPrices.productVariantId, productVariants.id)
+          sizeQuantities,
+          eq(supplierPrices.sizeQuantityId, sizeQuantities.id)
+        )
+        .innerJoin(
+          productSizes,
+          eq(sizeQuantities.sizeId, productSizes.id)
         )
         .innerJoin(
           baseProducts,
-          eq(productVariants.baseProductId, baseProducts.id)
+          eq(productSizes.productId, baseProducts.id)
         )
         .where(eq(supplierPrices.supplierId, ctx.user.id))
         .orderBy(desc(supplierPrices.updatedAt));
@@ -102,7 +107,7 @@ export const supplierPortalRouter = router({
         filteredPrices = allPrices.filter(
           (p) =>
             p.productName?.toLowerCase().includes(searchLower) ||
-            p.variantSku?.toLowerCase().includes(searchLower)
+            p.sizeName?.toLowerCase().includes(searchLower)
         );
       }
 
@@ -118,8 +123,8 @@ export const supplierPortalRouter = router({
       };
     }),
 
-  // ==================== GET AVAILABLE VARIANTS ====================
-  availableVariants: protectedProcedure
+  // ==================== GET AVAILABLE SIZE QUANTITIES ====================
+  availableSizeQuantities: protectedProcedure
     .input(
       z.object({
         search: z.string().optional(),
@@ -134,57 +139,65 @@ export const supplierPortalRouter = router({
       const db = await getDb();
       if (!db) throw new Error("Database not available");
 
-      // Get all variants
-      const allVariants = await db
+      // Get all size quantities with product info
+      const allSizeQuantities = await db
         .select({
-          id: productVariants.id,
-          sku: productVariants.sku,
-          attributes: productVariants.attributes,
-          baseProductName: baseProducts.name,
-          baseProductId: baseProducts.id,
+          id: sizeQuantities.id,
+          quantity: sizeQuantities.quantity,
+          price: sizeQuantities.price,
+          sizeName: productSizes.name,
+          dimensions: productSizes.dimensions,
+          sizeId: productSizes.id,
+          productName: baseProducts.name,
+          productId: baseProducts.id,
         })
-        .from(productVariants)
+        .from(sizeQuantities)
+        .innerJoin(
+          productSizes,
+          eq(sizeQuantities.sizeId, productSizes.id)
+        )
         .innerJoin(
           baseProducts,
-          eq(productVariants.baseProductId, baseProducts.id)
-        );
+          eq(productSizes.productId, baseProducts.id)
+        )
+        .where(eq(sizeQuantities.isActive, true));
 
       // Filter by search if provided
-      let variants = allVariants;
+      let result = allSizeQuantities;
       if (input.search) {
         const searchLower = input.search.toLowerCase();
-        variants = allVariants.filter((v) =>
-          v.baseProductName?.toLowerCase().includes(searchLower)
+        result = allSizeQuantities.filter((sq) =>
+          sq.productName?.toLowerCase().includes(searchLower) ||
+          sq.sizeName?.toLowerCase().includes(searchLower)
         );
       }
 
       // Get supplier's existing prices
       const existingPrices = await db
-        .select({ variantId: supplierPrices.productVariantId })
+        .select({ sizeQuantityId: supplierPrices.sizeQuantityId })
         .from(supplierPrices)
         .where(eq(supplierPrices.supplierId, ctx.user.id));
 
-      const existingVariantIds = new Set(
-        existingPrices.map((p) => p.variantId)
+      const existingSizeQuantityIds = new Set(
+        existingPrices.map((p) => p.sizeQuantityId)
       );
 
       // Add hasPrice flag
-      const result = variants.map((v) => ({
-        ...v,
-        hasPrice: existingVariantIds.has(v.id),
+      const finalResult = result.map((sq) => ({
+        ...sq,
+        hasPrice: existingSizeQuantityIds.has(sq.id),
       }));
 
-      return result;
+      return finalResult;
     }),
 
   // ==================== CREATE PRICE ====================
   createPrice: protectedProcedure
     .input(
       z.object({
-        productVariantId: z.number(),
+        sizeQuantityId: z.number(),
         price: z.number().positive("Price must be positive"),
         deliveryDays: z.number().int().positive("Delivery days must be positive"),
-        minimumQuantity: z.number().int().positive("Minimum quantity must be positive"),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -203,26 +216,25 @@ export const supplierPortalRouter = router({
         .where(
           and(
             eq(supplierPrices.supplierId, ctx.user.id),
-            eq(supplierPrices.productVariantId, input.productVariantId)
+            eq(supplierPrices.sizeQuantityId, input.sizeQuantityId)
           )
         );
 
       if (existing.length > 0) {
-        throw new Error("Price already exists for this variant");
+        throw new Error("Price already exists for this size+quantity");
       }
 
       // Insert new price
       await db.insert(supplierPrices).values({
         supplierId: ctx.user.id,
-        productVariantId: input.productVariantId,
+        sizeQuantityId: input.sizeQuantityId,
         pricePerUnit: input.price.toString(),
         deliveryDays: input.deliveryDays,
-        minQuantity: input.minimumQuantity,
         createdAt: new Date(),
         updatedAt: new Date(),
       });
 
-      return { success: true, id: input.productVariantId };
+      return { success: true, id: input.sizeQuantityId };
     }),
 
   // ==================== UPDATE PRICE ====================
@@ -232,7 +244,6 @@ export const supplierPortalRouter = router({
         id: z.number(),
         price: z.number().positive("Price must be positive").optional(),
         deliveryDays: z.number().int().positive("Delivery days must be positive").optional(),
-        minimumQuantity: z.number().int().positive("Minimum quantity must be positive").optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -262,7 +273,6 @@ export const supplierPortalRouter = router({
       const updateData: any = { updatedAt: new Date() };
       if (input.price !== undefined) updateData.pricePerUnit = input.price.toString();
       if (input.deliveryDays !== undefined) updateData.deliveryDays = input.deliveryDays;
-      if (input.minimumQuantity !== undefined) updateData.minQuantity = input.minimumQuantity;
 
       await db
         .update(supplierPrices)

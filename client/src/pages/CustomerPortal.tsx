@@ -49,10 +49,14 @@ type QuoteStatus = "draft" | "sent" | "approved" | "rejected" | "superseded" | "
 
 interface QuoteItem {
   id: number;
-  productVariantId: number;
+  sizeQuantityId: number;
   quantity: number;
   priceAtTimeOfQuote: string;
-  isUpsell: boolean;
+  isUpsell: boolean | null;
+  productName?: string | null;
+  sizeName?: string | null;
+  dimensions?: string | null;
+  sizeQuantity?: number | null;
 }
 
 interface Quote {
@@ -60,7 +64,8 @@ interface Quote {
   status: QuoteStatus;
   version: number;
   finalValue: string | null;
-  createdAt: string;
+  createdAt: string | Date;
+  parentQuoteId?: number | null;
   items?: QuoteItem[];
 }
 
@@ -388,7 +393,7 @@ export default function CustomerPortal() {
                       <TableBody>
                         {quoteDetails.items.map((item: QuoteItem) => (
                           <TableRow key={item.id}>
-                            <TableCell>מוצר #{item.productVariantId}</TableCell>
+                            <TableCell>{item.productName || 'מוצר'} - {item.sizeName || 'גודל'}</TableCell>
                             <TableCell>{item.quantity}</TableCell>
                             <TableCell>₪{parseFloat(item.priceAtTimeOfQuote).toLocaleString()}</TableCell>
                           </TableRow>

@@ -62,7 +62,10 @@ interface Category {
   name: string;
   description: string | null;
   icon: string | null;
-  displayOrder: number;
+  displayOrder: number | null;
+  isActive?: boolean | null;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 interface SizeQuantity {
@@ -70,8 +73,9 @@ interface SizeQuantity {
   sizeId: number;
   quantity: number;
   price: string;
-  displayOrder: number;
-  isActive: boolean;
+  displayOrder: number | null;
+  isActive: boolean | null;
+  createdAt?: Date | null;
 }
 
 interface ProductSize {
@@ -80,8 +84,10 @@ interface ProductSize {
   name: string;
   dimensions: string | null;
   basePrice: string;
-  displayOrder: number;
-  isActive: boolean;
+  displayOrder: number | null;
+  isActive: boolean | null;
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
   quantities?: SizeQuantity[];
 }
 
@@ -93,7 +99,9 @@ interface ProductAddon {
   description: string | null;
   priceType: string;
   price: string;
-  isActive: boolean;
+  isActive: boolean | null;
+  createdAt?: Date | null;
+  updatedAt?: Date | null;
 }
 
 interface Product {
@@ -102,10 +110,13 @@ interface Product {
   description: string | null;
   categoryId: number | null;
   imageUrl: string | null;
-  allowCustomQuantity: boolean;
-  isActive: boolean;
+  allowCustomQuantity: boolean | null;
+  isActive: boolean | null;
+  createdAt?: Date;
+  updatedAt?: Date;
   sizes: ProductSize[];
-  addons: ProductAddon[];
+  addons?: ProductAddon[];
+  quantities?: SizeQuantity[];
 }
 
 export default function Products() {

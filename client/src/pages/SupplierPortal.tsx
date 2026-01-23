@@ -8,20 +8,24 @@ interface Price {
   id: number;
   price: string;
   deliveryDays: number | null;
-  minimumQuantity: number | null;
   updatedAt: Date;
-  variantId: number;
-  variantSku: string;
-  attributes: any;
+  sizeQuantityId: number;
+  quantity: number;
+  sizeName: string;
+  dimensions: string | null;
   productName: string;
+  productId: number;
 }
 
-interface Variant {
+interface SizeQuantity {
   id: number;
-  sku: string;
-  attributes: any;
-  baseProductName: string;
-  baseProductId: number;
+  quantity: number;
+  price: string;
+  sizeName: string;
+  dimensions: string | null;
+  sizeId: number;
+  productName: string;
+  productId: number;
   hasPrice: boolean;
 }
 
@@ -32,10 +36,9 @@ export default function SupplierPortal() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editFormData, setEditFormData] = useState<Partial<Price>>({});
   const [addFormData, setAddFormData] = useState({
-    productVariantId: 0,
+    sizeQuantityId: 0,
     price: 0,
     deliveryDays: 7,
-    minimumQuantity: 1,
   });
 
   const limit = 20;
@@ -50,47 +53,46 @@ export default function SupplierPortal() {
     search: search || undefined,
   });
 
-  const { data: variants = [] } = trpc.supplierPortal.availableVariants.useQuery({
+  const { data: sizeQuantities = [] } = trpc.supplierPortal.availableSizeQuantities.useQuery({
     search: search || undefined,
   });
 
   // Mutations
   const createPriceMutation = trpc.supplierPortal.createPrice.useMutation({
     onSuccess: () => {
-      toast.success("Price added successfully");
+      toast.success("מחיר נוסף בהצלחה");
       utils.supplierPortal.invalidate();
       setShowAddModal(false);
       setAddFormData({
-        productVariantId: 0,
+        sizeQuantityId: 0,
         price: 0,
         deliveryDays: 7,
-        minimumQuantity: 1,
       });
     },
     onError: (error) => {
-      toast.error(error.message || "Failed to add price");
+      toast.error(error.message || "שגיאה בהוספת מחיר");
     },
   });
 
   const updatePriceMutation = trpc.supplierPortal.updatePrice.useMutation({
     onSuccess: () => {
-      toast.success("Price updated successfully");
+      toast.success("מחיר עודכן בהצלחה");
       utils.supplierPortal.invalidate();
       setEditingId(null);
       setEditFormData({});
     },
     onError: (error) => {
-      toast.error(error.message || "Failed to update price");
+      toast.error(error.message || "שגיאה בעדכון מחיר");
     },
   });
 
   const deletePriceMutation = trpc.supplierPortal.deletePrice.useMutation({
     onSuccess: () => {
-      toast.success("Price deleted successfully");
+      toast.success("מחיר נמחק בהצלחה");
       utils.supplierPortal.invalidate();
     },
     onError: (error) => {
-      toast.error(error.message || "Failed to delete price");
+      toast.error(error.message || "שגיאה במחיקת מחיר");
     },
   });
 
@@ -103,35 +105,34 @@ export default function SupplierPortal() {
     if (editingId) {
       updatePriceMutation.mutate({
         id: editingId,
-        price: editFormData.price ? parseFloat(editFormData.price) : undefined,
+        price: editFormData.price ? parseFloat(editFormData.price as any) : undefined,
         deliveryDays: editFormData.deliveryDays || undefined,
-        minimumQuantity: editFormData.minimumQuantity || undefined,
       });
     }
   };
 
   const handleAddPrice = () => {
-    if (addFormData.productVariantId > 0) {
+    if (addFormData.sizeQuantityId > 0) {
       createPriceMutation.mutate(addFormData);
     } else {
-      toast.error("Please select a product variant");
+      toast.error("יש לבחור מוצר וגודל");
     }
   };
 
-  const availableVariants = variants.filter((v) => !v.hasPrice);
+  const availableSizeQuantities = sizeQuantities.filter((sq: SizeQuantity) => !sq.hasPrice);
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold">Supplier Portal</h1>
+          <h1 className="text-3xl font-bold">פורטל ספקים</h1>
           <button
             onClick={() => setShowAddModal(true)}
             className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
           >
             <Plus size={20} />
-            Add Price
+            הוסף מחיר
           </button>
         </div>
 
@@ -139,26 +140,26 @@ export default function SupplierPortal() {
         {dashboard && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="bg-white p-4 rounded-lg shadow">
-              <p className="text-gray-600 text-sm">Total Products</p>
+              <p className="text-gray-600 text-sm">סה"כ מוצרים</p>
               <p className="text-2xl font-bold">{dashboard.totalProducts}</p>
             </div>
             <div className="bg-white p-4 rounded-lg shadow">
-              <p className="text-gray-600 text-sm">Active Listings</p>
+              <p className="text-gray-600 text-sm">רישומים פעילים</p>
               <p className="text-2xl font-bold">{dashboard.activeListings}</p>
             </div>
             <div className="bg-white p-4 rounded-lg shadow">
-              <p className="text-gray-600 text-sm">Price Range</p>
+              <p className="text-gray-600 text-sm">טווח מחירים</p>
               <p className="text-lg font-bold">
-                ${Number(dashboard.priceRange.min).toFixed(2)} - $
+                ₪{Number(dashboard.priceRange.min).toFixed(2)} - ₪
                 {Number(dashboard.priceRange.max).toFixed(2)}
               </p>
             </div>
             <div className="bg-white p-4 rounded-lg shadow">
-              <p className="text-gray-600 text-sm">Last Updated</p>
+              <p className="text-gray-600 text-sm">עדכון אחרון</p>
               <p className="text-sm font-bold">
                 {dashboard.lastUpdated
-                  ? new Date(dashboard.lastUpdated).toLocaleDateString()
-                  : "Never"}
+                  ? new Date(dashboard.lastUpdated).toLocaleDateString('he-IL')
+                  : "לא עודכן"}
               </p>
             </div>
           </div>
@@ -168,7 +169,7 @@ export default function SupplierPortal() {
         <div className="bg-white p-4 rounded-lg shadow">
           <input
             type="text"
-            placeholder="Search by product name or SKU..."
+            placeholder="חיפוש לפי שם מוצר או גודל..."
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
@@ -184,26 +185,26 @@ export default function SupplierPortal() {
             <table className="w-full">
               <thead className="bg-gray-50 border-b">
                 <tr>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                    Product
+                  <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">
+                    מוצר
                   </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                    SKU
+                  <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">
+                    גודל
                   </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                    Price
+                  <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">
+                    כמות
                   </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                    Delivery Days
+                  <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">
+                    מחיר
                   </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                    Min Quantity
+                  <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">
+                    ימי אספקה
                   </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                    Updated
+                  <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">
+                    עודכן
                   </th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">
-                    Actions
+                  <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">
+                    פעולות
                   </th>
                 </tr>
               </thead>
@@ -211,7 +212,8 @@ export default function SupplierPortal() {
                 {pricesData?.data.map((price: Price) => (
                   <tr key={price.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 text-sm">{price.productName}</td>
-                    <td className="px-6 py-4 text-sm">{price.variantSku}</td>
+                    <td className="px-6 py-4 text-sm">{price.sizeName}</td>
+                    <td className="px-6 py-4 text-sm">{price.quantity} יח'</td>
                     <td className="px-6 py-4 text-sm">
                       {editingId === price.id ? (
                         <input
@@ -221,13 +223,13 @@ export default function SupplierPortal() {
                           onChange={(e) =>
                             setEditFormData({
                               ...editFormData,
-                              price: e.target.value,
+                              price: e.target.value as any,
                             })
                           }
                           className="w-20 px-2 py-1 border border-gray-300 rounded"
                         />
                       ) : (
-                        `$${Number(price.price).toFixed(2)}`
+                        `₪${Number(price.price).toFixed(2)}`
                       )}
                     </td>
                     <td className="px-6 py-4 text-sm">
@@ -244,28 +246,11 @@ export default function SupplierPortal() {
                           className="w-20 px-2 py-1 border border-gray-300 rounded"
                         />
                       ) : (
-                        `${price.deliveryDays} days`
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-sm">
-                      {editingId === price.id ? (
-                        <input
-                          type="number"
-                          value={editFormData.minimumQuantity || 0}
-                          onChange={(e) =>
-                            setEditFormData({
-                              ...editFormData,
-                              minimumQuantity: parseInt(e.target.value),
-                            })
-                          }
-                          className="w-20 px-2 py-1 border border-gray-300 rounded"
-                        />
-                      ) : (
-                        price.minimumQuantity
+                        `${price.deliveryDays} ימים`
                       )}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
-                      {new Date(price.updatedAt).toLocaleDateString()}
+                      {new Date(price.updatedAt).toLocaleDateString('he-IL')}
                     </td>
                     <td className="px-6 py-4 text-sm space-x-2">
                       {editingId === price.id ? (
@@ -273,33 +258,34 @@ export default function SupplierPortal() {
                           <button
                             onClick={handleEditSave}
                             disabled={updatePriceMutation.isPending}
-                            className="text-green-600 hover:text-green-800 font-semibold disabled:opacity-50"
+                            className="text-green-600 hover:text-green-800 font-semibold disabled:opacity-50 ml-2"
                           >
-                            Save
+                            שמור
                           </button>
                           <button
                             onClick={() => setEditingId(null)}
                             className="text-gray-600 hover:text-gray-800"
                           >
-                            Cancel
+                            ביטול
                           </button>
                         </>
                       ) : (
                         <>
                           <button
                             onClick={() => handleEditStart(price)}
-                            className="text-blue-600 hover:text-blue-800 inline-flex items-center gap-1"
+                            className="text-blue-600 hover:text-blue-800 ml-2"
                           >
                             <Edit2 size={16} />
-                            Edit
                           </button>
                           <button
-                            onClick={() => deletePriceMutation.mutate({ id: price.id })}
-                            disabled={deletePriceMutation.isPending}
-                            className="text-red-600 hover:text-red-800 inline-flex items-center gap-1 disabled:opacity-50"
+                            onClick={() => {
+                              if (confirm("האם אתה בטוח שברצונך למחוק מחיר זה?")) {
+                                deletePriceMutation.mutate({ id: price.id });
+                              }
+                            }}
+                            className="text-red-600 hover:text-red-800"
                           >
                             <Trash2 size={16} />
-                            Delete
                           </button>
                         </>
                       )}
@@ -311,31 +297,25 @@ export default function SupplierPortal() {
           </div>
 
           {/* Pagination */}
-          {pricesData && (
+          {pricesData && pricesData.totalPages > 1 && (
             <div className="px-6 py-4 border-t flex justify-between items-center">
-              <p className="text-sm text-gray-600">
-                Showing {(page - 1) * limit + 1} to{" "}
-                {Math.min(page * limit, pricesData.total)} of {pricesData.total} results
-              </p>
-              <div className="space-x-2">
-                <button
-                  onClick={() => setPage(Math.max(1, page - 1))}
-                  disabled={page === 1}
-                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-                >
-                  Previous
-                </button>
-                <span className="px-4 py-2">
-                  Page {page} of {pricesData.totalPages}
-                </span>
-                <button
-                  onClick={() => setPage(Math.min(pricesData.totalPages, page + 1))}
-                  disabled={page === pricesData.totalPages}
-                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-                >
-                  Next
-                </button>
-              </div>
+              <button
+                onClick={() => setPage(Math.max(1, page - 1))}
+                disabled={page === 1}
+                className="px-4 py-2 border rounded disabled:opacity-50"
+              >
+                הקודם
+              </button>
+              <span className="text-sm text-gray-600">
+                עמוד {page} מתוך {pricesData.totalPages}
+              </span>
+              <button
+                onClick={() => setPage(Math.min(pricesData.totalPages, page + 1))}
+                disabled={page === pricesData.totalPages}
+                className="px-4 py-2 border rounded disabled:opacity-50"
+              >
+                הבא
+              </button>
             </div>
           )}
         </div>
@@ -343,96 +323,79 @@ export default function SupplierPortal() {
         {/* Add Price Modal */}
         {showAddModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 max-w-md w-full">
-              <h2 className="text-xl font-bold mb-4">Add New Price</h2>
+            <div className="bg-white rounded-lg p-6 w-full max-w-md">
+              <h2 className="text-xl font-bold mb-4">הוסף מחיר חדש</h2>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Product Variant
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    מוצר וגודל
                   </label>
                   <select
-                    value={addFormData.productVariantId}
+                    value={addFormData.sizeQuantityId}
                     onChange={(e) =>
                       setAddFormData({
                         ...addFormData,
-                        productVariantId: parseInt(e.target.value),
+                        sizeQuantityId: parseInt(e.target.value),
                       })
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
                   >
-                    <option value={0}>Select a variant...</option>
-                    {availableVariants.map((v: Variant) => (
-                      <option key={v.id} value={v.id}>
-                        {v.baseProductName} - {v.sku}
+                    <option value={0}>בחר מוצר וגודל...</option>
+                    {availableSizeQuantities.map((sq: SizeQuantity) => (
+                      <option key={sq.id} value={sq.id}>
+                        {sq.productName} - {sq.sizeName} ({sq.quantity} יח')
                       </option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Price</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    מחיר (₪)
+                  </label>
                   <input
                     type="number"
                     step="0.01"
-                    min="0"
                     value={addFormData.price}
                     onChange={(e) =>
                       setAddFormData({
                         ...addFormData,
-                        price: parseFloat(e.target.value),
+                        price: parseFloat(e.target.value) || 0,
                       })
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Delivery Days
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    ימי אספקה
                   </label>
                   <input
                     type="number"
-                    min="1"
                     value={addFormData.deliveryDays}
                     onChange={(e) =>
                       setAddFormData({
                         ...addFormData,
-                        deliveryDays: parseInt(e.target.value),
+                        deliveryDays: parseInt(e.target.value) || 7,
                       })
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Minimum Quantity
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={addFormData.minimumQuantity}
-                    onChange={(e) =>
-                      setAddFormData({
-                        ...addFormData,
-                        minimumQuantity: parseInt(e.target.value),
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-                <div className="flex justify-end space-x-2 pt-4">
-                  <button
-                    onClick={() => setShowAddModal(false)}
-                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleAddPrice}
-                    disabled={createPriceMutation.isPending}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                  >
-                    {createPriceMutation.isPending ? "Adding..." : "Add Price"}
-                  </button>
-                </div>
+              </div>
+              <div className="flex justify-end gap-2 mt-6">
+                <button
+                  onClick={() => setShowAddModal(false)}
+                  className="px-4 py-2 border rounded-lg hover:bg-gray-50"
+                >
+                  ביטול
+                </button>
+                <button
+                  onClick={handleAddPrice}
+                  disabled={createPriceMutation.isPending}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {createPriceMutation.isPending ? "מוסיף..." : "הוסף"}
+                </button>
               </div>
             </div>
           </div>

@@ -526,9 +526,10 @@ function StaffManagementSettings() {
     setFormData({
       name: staffUser.name || "",
       email: staffUser.email || "",
+      password: "",
       phone: staffUser.phone || "",
       companyName: staffUser.companyName || "",
-      role: staffUser.role,
+      role: staffUser.role as "employee" | "courier",
       permissions: staffUser.permissions || {},
     });
     setIsCreateDialogOpen(true);

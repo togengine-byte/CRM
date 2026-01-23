@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { protectedProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
-import { quotes, quoteItems, quoteAttachments, productVariants, baseProducts, activityLog } from "../drizzle/schema";
+import { quotes, quoteItems, quoteAttachments, sizeQuantities, productSizes, baseProducts, activityLog } from "../drizzle/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 
 /**
@@ -130,17 +130,19 @@ export const customerPortalRouter = router({
       const items = await db
         .select({
           id: quoteItems.id,
-          productVariantId: quoteItems.productVariantId,
+          sizeQuantityId: quoteItems.sizeQuantityId,
           quantity: quoteItems.quantity,
           priceAtTimeOfQuote: quoteItems.priceAtTimeOfQuote,
           isUpsell: quoteItems.isUpsell,
           productName: baseProducts.name,
-          variantSku: productVariants.sku,
-          variantAttributes: productVariants.attributes,
+          sizeName: productSizes.name,
+          dimensions: productSizes.dimensions,
+          sizeQuantity: sizeQuantities.quantity,
         })
         .from(quoteItems)
-        .leftJoin(productVariants, eq(quoteItems.productVariantId, productVariants.id))
-        .leftJoin(baseProducts, eq(productVariants.baseProductId, baseProducts.id))
+        .leftJoin(sizeQuantities, eq(quoteItems.sizeQuantityId, sizeQuantities.id))
+        .leftJoin(productSizes, eq(sizeQuantities.sizeId, productSizes.id))
+        .leftJoin(baseProducts, eq(productSizes.productId, baseProducts.id))
         .where(eq(quoteItems.quoteId, input.quoteId));
 
       // Get attachments

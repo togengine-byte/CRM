@@ -112,7 +112,7 @@ const formatDetails = (details: unknown): string => {
   if (obj.customerId) parts.push(`לקוח #${obj.customerId}`);
   if (obj.supplierId) parts.push(`ספק #${obj.supplierId}`);
   if (obj.productId) parts.push(`מוצר #${obj.productId}`);
-  if (obj.variantId) parts.push(`וריאנט #${obj.variantId}`);
+  if (obj.sizeQuantityId) parts.push(`מוצר+גודל #${obj.sizeQuantityId}`);
   if (obj.rating) parts.push(`דירוג: ${obj.rating}`);
   if (obj.reason) parts.push(`סיבה: ${obj.reason}`);
   if (obj.version) parts.push(`גרסה ${obj.version}`);

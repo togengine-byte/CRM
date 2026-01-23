@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { desc } from "drizzle-orm";
+import { desc, sql } from "drizzle-orm";
 import { developerLogs } from "../drizzle/schema";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
@@ -36,9 +36,7 @@ import {
   createProduct,
   updateProduct,
   deleteProduct,
-  createVariant,
-  updateVariant,
-  deleteVariant,
+  // variant functions removed - using sizes/quantities now
   getProductCategories,
   // Product Sizes, Quantities, Addons
   getProductWithDetails,
@@ -69,7 +67,7 @@ import {
   createSupplier,
   updateSupplier,
   getSupplierPrices,
-  updateSupplierPrice,
+  upsertSupplierPrice,
   deleteSupplierPrice,
   getSupplierOpenJobs,
   getSupplierRecommendations,
@@ -374,6 +372,7 @@ export const appRouter = router({
     getCategories: publicProcedure
       .query(async () => {
         const db = await getDb();
+        if (!db) return [];
         const { categories } = await import('../drizzle/schema');
         return await db.select().from(categories).orderBy(categories.displayOrder);
       }),
@@ -433,19 +432,12 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         if (!ctx.user) throw new Error("Not authenticated");
         if (ctx.user.role !== 'admin' && ctx.user.role !== 'employee') {
-          throw new Error("Only employees can create variants");
+          throw new Error("Variants are deprecated - use sizes and quantities");
         }
-        return await createVariant({
-          baseProductId: input.baseProductId,
-          sku: input.sku,
-          name: input.name,
-          price: input.price,
-          pricingType: input.pricingType,
-          attributes: input.attributes as Record<string, unknown> | undefined,
-          validationProfileId: input.validationProfileId,
-        });
+        throw new Error("Variants are deprecated - use sizes and quantities");
       }),
 
+    // DEPRECATED - variants replaced by sizes/quantities
     updateVariant: protectedProcedure
       .input(z.object({
         id: z.number(),
@@ -457,31 +449,14 @@ export const appRouter = router({
         validationProfileId: z.number().optional(),
         isActive: z.boolean().optional(),
       }))
-      .mutation(async ({ ctx, input }) => {
-        if (!ctx.user) throw new Error("Not authenticated");
-        if (ctx.user.role !== 'admin' && ctx.user.role !== 'employee') {
-          throw new Error("Only employees can update variants");
-        }
-        return await updateVariant({
-          id: input.id,
-          sku: input.sku,
-          name: input.name,
-          price: input.price,
-          pricingType: input.pricingType,
-          attributes: input.attributes as Record<string, unknown> | undefined,
-          validationProfileId: input.validationProfileId,
-          isActive: input.isActive,
-        });
+      .mutation(async () => {
+        throw new Error("Variants are deprecated - use sizes and quantities");
       }),
 
     deleteVariant: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(async ({ ctx, input }) => {
-        if (!ctx.user) throw new Error("Not authenticated");
-        if (ctx.user.role !== 'admin' && ctx.user.role !== 'employee') {
-          throw new Error("Only employees can delete variants");
-        }
-        return await deleteVariant(input.id);
+      .mutation(async () => {
+        throw new Error("Variants are deprecated - use sizes and quantities");
       }),
 
     // ===== SIZE QUANTITIES =====
@@ -489,6 +464,7 @@ export const appRouter = router({
       .input(z.object({ sizeId: z.number() }))
       .query(async ({ input }) => {
         const db = await getDb();
+        if (!db) return [];
         const { sizeQuantities } = await import('../drizzle/schema');
         const { eq, asc, and } = await import('drizzle-orm');
         return await db.select().from(sizeQuantities)
@@ -509,6 +485,7 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         if (!ctx.user) throw new Error("Not authenticated");
         const db = await getDb();
+        if (!db) throw new Error("Database not available");
         const { sizeQuantities } = await import('../drizzle/schema');
         const result = await db.insert(sizeQuantities).values({
           sizeId: input.sizeId,
@@ -530,6 +507,7 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         if (!ctx.user) throw new Error("Not authenticated");
         const db = await getDb();
+        if (!db) throw new Error("Database not available");
         const { sizeQuantities } = await import('../drizzle/schema');
         const { eq } = await import('drizzle-orm');
         const updateData: any = {};
@@ -549,6 +527,7 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         if (!ctx.user) throw new Error("Not authenticated");
         const db = await getDb();
+        if (!db) throw new Error("Database not available");
         const { sizeQuantities } = await import('../drizzle/schema');
         const { eq } = await import('drizzle-orm');
         // Soft delete - set isActive to false
@@ -563,6 +542,7 @@ export const appRouter = router({
       .input(z.object({ productId: z.number() }))
       .query(async ({ input }) => {
         const db = await getDb();
+        if (!db) return [];
         const { productSizes } = await import('../drizzle/schema');
         const { eq, asc, and } = await import('drizzle-orm');
         return await db.select().from(productSizes)
@@ -612,11 +592,16 @@ export const appRouter = router({
       .input(z.object({ productId: z.number() }))
       .query(async ({ input }) => {
         const db = await getDb();
-        const { productQuantities } = await import('../drizzle/schema');
-        const { eq, asc } = await import('drizzle-orm');
-        return await db.select().from(productQuantities)
-          .where(eq(productQuantities.productId, input.productId))
-          .orderBy(asc(productQuantities.displayOrder));
+        if (!db) return [];
+        const { sizeQuantities, productSizes } = await import('../drizzle/schema');
+        const { eq, asc, inArray } = await import('drizzle-orm');
+        // Get sizes for this product first
+        const sizes = await db.select().from(productSizes).where(eq(productSizes.productId, input.productId));
+        if (sizes.length === 0) return [];
+        const sizeIds = sizes.map(s => s.id);
+        return await db.select().from(sizeQuantities)
+          .where(inArray(sizeQuantities.sizeId, sizeIds))
+          .orderBy(asc(sizeQuantities.displayOrder));
       }),
 
     createQuantity: protectedProcedure
@@ -656,6 +641,7 @@ export const appRouter = router({
       .input(z.object({ productId: z.number().optional(), categoryId: z.number().optional() }))
       .query(async ({ input }) => {
         const db = await getDb();
+        if (!db) return [];
         const { productAddons } = await import('../drizzle/schema');
         const { eq, or, isNull, asc } = await import('drizzle-orm');
         if (input.productId) {
@@ -754,7 +740,7 @@ export const appRouter = router({
     request: protectedProcedure
       .input(z.object({
         items: z.array(z.object({
-          productVariantId: z.number(),
+          sizeQuantityId: z.number(),
           quantity: z.number(),
         })).optional(),
       }))
@@ -770,7 +756,7 @@ export const appRouter = router({
       .input(z.object({
         quoteId: z.number(),
         items: z.array(z.object({
-          productVariantId: z.number(),
+          sizeQuantityId: z.number(),
           quantity: z.number(),
           priceAtTimeOfQuote: z.number(),
           isUpsell: z.boolean().optional(),
@@ -860,19 +846,19 @@ export const appRouter = router({
         if (!db) throw new Error("Database not available");
         
         // Get quote items
-        const quoteItems = await db.execute(sql`
-          SELECT id, "productVariantId", quantity FROM quote_items WHERE "quoteId" = ${input.quoteId}
+        const quoteItemsResult = await db.execute(sql`
+          SELECT id, "sizeQuantityId", quantity FROM quote_items WHERE "quoteId" = ${input.quoteId}
         `);
         
-        if (!quoteItems.rows || quoteItems.rows.length === 0) {
+        if (!quoteItemsResult.rows || quoteItemsResult.rows.length === 0) {
           throw new Error("No items found in quote");
         }
         
         // Get supplier price for the product
-        const firstItem = quoteItems.rows[0] as { id: number; productVariantId: number; quantity: number };
+        const firstItem = quoteItemsResult.rows[0] as { id: number; sizeQuantityId: number; quantity: number };
         const supplierPrice = await db.execute(sql`
           SELECT "pricePerUnit", "deliveryDays" FROM supplier_prices 
-          WHERE "supplierId" = ${input.supplierId} AND "productVariantId" = ${firstItem.productVariantId}
+          WHERE "supplierId" = ${input.supplierId} AND "sizeQuantityId" = ${firstItem.sizeQuantityId}
           LIMIT 1
         `);
         
@@ -880,8 +866,8 @@ export const appRouter = router({
         const deliveryDays = supplierPrice.rows?.[0]?.deliveryDays || 3;
         
         // Assign supplier to all quote items
-        for (const item of quoteItems.rows) {
-          const typedItem = item as { id: number; productVariantId: number; quantity: number };
+        for (const item of quoteItemsResult.rows) {
+          const typedItem = item as { id: number; sizeQuantityId: number; quantity: number };
           await assignSupplierToQuoteItem(
             typedItem.id,
             input.supplierId,
@@ -1040,7 +1026,7 @@ export const appRouter = router({
           address: z.string().optional(),
         }),
         quoteItems: z.array(z.object({
-          productVariantId: z.number(),
+          sizeQuantityId: z.number(),
           quantity: z.number().int().positive(),
         })).min(1),
         notes: z.string().optional(),
@@ -1138,30 +1124,29 @@ export const appRouter = router({
     updatePrice: protectedProcedure
       .input(z.object({
         supplierId: z.number(),
-        variantId: z.number(),
+        sizeQuantityId: z.number(),
         price: z.number().positive("Price must be positive"),
         deliveryDays: z.number().int().positive().optional(),
-        minQuantity: z.number().int().positive().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         if (!ctx.user) throw new Error("Not authenticated");
         if (ctx.user.role !== 'admin' && ctx.user.role !== 'employee') {
           throw new Error("Only employees can update supplier prices");
         }
-        return await updateSupplierPrice(input);
+        return await upsertSupplierPrice(input);
       }),
 
     deletePrice: protectedProcedure
       .input(z.object({
         supplierId: z.number(),
-        variantId: z.number(),
+        sizeQuantityId: z.number(),
       }))
       .mutation(async ({ ctx, input }) => {
         if (!ctx.user) throw new Error("Not authenticated");
         if (ctx.user.role !== 'admin' && ctx.user.role !== 'employee') {
           throw new Error("Only employees can delete supplier prices");
         }
-        return await deleteSupplierPrice(input.supplierId, input.variantId);
+        return await deleteSupplierPrice(input.supplierId, input.sizeQuantityId);
       }),
 
     openJobs: protectedProcedure
@@ -1177,7 +1162,7 @@ export const appRouter = router({
 
     recommendations: protectedProcedure
       .input(z.object({
-        variantId: z.number(),
+        sizeQuantityId: z.number(),
         quantity: z.number().int().positive(),
       }))
       .query(async ({ ctx, input }) => {
@@ -1185,7 +1170,7 @@ export const appRouter = router({
         if (ctx.user.role !== 'admin' && ctx.user.role !== 'employee') {
           throw new Error("Only employees can view supplier recommendations");
         }
-        return await getSupplierRecommendations(input.variantId, input.quantity);
+        return await getSupplierRecommendations(input.sizeQuantityId, input.quantity);
       }),
 
     // Enhanced recommendations based on supplier_jobs history (reliability, speed, rating)

@@ -11,7 +11,7 @@ interface CreateCustomerWithQuoteInput {
     address?: string;
   };
   quoteItems: Array<{
-    productVariantId: number;
+    sizeQuantityId: number;
     quantity: number;
   }>;
   notes?: string;
@@ -64,9 +64,9 @@ export async function createCustomerWithQuote(input: CreateCustomerWithQuoteInpu
   for (const item of input.quoteItems) {
     await db.insert(quoteItems).values({
       quoteId: quoteId,
-      productVariantId: item.productVariantId,
+      sizeQuantityId: item.sizeQuantityId,
       quantity: item.quantity,
-      priceAtTimeOfQuote: 0, // Will be calculated by employee
+      priceAtTimeOfQuote: "0", // Will be calculated by employee
     });
   }
 

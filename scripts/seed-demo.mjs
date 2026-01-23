@@ -1,6 +1,7 @@
 /**
  * Demo Data Seed Script for PostgreSQL
- * Creates 5 customers, 5 suppliers, 5 products with variants, and 5 quotes
+ * Creates 5 customers, 5 suppliers, 5 products with sizes and quantities, and 5 quotes
+ * Updated for new schema: productSizes + sizeQuantities (no variants)
  */
 
 import { drizzle } from 'drizzle-orm/node-postgres';
@@ -69,107 +70,120 @@ async function seed() {
       console.log(`  ✓ ${s.company}`);
     }
 
-    // ==================== 5 BASE PRODUCTS + VARIANTS ====================
-    console.log('\n📦 Creating 5 products with variants...');
+    // ==================== 5 BASE PRODUCTS + SIZES + QUANTITIES ====================
+    console.log('\n📦 Creating 5 products with sizes and quantities...');
     const products = [
       { 
         name: 'כרטיסי ביקור', 
         description: 'כרטיסי ביקור מקצועיים בגדלים שונים',
         category: 'כרטיסים',
-        variants: [
-          { sku: 'BC-STD-100', name: 'כרטיסי ביקור סטנדרט - 100 יח\'', attrs: { size: '9x5cm', paper: '350gsm', finish: 'מט' }, price: 120 },
-          { sku: 'BC-STD-500', name: 'כרטיסי ביקור סטנדרט - 500 יח\'', attrs: { size: '9x5cm', paper: '350gsm', finish: 'מט' }, price: 280 },
-          { sku: 'BC-PRE-100', name: 'כרטיסי ביקור פרימיום - 100 יח\'', attrs: { size: '9x5cm', paper: '400gsm', finish: 'למינציה' }, price: 180 },
+        sizes: [
+          { name: 'סטנדרט', dimensions: '9x5cm', quantities: [{ qty: 100, price: 120 }, { qty: 500, price: 280 }] },
+          { name: 'פרימיום', dimensions: '9x5cm למינציה', quantities: [{ qty: 100, price: 180 }, { qty: 500, price: 400 }] },
         ]
       },
       { 
         name: 'ברושורים', 
         description: 'ברושורים מקופלים לפרסום ושיווק',
         category: 'דפוס',
-        variants: [
-          { sku: 'BR-A4-100', name: 'ברושור A4 מקופל - 100 יח\'', attrs: { size: 'A4', folds: 2, paper: '170gsm' }, price: 450 },
-          { sku: 'BR-A4-500', name: 'ברושור A4 מקופל - 500 יח\'', attrs: { size: 'A4', folds: 2, paper: '170gsm' }, price: 1200 },
-          { sku: 'BR-A5-100', name: 'ברושור A5 מקופל - 100 יח\'', attrs: { size: 'A5', folds: 2, paper: '170gsm' }, price: 280 },
+        sizes: [
+          { name: 'A4 מקופל', dimensions: 'A4', quantities: [{ qty: 100, price: 450 }, { qty: 500, price: 1200 }] },
+          { name: 'A5 מקופל', dimensions: 'A5', quantities: [{ qty: 100, price: 280 }, { qty: 500, price: 750 }] },
         ]
       },
       { 
         name: 'פוסטרים', 
         description: 'פוסטרים בגדלים שונים להדפסה',
         category: 'דפוס גדול',
-        variants: [
-          { sku: 'PO-A3-10', name: 'פוסטר A3 - 10 יח\'', attrs: { size: 'A3', paper: '200gsm', finish: 'מבריק' }, price: 150 },
-          { sku: 'PO-A2-10', name: 'פוסטר A2 - 10 יח\'', attrs: { size: 'A2', paper: '200gsm', finish: 'מבריק' }, price: 280 },
-          { sku: 'PO-A1-5', name: 'פוסטר A1 - 5 יח\'', attrs: { size: 'A1', paper: '200gsm', finish: 'מבריק' }, price: 350 },
+        sizes: [
+          { name: 'A3', dimensions: '297x420mm', quantities: [{ qty: 10, price: 150 }, { qty: 50, price: 500 }] },
+          { name: 'A2', dimensions: '420x594mm', quantities: [{ qty: 10, price: 280 }, { qty: 50, price: 900 }] },
+          { name: 'A1', dimensions: '594x841mm', quantities: [{ qty: 5, price: 350 }, { qty: 20, price: 1000 }] },
         ]
       },
       { 
         name: 'קופסאות מתנה', 
         description: 'קופסאות קרטון מעוצבות למתנות ומוצרים',
         category: 'אריזות',
-        variants: [
-          { sku: 'BX-SM-50', name: 'קופסה קטנה 10x10x10 - 50 יח\'', attrs: { size: '10x10x10cm', material: 'קרטון 300gsm' }, price: 320 },
-          { sku: 'BX-MD-50', name: 'קופסה בינונית 20x15x10 - 50 יח\'', attrs: { size: '20x15x10cm', material: 'קרטון 350gsm' }, price: 480 },
-          { sku: 'BX-LG-25', name: 'קופסה גדולה 30x20x15 - 25 יח\'', attrs: { size: '30x20x15cm', material: 'קרטון 400gsm' }, price: 520 },
+        sizes: [
+          { name: 'קטנה', dimensions: '10x10x10cm', quantities: [{ qty: 50, price: 320 }, { qty: 100, price: 550 }] },
+          { name: 'בינונית', dimensions: '20x15x10cm', quantities: [{ qty: 50, price: 480 }, { qty: 100, price: 850 }] },
+          { name: 'גדולה', dimensions: '30x20x15cm', quantities: [{ qty: 25, price: 520 }, { qty: 50, price: 900 }] },
         ]
       },
       { 
         name: 'מדבקות', 
         description: 'מדבקות בגזירה מותאמת אישית',
         category: 'מדבקות',
-        variants: [
-          { sku: 'ST-CIR-100', name: 'מדבקות עגולות 5cm - 100 יח\'', attrs: { shape: 'עגול', size: '5cm', material: 'ויניל' }, price: 85 },
-          { sku: 'ST-SQR-100', name: 'מדבקות מרובעות 5x5 - 100 יח\'', attrs: { shape: 'מרובע', size: '5x5cm', material: 'ויניל' }, price: 85 },
-          { sku: 'ST-CUS-100', name: 'מדבקות גזירה מותאמת - 100 יח\'', attrs: { shape: 'מותאם', material: 'ויניל פרימיום' }, price: 150 },
+        sizes: [
+          { name: 'עגולות 5cm', dimensions: 'קוטר 5cm', quantities: [{ qty: 100, price: 85 }, { qty: 500, price: 300 }] },
+          { name: 'מרובעות 5x5', dimensions: '5x5cm', quantities: [{ qty: 100, price: 85 }, { qty: 500, price: 300 }] },
+          { name: 'גזירה מותאמת', dimensions: 'מותאם אישית', quantities: [{ qty: 100, price: 150 }, { qty: 500, price: 550 }] },
         ]
       },
     ];
 
-    const productVariantIds = [];
+    const sizeQuantityIds = [];
     for (const p of products) {
       const productResult = await client.query(
-        `INSERT INTO base_products (name, description, category, isActive) VALUES ($1, $2, $3, $4) RETURNING id`,
+        `INSERT INTO base_products (name, description, category, "isActive") VALUES ($1, $2, $3, $4) RETURNING id`,
         [p.name, p.description, p.category, true]
       );
       const productId = productResult.rows[0].id;
       console.log(`  ✓ ${p.name}`);
 
-      for (const v of p.variants) {
-        const variantResult = await client.query(
-          `INSERT INTO product_variants (baseProductId, sku, name, attributes, isActive) VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-          [productId, `${v.sku}-${timestamp}`, v.name, JSON.stringify(v.attrs), true]
+      for (const size of p.sizes) {
+        const sizeResult = await client.query(
+          `INSERT INTO product_sizes ("productId", name, dimensions, "isActive") VALUES ($1, $2, $3, $4) RETURNING id`,
+          [productId, size.name, size.dimensions, true]
         );
-        productVariantIds.push({ id: variantResult.rows[0].id, price: v.price, name: v.name });
-        console.log(`    - ${v.name}`);
+        const sizeId = sizeResult.rows[0].id;
+        console.log(`    - ${size.name} (${size.dimensions})`);
+
+        for (const q of size.quantities) {
+          const sqResult = await client.query(
+            `INSERT INTO size_quantities ("sizeId", quantity, price, "isActive") VALUES ($1, $2, $3, $4) RETURNING id`,
+            [sizeId, q.qty, q.price, true]
+          );
+          sizeQuantityIds.push({ 
+            id: sqResult.rows[0].id, 
+            price: q.price, 
+            productName: p.name, 
+            sizeName: size.name,
+            quantity: q.qty 
+          });
+          console.log(`      • ${q.qty} יח' - ₪${q.price}`);
+        }
       }
     }
 
     // ==================== DEFAULT PRICELIST ====================
     console.log('\n💰 Creating default pricelist...');
     const pricelistResult = await client.query(
-      `INSERT INTO pricelists (name, description, isDefault, isActive) VALUES ($1, $2, $3, $4) RETURNING id`,
+      `INSERT INTO pricelists (name, description, "isDefault", "isActive") VALUES ($1, $2, $3, $4) RETURNING id`,
       ['מחירון ברירת מחדל', 'מחירון סטנדרטי לכל הלקוחות', true, true]
     );
     const pricelistId = pricelistResult.rows[0].id;
 
-    for (const pv of productVariantIds) {
+    for (const sq of sizeQuantityIds) {
       await client.query(
-        `INSERT INTO pricelist_items (pricelistId, productVariantId, minQuantity, pricePerUnit) VALUES ($1, $2, $3, $4)`,
-        [pricelistId, pv.id, 1, pv.price]
+        `INSERT INTO pricelist_items ("pricelistId", "sizeQuantityId", "pricePerUnit") VALUES ($1, $2, $3)`,
+        [pricelistId, sq.id, sq.price]
       );
     }
-    console.log(`  ✓ מחירון ברירת מחדל עם ${productVariantIds.length} פריטים`);
+    console.log(`  ✓ מחירון ברירת מחדל עם ${sizeQuantityIds.length} פריטים`);
 
     // ==================== SUPPLIER PRICES ====================
     console.log('\n🏷️ Creating supplier prices...');
     for (const supplierId of supplierIds) {
-      const selectedVariants = productVariantIds.slice(0, Math.floor(Math.random() * 5) + 3);
-      for (const pv of selectedVariants) {
-        const supplierCost = Math.round(pv.price * (0.5 + Math.random() * 0.2));
+      const selectedItems = sizeQuantityIds.slice(0, Math.floor(Math.random() * 8) + 5);
+      for (const sq of selectedItems) {
+        const supplierCost = Math.round(sq.price * (0.5 + Math.random() * 0.2));
         const deliveryDays = Math.floor(Math.random() * 5) + 2;
         await client.query(
-          `INSERT INTO supplier_prices (supplierId, productVariantId, minQuantity, pricePerUnit, deliveryDays, qualityRating) 
-           VALUES ($1, $2, $3, $4, $5, $6)`,
-          [supplierId, pv.id, 1, supplierCost, deliveryDays, (Math.random() * 2 + 3).toFixed(2)]
+          `INSERT INTO supplier_prices ("supplierId", "sizeQuantityId", "pricePerUnit", "deliveryDays") 
+           VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`,
+          [supplierId, sq.id, supplierCost, deliveryDays]
         );
       }
     }
@@ -188,17 +202,17 @@ async function seed() {
     for (let i = 0; i < quoteData.length; i++) {
       const q = quoteData[i];
       const quoteResult = await client.query(
-        `INSERT INTO quotes (customerId, quote_status, version) VALUES ($1, $2, $3) RETURNING id`,
+        `INSERT INTO quotes ("customerId", quote_status, version) VALUES ($1, $2, $3) RETURNING id`,
         [q.customerId, q.status, 1]
       );
       const quoteId = quoteResult.rows[0].id;
 
       let totalValue = 0;
       for (const itemIdx of q.items) {
-        if (itemIdx < productVariantIds.length) {
-          const pv = productVariantIds[itemIdx];
+        if (itemIdx < sizeQuantityIds.length) {
+          const sq = sizeQuantityIds[itemIdx];
           const quantity = Math.floor(Math.random() * 3) + 1;
-          const price = pv.price * quantity;
+          const price = sq.price * quantity;
           totalValue += price;
 
           const assignedSupplier = ['approved', 'in_production', 'ready'].includes(q.status) 
@@ -207,16 +221,16 @@ async function seed() {
           const supplierCost = assignedSupplier ? Math.round(price * 0.6) : null;
 
           await client.query(
-            `INSERT INTO quote_items (quoteId, productVariantId, quantity, priceAtTimeOfQuote, supplierId, supplierCost, deliveryDays) 
+            `INSERT INTO quote_items ("quoteId", "sizeQuantityId", quantity, "priceAtTimeOfQuote", "supplierId", "supplierCost", "deliveryDays") 
              VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-            [quoteId, pv.id, quantity, pv.price, assignedSupplier, supplierCost, assignedSupplier ? 3 : null]
+            [quoteId, sq.id, quantity, sq.price, assignedSupplier, supplierCost, assignedSupplier ? 3 : null]
           );
         }
       }
 
       if (['approved', 'in_production', 'ready'].includes(q.status)) {
         await client.query(
-          `UPDATE quotes SET finalValue = $1 WHERE id = $2`,
+          `UPDATE quotes SET "finalValue" = $1 WHERE id = $2`,
           [totalValue, quoteId]
         );
       }
@@ -236,7 +250,7 @@ async function seed() {
 
     for (const a of activities) {
       await client.query(
-        `INSERT INTO activity_log (userId, actionType, details) VALUES ($1, $2, $3)`,
+        `INSERT INTO activity_log ("userId", "actionType", details) VALUES ($1, $2, $3)`,
         [1, a.action, JSON.stringify(a.details)]
       );
     }
@@ -246,7 +260,7 @@ async function seed() {
     console.log('\n📊 Summary:');
     console.log(`   • 5 לקוחות פעילים`);
     console.log(`   • 5 ספקים פעילים`);
-    console.log(`   • 5 מוצרים עם ${productVariantIds.length} וריאנטים`);
+    console.log(`   • 5 מוצרים עם ${sizeQuantityIds.length} אפשרויות גודל/כמות`);
     console.log(`   • 5 הצעות מחיר בסטטוסים שונים`);
     console.log(`   • מחירון ברירת מחדל`);
     console.log(`   • מחירי ספקים`);

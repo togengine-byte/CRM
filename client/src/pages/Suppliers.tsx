@@ -74,6 +74,8 @@ export default function Suppliers() {
     address: "",
   });
 
+  const utils = trpc.useUtils();
+
   // Queries
   const { data: suppliers = [], refetch: refetchSuppliers } = trpc.suppliers.list.useQuery({
     status: statusFilter !== "all" ? statusFilter as 'active' | 'pending_approval' | 'rejected' | 'deactivated' : undefined,
@@ -440,15 +442,15 @@ export default function Suppliers() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {supplierPrices.map((price) => (
+                          {supplierPrices.map((price: any) => (
                             <TableRow key={price.id}>
                               <TableCell>{price.productName}</TableCell>
-                              <TableCell>{price.variantName}</TableCell>
+                              <TableCell>{price.sizeName} {price.dimensions ? `(${price.dimensions})` : ''}</TableCell>
                               <TableCell className="font-medium">
                                 ₪{Number(price.price).toLocaleString()}
                               </TableCell>
                               <TableCell>{price.deliveryDays} ימים</TableCell>
-                              <TableCell>{price.minQuantity}</TableCell>
+                              <TableCell>{price.quantity}</TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
@@ -481,10 +483,10 @@ export default function Suppliers() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {openJobs.map((job) => (
+                          {openJobs.map((job: any) => (
                             <TableRow key={job.quoteItemId}>
                               <TableCell>#{job.quoteId}</TableCell>
-                              <TableCell>{job.productName} - {job.variantName}</TableCell>
+                              <TableCell>{job.productName} - {job.sizeName} {job.dimensions ? `(${job.dimensions})` : ''}</TableCell>
                               <TableCell>{job.quantity}</TableCell>
                               <TableCell>
                                 {job.supplierCost ? `₪${Number(job.supplierCost).toLocaleString()}` : "-"}

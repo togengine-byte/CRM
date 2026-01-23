@@ -49,7 +49,8 @@ interface ReadyJob {
   id: number;
   quoteId: number;
   productName: string;
-  variantName: string;
+  sizeName: string;
+  dimensions?: string | null;
   quantity: number;
   supplierName: string;
   supplierAddress: string;
@@ -134,7 +135,7 @@ export default function CourierPortal() {
   };
 
   // Filter jobs based on tab and search
-  const filteredJobs = jobs.filter((job: ReadyJob) => {
+  const filteredJobs = (jobs as any[]).filter((job: any) => {
     const matchesSearch = !searchQuery || 
       job.productName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       job.supplierName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -238,13 +239,13 @@ export default function CourierPortal() {
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="grid w-full grid-cols-3 mb-4">
               <TabsTrigger value="pending">
-                ממתינים ({jobs.filter((j: ReadyJob) => !j.pickedUp).length})
+                ממתינים ({(jobs as any[]).filter((j: any) => !j.pickedUp).length})
               </TabsTrigger>
               <TabsTrigger value="in_transit">
-                בדרך ({jobs.filter((j: ReadyJob) => j.pickedUp && !j.delivered).length})
+                בדרך ({(jobs as any[]).filter((j: any) => j.pickedUp && !j.delivered).length})
               </TabsTrigger>
               <TabsTrigger value="delivered">
-                נמסרו ({jobs.filter((j: ReadyJob) => j.delivered).length})
+                נמסרו ({(jobs as any[]).filter((j: any) => j.delivered).length})
               </TabsTrigger>
             </TabsList>
 
@@ -276,12 +277,12 @@ export default function CourierPortal() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredJobs.map((job: ReadyJob) => (
+                    {filteredJobs.map((job: any) => (
                       <TableRow key={job.id}>
                         <TableCell>
                           <div>
                             <div className="font-medium">{job.productName || "מוצר"}</div>
-                            <div className="text-sm text-muted-foreground">{job.variantName}</div>
+                            <div className="text-sm text-muted-foreground">{job.sizeName} {job.dimensions ? `(${job.dimensions})` : ''}</div>
                           </div>
                         </TableCell>
                         <TableCell>{job.quantity}</TableCell>
@@ -376,8 +377,8 @@ export default function CourierPortal() {
                     <span className="font-medium">{selectedJob.productName}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">וריאנט:</span>
-                    <span>{selectedJob.variantName || "-"}</span>
+                    <span className="text-muted-foreground">גודל:</span>
+                    <span>{selectedJob.sizeName} {selectedJob.dimensions ? `(${selectedJob.dimensions})` : ''}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">כמות:</span>

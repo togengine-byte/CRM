@@ -1,4 +1,4 @@
-import { eq, desc, sql, and, count, inArray, like, gte, lte, SQL } from "drizzle-orm";
+import { eq, desc, sql, and, count, inArray, like, gte, lte, SQL, or, sum, isNull, isNotNull, ne, asc, ilike } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import crypto from "crypto";
 import { 
@@ -7,7 +7,9 @@ import {
   quotes, 
   activityLog,
   baseProducts,
-  productVariants,
+  productSizes,
+  sizeQuantities,
+  productAddons,
   quoteItems,
   quoteAttachments,
   pricelists,
@@ -457,7 +459,7 @@ export async function getQuoteById(quoteId: number) {
 
   const items = await db.select({
     id: quoteItems.id,
-    productVariantId: quoteItems.productVariantId,
+    sizeQuantityId: quoteItems.sizeQuantityId,
     quantity: quoteItems.quantity,
     priceAtTimeOfQuote: quoteItems.priceAtTimeOfQuote,
     isUpsell: quoteItems.isUpsell,
@@ -543,7 +545,7 @@ export async function getQuoteHistory(quoteId: number) {
 export interface CreateQuoteRequest {
   customerId: number;
   items: {
-    productVariantId: number;
+    sizeQuantityId: number;
     quantity: number;
   }[];
 }
@@ -569,7 +571,7 @@ export async function createQuoteRequest(data: CreateQuoteRequest) {
     for (const item of data.items) {
       await db.insert(quoteItems).values({
         quoteId: Number(quoteId),
-        productVariantId: item.productVariantId,
+        sizeQuantityId: item.sizeQuantityId,
         quantity: item.quantity,
         priceAtTimeOfQuote: "0",
       });
@@ -589,7 +591,7 @@ export interface UpdateQuoteRequest {
   quoteId: number;
   employeeId: number;
   items?: {
-    productVariantId: number;
+    sizeQuantityId: number;
     quantity: number;
     priceAtTimeOfQuote: number;
     isUpsell?: boolean;
@@ -628,7 +630,7 @@ export async function updateQuote(data: UpdateQuoteRequest) {
     for (const item of data.items) {
       await db.insert(quoteItems).values({
         quoteId: data.quoteId,
-        productVariantId: item.productVariantId,
+        sizeQuantityId: item.sizeQuantityId,
         quantity: item.quantity,
         priceAtTimeOfQuote: item.priceAtTimeOfQuote.toString(),
         isUpsell: item.isUpsell || false,
@@ -685,7 +687,7 @@ export async function reviseQuote(data: ReviseQuoteRequest) {
   for (const item of items) {
     await db.insert(quoteItems).values({
       quoteId: Number(newQuoteId),
-      productVariantId: item.productVariantId,
+      sizeQuantityId: item.sizeQuantityId,
       quantity: item.quantity,
       priceAtTimeOfQuote: item.priceAtTimeOfQuote,
       isUpsell: item.isUpsell,
@@ -793,24 +795,35 @@ export interface UpdateProductInput {
   isActive?: boolean;
 }
 
-export interface CreateVariantInput {
-  baseProductId: number;
-  sku: string;
+export interface CreateSizeInput {
+  productId: number;
   name: string;
-  price?: number;
-  pricingType?: string;
-  attributes?: Record<string, unknown>;
-  validationProfileId?: number;
+  dimensions?: string;
+  basePrice?: string;
+  displayOrder?: number;
 }
 
-export interface UpdateVariantInput {
+export interface UpdateSizeInput {
   id: number;
-  sku?: string;
   name?: string;
-  price?: number;
-  pricingType?: string;
-  attributes?: Record<string, unknown>;
-  validationProfileId?: number;
+  dimensions?: string;
+  basePrice?: string;
+  displayOrder?: number;
+  isActive?: boolean;
+}
+
+export interface CreateSizeQuantityInput {
+  sizeId: number;
+  quantity: number;
+  price: string;
+  displayOrder?: number;
+}
+
+export interface UpdateSizeQuantityInput {
+  id: number;
+  quantity?: number;
+  price?: string;
+  displayOrder?: number;
   isActive?: boolean;
 }
 
@@ -848,32 +861,31 @@ export async function getProducts(filters?: {
     filtered = filtered.filter(p => p.isActive === filters.isActive);
   }
 
-  // Get variants for each product
-  const productsWithVariants = await Promise.all(
+  // Get sizes for each product
+  const productsWithSizes = await Promise.all(
     filtered.map(async (product) => {
-      const variants = await db.select({
-        id: productVariants.id,
-        sku: productVariants.sku,
-        name: productVariants.name,
-        price: productVariants.price,
-        pricingType: productVariants.pricingType,
-        attributes: productVariants.attributes,
-        validationProfileId: productVariants.validationProfileId,
-        isActive: productVariants.isActive,
-        createdAt: productVariants.createdAt,
+      const sizes = await db.select({
+        id: productSizes.id,
+        name: productSizes.name,
+        dimensions: productSizes.dimensions,
+        basePrice: productSizes.basePrice,
+        displayOrder: productSizes.displayOrder,
+        isActive: productSizes.isActive,
+        createdAt: productSizes.createdAt,
       })
-      .from(productVariants)
-      .where(eq(productVariants.baseProductId, product.id));
+      .from(productSizes)
+      .where(eq(productSizes.productId, product.id))
+      .orderBy(productSizes.displayOrder);
 
       return {
         ...product,
-        variants,
-        variantCount: variants.length,
+        sizes,
+        sizeCount: sizes.length,
       };
     })
   );
 
-  return productsWithVariants;
+  return productsWithSizes;
 }
 
 export async function getProductById(productId: number) {
@@ -887,13 +899,26 @@ export async function getProductById(productId: number) {
 
   if (!product) return null;
 
-  const variants = await db.select()
-    .from(productVariants)
-    .where(eq(productVariants.baseProductId, productId));
+  // Get sizes with their quantities
+  const sizes = await db.select()
+    .from(productSizes)
+    .where(eq(productSizes.productId, productId))
+    .orderBy(productSizes.displayOrder);
+
+  // Get quantities for each size
+  const sizesWithQuantities = await Promise.all(
+    sizes.map(async (size) => {
+      const quantities = await db.select()
+        .from(sizeQuantities)
+        .where(eq(sizeQuantities.sizeId, size.id))
+        .orderBy(sizeQuantities.displayOrder);
+      return { ...size, quantities };
+    })
+  );
 
   return {
     ...product,
-    variants,
+    sizes: sizesWithQuantities,
   };
 }
 
@@ -947,119 +972,194 @@ export async function deleteProduct(productId: number) {
     .set({ isActive: false })
     .where(eq(baseProducts.id, productId));
 
-  // Also deactivate all variants
-  await db.update(productVariants)
+  // Also deactivate all sizes
+  await db.update(productSizes)
     .set({ isActive: false })
-    .where(eq(productVariants.baseProductId, productId));
+    .where(eq(productSizes.productId, productId));
 
   await logActivity(null, "product_deleted", { productId });
 
   return { success: true };
 }
 
-export async function createVariant(input: CreateVariantInput) {
+// ==================== SIZE FUNCTIONS ====================
+
+export async function createSize(input: CreateSizeInput) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
   // Check if product exists
   const [product] = await db.select()
     .from(baseProducts)
-    .where(eq(baseProducts.id, input.baseProductId))
+    .where(eq(baseProducts.id, input.productId))
     .limit(1);
 
   if (!product) {
-    throw new Error("Base product not found");
+    throw new Error("Product not found");
   }
 
-  // Check if SKU is unique
-  const [existingSku] = await db.select()
-    .from(productVariants)
-    .where(eq(productVariants.sku, input.sku))
-    .limit(1);
-
-  if (existingSku) {
-    throw new Error("SKU already exists");
-  }
-
-  const result = await db.insert(productVariants).values({
-    baseProductId: input.baseProductId,
-    sku: input.sku,
+  const result = await db.insert(productSizes).values({
+    productId: input.productId,
     name: input.name,
-    price: input.price?.toString() || null,
-    pricingType: input.pricingType || 'fixed',
-    attributes: input.attributes || null,
-    validationProfileId: input.validationProfileId || null,
+    dimensions: input.dimensions || null,
+    basePrice: input.basePrice || "0",
+    displayOrder: input.displayOrder || 0,
     isActive: true,
+  }).returning();
+
+  await logActivity(null, "size_created", { 
+    sizeId: result[0].id, 
+    productId: input.productId,
+    name: input.name 
   });
 
-  const insertId = result[0].insertId;
-
-  await logActivity(null, "variant_created", { 
-    variantId: insertId, 
-    productId: input.baseProductId,
-    sku: input.sku 
-  });
-
-  return { id: insertId, ...input };
+  return result[0];
 }
 
-export async function updateVariant(input: UpdateVariantInput) {
+export async function updateSize(input: UpdateSizeInput) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
   const updateData: Record<string, unknown> = {};
-  if (input.sku !== undefined) {
-    // Check if new SKU is unique
-    const [existingSku] = await db.select()
-      .from(productVariants)
-      .where(and(
-        eq(productVariants.sku, input.sku),
-        sql`${productVariants.id} != ${input.id}`
-      ))
-      .limit(1);
-
-    if (existingSku) {
-      throw new Error("SKU already exists");
-    }
-    updateData.sku = input.sku;
-  }
   if (input.name !== undefined) updateData.name = input.name;
-  if (input.price !== undefined) updateData.price = input.price.toString();
-  if (input.pricingType !== undefined) updateData.pricingType = input.pricingType;
-  if (input.attributes !== undefined) updateData.attributes = input.attributes;
-  if (input.validationProfileId !== undefined) updateData.validationProfileId = input.validationProfileId;
+  if (input.dimensions !== undefined) updateData.dimensions = input.dimensions;
+  if (input.basePrice !== undefined) updateData.basePrice = input.basePrice;
+  if (input.displayOrder !== undefined) updateData.displayOrder = input.displayOrder;
   if (input.isActive !== undefined) updateData.isActive = input.isActive;
 
   if (Object.keys(updateData).length === 0) {
     throw new Error("No fields to update");
   }
 
-  await db.update(productVariants)
+  await db.update(productSizes)
     .set(updateData)
-    .where(eq(productVariants.id, input.id));
+    .where(eq(productSizes.id, input.id));
 
-  await logActivity(null, "variant_updated", { variantId: input.id, changes: updateData });
+  await logActivity(null, "size_updated", { sizeId: input.id, changes: updateData });
 
   const [updated] = await db.select()
-    .from(productVariants)
-    .where(eq(productVariants.id, input.id))
+    .from(productSizes)
+    .where(eq(productSizes.id, input.id))
     .limit(1);
 
   return updated;
 }
 
-export async function deleteVariant(variantId: number) {
+export async function deleteSize(sizeId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
   // Soft delete
-  await db.update(productVariants)
+  await db.update(productSizes)
     .set({ isActive: false })
-    .where(eq(productVariants.id, variantId));
+    .where(eq(productSizes.id, sizeId));
 
-  await logActivity(null, "variant_deleted", { variantId });
+  // Also deactivate all quantities for this size
+  await db.update(sizeQuantities)
+    .set({ isActive: false })
+    .where(eq(sizeQuantities.sizeId, sizeId));
+
+  await logActivity(null, "size_deleted", { sizeId });
 
   return { success: true };
+}
+
+// ==================== SIZE QUANTITY FUNCTIONS ====================
+
+export async function createSizeQuantity(input: CreateSizeQuantityInput) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Check if size exists
+  const [size] = await db.select()
+    .from(productSizes)
+    .where(eq(productSizes.id, input.sizeId))
+    .limit(1);
+
+  if (!size) {
+    throw new Error("Size not found");
+  }
+
+  const result = await db.insert(sizeQuantities).values({
+    sizeId: input.sizeId,
+    quantity: input.quantity,
+    price: input.price,
+    displayOrder: input.displayOrder || 0,
+    isActive: true,
+  }).returning();
+
+  await logActivity(null, "size_quantity_created", { 
+    sizeQuantityId: result[0].id, 
+    sizeId: input.sizeId,
+    quantity: input.quantity 
+  });
+
+  return result[0];
+}
+
+export async function updateSizeQuantity(input: UpdateSizeQuantityInput) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const updateData: Record<string, unknown> = {};
+  if (input.quantity !== undefined) updateData.quantity = input.quantity;
+  if (input.price !== undefined) updateData.price = input.price;
+  if (input.displayOrder !== undefined) updateData.displayOrder = input.displayOrder;
+  if (input.isActive !== undefined) updateData.isActive = input.isActive;
+
+  if (Object.keys(updateData).length === 0) {
+    throw new Error("No fields to update");
+  }
+
+  await db.update(sizeQuantities)
+    .set(updateData)
+    .where(eq(sizeQuantities.id, input.id));
+
+  await logActivity(null, "size_quantity_updated", { sizeQuantityId: input.id, changes: updateData });
+
+  const [updated] = await db.select()
+    .from(sizeQuantities)
+    .where(eq(sizeQuantities.id, input.id))
+    .limit(1);
+
+  return updated;
+}
+
+export async function deleteSizeQuantity(sizeQuantityId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Soft delete
+  await db.update(sizeQuantities)
+    .set({ isActive: false })
+    .where(eq(sizeQuantities.id, sizeQuantityId));
+
+  await logActivity(null, "size_quantity_deleted", { sizeQuantityId });
+
+  return { success: true };
+}
+
+export async function getSizeQuantityById(sizeQuantityId: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const result = await db.select({
+    id: sizeQuantities.id,
+    sizeId: sizeQuantities.sizeId,
+    quantity: sizeQuantities.quantity,
+    price: sizeQuantities.price,
+    sizeName: productSizes.name,
+    dimensions: productSizes.dimensions,
+    productId: productSizes.productId,
+    productName: baseProducts.name,
+  })
+    .from(sizeQuantities)
+    .innerJoin(productSizes, eq(sizeQuantities.sizeId, productSizes.id))
+    .innerJoin(baseProducts, eq(productSizes.productId, baseProducts.id))
+    .where(eq(sizeQuantities.id, sizeQuantityId))
+    .limit(1);
+
+  return result[0] || null;
 }
 
 export async function getProductCategories() {
@@ -1363,17 +1463,23 @@ export async function getSupplierById(id: number) {
 
   if (supplier.length === 0) return null;
 
-  // Get supplier prices
+  // Get supplier prices with size+quantity info
   const prices = await db.select({
     id: supplierPrices.id,
-    variantId: supplierPrices.productVariantId,
+    sizeQuantityId: supplierPrices.sizeQuantityId,
     price: supplierPrices.pricePerUnit,
     deliveryDays: supplierPrices.deliveryDays,
-    minQuantity: supplierPrices.minQuantity,
     qualityRating: supplierPrices.qualityRating,
     updatedAt: supplierPrices.updatedAt,
+    quantity: sizeQuantities.quantity,
+    sizeName: productSizes.name,
+    dimensions: productSizes.dimensions,
+    productName: baseProducts.name,
   })
     .from(supplierPrices)
+    .innerJoin(sizeQuantities, eq(supplierPrices.sizeQuantityId, sizeQuantities.id))
+    .innerJoin(productSizes, eq(sizeQuantities.sizeId, productSizes.id))
+    .innerJoin(baseProducts, eq(productSizes.productId, baseProducts.id))
     .where(eq(supplierPrices.supplierId, id));
 
   // Get open jobs count
@@ -1460,29 +1566,30 @@ export async function getSupplierPrices(supplierId: number) {
 
   return await db.select({
     id: supplierPrices.id,
-    variantId: supplierPrices.productVariantId,
-    variantName: productVariants.name,
-    variantSku: productVariants.sku,
+    sizeQuantityId: supplierPrices.sizeQuantityId,
+    quantity: sizeQuantities.quantity,
+    sizeName: productSizes.name,
+    dimensions: productSizes.dimensions,
     productName: baseProducts.name,
+    productId: baseProducts.id,
     price: supplierPrices.pricePerUnit,
     deliveryDays: supplierPrices.deliveryDays,
-    minQuantity: supplierPrices.minQuantity,
     qualityRating: supplierPrices.qualityRating,
     updatedAt: supplierPrices.updatedAt,
   })
     .from(supplierPrices)
-    .innerJoin(productVariants, eq(supplierPrices.productVariantId, productVariants.id))
-    .innerJoin(baseProducts, eq(productVariants.baseProductId, baseProducts.id))
+    .innerJoin(sizeQuantities, eq(supplierPrices.sizeQuantityId, sizeQuantities.id))
+    .innerJoin(productSizes, eq(sizeQuantities.sizeId, productSizes.id))
+    .innerJoin(baseProducts, eq(productSizes.productId, baseProducts.id))
     .where(eq(supplierPrices.supplierId, supplierId))
-    .orderBy(baseProducts.name, productVariants.name);
+    .orderBy(baseProducts.name, productSizes.name, sizeQuantities.quantity);
 }
 
-export async function updateSupplierPrice(input: {
+export async function upsertSupplierPrice(input: {
   supplierId: number;
-  variantId: number;
+  sizeQuantityId: number;
   price: number;
   deliveryDays?: number;
-  minQuantity?: number;
   isPreferred?: boolean;
 }) {
   const db = await getDb();
@@ -1493,7 +1600,7 @@ export async function updateSupplierPrice(input: {
     .from(supplierPrices)
     .where(and(
       eq(supplierPrices.supplierId, input.supplierId),
-      eq(supplierPrices.productVariantId, input.variantId)
+      eq(supplierPrices.sizeQuantityId, input.sizeQuantityId)
     ))
     .limit(1);
 
@@ -1503,37 +1610,37 @@ export async function updateSupplierPrice(input: {
       .set({
         pricePerUnit: input.price.toString(),
         deliveryDays: input.deliveryDays ?? existing[0].deliveryDays,
-        minQuantity: input.minQuantity ?? existing[0].minQuantity,
+        isPreferred: input.isPreferred ?? existing[0].isPreferred,
       })
       .where(eq(supplierPrices.id, existing[0].id));
   } else {
     // Create new
     await db.insert(supplierPrices).values({
       supplierId: input.supplierId,
-      productVariantId: input.variantId,
+      sizeQuantityId: input.sizeQuantityId,
       pricePerUnit: input.price.toString(),
       deliveryDays: input.deliveryDays ?? 3,
-      minQuantity: input.minQuantity ?? 1,
+      isPreferred: input.isPreferred ?? false,
     });
   }
 
   await logActivity(null, "supplier_price_updated", { 
     supplierId: input.supplierId, 
-    variantId: input.variantId, 
+    sizeQuantityId: input.sizeQuantityId, 
     price: input.price 
   });
 
   return { success: true };
 }
 
-export async function deleteSupplierPrice(supplierId: number, variantId: number) {
+export async function deleteSupplierPrice(supplierId: number, sizeQuantityId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
   await db.delete(supplierPrices)
     .where(and(
       eq(supplierPrices.supplierId, supplierId),
-      eq(supplierPrices.productVariantId, variantId)
+      eq(supplierPrices.sizeQuantityId, sizeQuantityId)
     ));
 
   return { success: true };
@@ -1546,8 +1653,9 @@ export async function getSupplierOpenJobs(supplierId: number) {
   return await db.select({
     quoteItemId: quoteItems.id,
     quoteId: quoteItems.quoteId,
-    variantId: quoteItems.productVariantId,
-    variantName: productVariants.name,
+    sizeQuantityId: quoteItems.sizeQuantityId,
+    sizeName: productSizes.name,
+    dimensions: productSizes.dimensions,
     productName: baseProducts.name,
     quantity: quoteItems.quantity,
     supplierCost: quoteItems.supplierCost,
@@ -1557,8 +1665,9 @@ export async function getSupplierOpenJobs(supplierId: number) {
   })
     .from(quoteItems)
     .innerJoin(quotes, eq(quoteItems.quoteId, quotes.id))
-    .innerJoin(productVariants, eq(quoteItems.productVariantId, productVariants.id))
-    .innerJoin(baseProducts, eq(productVariants.baseProductId, baseProducts.id))
+    .innerJoin(sizeQuantities, eq(quoteItems.sizeQuantityId, sizeQuantities.id))
+    .innerJoin(productSizes, eq(sizeQuantities.sizeId, productSizes.id))
+    .innerJoin(baseProducts, eq(productSizes.productId, baseProducts.id))
     .where(and(
       eq(quoteItems.supplierId, supplierId),
       inArray(quotes.status, ['approved', 'in_production'])
@@ -1566,22 +1675,21 @@ export async function getSupplierOpenJobs(supplierId: number) {
     .orderBy(desc(quotes.createdAt));
 }
 
-// Weighted Supplier Recommendation Engine
-export async function getSupplierRecommendations(variantId: number, quantity: number) {
+// Weighted Supplier Recommendation Engine - by sizeQuantityId
+export async function getSupplierRecommendations(sizeQuantityId: number, quantity: number) {
   const db = await getDb();
   if (!db) return [];
 
   // Get weights from settings
   const weights = await getSupplierWeights();
 
-  // Get all suppliers with prices for this variant
+  // Get all suppliers with prices for this size+quantity
   const suppliers = await db.select({
     supplierId: supplierPrices.supplierId,
     supplierName: users.name,
     supplierCompany: users.companyName,
     price: supplierPrices.pricePerUnit,
     deliveryDays: supplierPrices.deliveryDays,
-    minQuantity: supplierPrices.minQuantity,
     qualityRating: supplierPrices.qualityRating,
     totalRatingPoints: users.totalRatingPoints,
     ratedDealsCount: users.ratedDealsCount,
@@ -1589,9 +1697,8 @@ export async function getSupplierRecommendations(variantId: number, quantity: nu
     .from(supplierPrices)
     .innerJoin(users, eq(supplierPrices.supplierId, users.id))
     .where(and(
-      eq(supplierPrices.productVariantId, variantId),
-      eq(users.status, 'active'),
-      sql`${supplierPrices.minQuantity} <= ${quantity}`
+      eq(supplierPrices.sizeQuantityId, sizeQuantityId),
+      eq(users.status, 'active')
     ))
     .orderBy(supplierPrices.pricePerUnit);
 
@@ -1708,7 +1815,8 @@ export async function getCourierReadyJobs() {
     id: quoteItems.id,
     quoteId: quoteItems.quoteId,
     productName: baseProducts.name,
-    variantName: productVariants.name,
+    sizeName: productSizes.name,
+    dimensions: productSizes.dimensions,
     quantity: quoteItems.quantity,
     supplierId: quoteItems.supplierId,
     supplierName: users.name,
@@ -1724,8 +1832,9 @@ export async function getCourierReadyJobs() {
   })
     .from(quoteItems)
     .innerJoin(quotes, eq(quoteItems.quoteId, quotes.id))
-    .innerJoin(productVariants, eq(quoteItems.productVariantId, productVariants.id))
-    .innerJoin(baseProducts, eq(productVariants.baseProductId, baseProducts.id))
+    .innerJoin(sizeQuantities, eq(quoteItems.sizeQuantityId, sizeQuantities.id))
+    .innerJoin(productSizes, eq(sizeQuantities.sizeId, productSizes.id))
+    .innerJoin(baseProducts, eq(productSizes.productId, baseProducts.id))
     .leftJoin(users, eq(quoteItems.supplierId, users.id))
     .where(and(
       eq(quotes.status, 'ready'),
@@ -1895,8 +2004,9 @@ export async function getProductPerformance(startDate?: Date, endDate?: Date) {
     avgUnitPrice: sql<number>`COALESCE(AVG(${quoteItems.priceAtTimeOfQuote}), 0)`,
   })
     .from(baseProducts)
-    .leftJoin(productVariants, eq(productVariants.baseProductId, baseProducts.id))
-    .leftJoin(quoteItems, eq(quoteItems.productVariantId, productVariants.id))
+    .leftJoin(productSizes, eq(productSizes.productId, baseProducts.id))
+    .leftJoin(sizeQuantities, eq(sizeQuantities.sizeId, productSizes.id))
+    .leftJoin(quoteItems, eq(quoteItems.sizeQuantityId, sizeQuantities.id))
     .leftJoin(quotes, and(
       eq(quoteItems.quoteId, quotes.id),
       sql`${quotes.createdAt} BETWEEN ${start} AND ${end}`
@@ -2621,15 +2731,6 @@ export async function createCustomerSignupRequest(data: {
     }
     throw error;
   }
-
-  await logActivity(null, 'customer_signup_request', {
-    requestId: data.requestId,
-    name: data.name,
-    email: data.email,
-    filesCount: data.files.length,
-  });
-
-  return result;
 }
 
 export async function getCustomerSignupRequests(status?: string) {
@@ -3028,29 +3129,27 @@ export async function getActiveJobs() {
       sj."quoteId",
       sj."supplierId",
       sj."customerId",
-      sj."productVariantId",
+      sj."sizeQuantityId",
       sj.quantity,
       sj."pricePerUnit",
-      sj."totalPrice",
       sj.status,
       sj."supplierMarkedReady",
       sj."supplierReadyAt",
-      sj."expectedDeliveryDate",
-      sj."actualDeliveryDate",
       sj."createdAt",
-      sj.notes,
       sj."fileValidationWarnings",
       supplier.name as "supplierName",
       supplier."companyName" as "supplierCompany",
       customer.name as "customerName",
       customer."companyName" as "customerCompany",
-      pv.name as "variantName",
+      ps.name as "sizeName",
+      ps.dimensions as "dimensions",
       bp.name as "productName"
     FROM supplier_jobs sj
     LEFT JOIN users supplier ON sj."supplierId" = supplier.id
     LEFT JOIN users customer ON sj."customerId" = customer.id
-    LEFT JOIN product_variants pv ON sj."productVariantId" = pv.id
-    LEFT JOIN base_products bp ON pv."baseProductId" = bp.id
+    LEFT JOIN size_quantities sq ON sj."sizeQuantityId" = sq.id
+    LEFT JOIN product_sizes ps ON sq.size_id = ps.id
+    LEFT JOIN base_products bp ON ps.product_id = bp.id
     ORDER BY 
       CASE sj.status 
         WHEN 'ready' THEN 1
@@ -3067,23 +3166,21 @@ export async function getActiveJobs() {
     quoteId: row.quoteId,
     supplierId: row.supplierId,
     customerId: row.customerId,
-    productVariantId: row.productVariantId,
+    sizeQuantityId: row.sizeQuantityId,
     quantity: row.quantity,
     pricePerUnit: row.pricePerUnit,
-    totalPrice: row.totalPrice,
     status: row.status,
     supplierMarkedReady: row.supplierMarkedReady,
     supplierReadyAt: row.supplierReadyAt,
-    expectedDeliveryDate: row.expectedDeliveryDate,
-    actualDeliveryDate: row.actualDeliveryDate,
     createdAt: row.createdAt,
-    notes: row.notes,
     fileValidationWarnings: row.fileValidationWarnings || [],
     supplierName: row.supplierName || 'ספק לא מזוהה',
     supplierCompany: row.supplierCompany,
     customerName: row.customerName || 'לקוח לא מזוהה',
     customerCompany: row.customerCompany,
-    productName: row.productName ? `${row.productName} - ${row.variantName}` : 'מוצר לא מזוהה',
+    productName: row.productName ? `${row.productName} - ${row.sizeName}` : 'מוצר לא מזוהה',
+    sizeName: row.sizeName,
+    dimensions: row.dimensions,
   }));
 }
 
@@ -3096,23 +3193,24 @@ export async function getJobsReadyForPickup() {
       sj.id,
       sj."supplierId",
       sj."customerId",
-      sj."productVariantId",
+      sj."sizeQuantityId",
       sj.quantity,
       sj."supplierReadyAt",
-      sj.notes,
       supplier.name as "supplierName",
       supplier."companyName" as "supplierCompany",
       supplier.address as "supplierAddress",
       customer.name as "customerName",
       customer."companyName" as "customerCompany",
       customer.address as "customerAddress",
-      pv.name as "variantName",
+      ps.name as "sizeName",
+      ps.dimensions as "dimensions",
       bp.name as "productName"
     FROM supplier_jobs sj
     LEFT JOIN users supplier ON sj."supplierId" = supplier.id
     LEFT JOIN users customer ON sj."customerId" = customer.id
-    LEFT JOIN product_variants pv ON sj."productVariantId" = pv.id
-    LEFT JOIN base_products bp ON pv."baseProductId" = bp.id
+    LEFT JOIN size_quantities sq ON sj."sizeQuantityId" = sq.id
+    LEFT JOIN product_sizes ps ON sq.size_id = ps.id
+    LEFT JOIN base_products bp ON ps.product_id = bp.id
     WHERE sj.status = 'ready'
     ORDER BY sj."supplierReadyAt" ASC
   `);
@@ -3121,17 +3219,18 @@ export async function getJobsReadyForPickup() {
     id: row.id,
     supplierId: row.supplierId,
     customerId: row.customerId,
-    productVariantId: row.productVariantId,
+    sizeQuantityId: row.sizeQuantityId,
     quantity: row.quantity,
     supplierReadyAt: row.supplierReadyAt,
-    notes: row.notes,
     supplierName: row.supplierName || 'ספק לא מזוהה',
     supplierCompany: row.supplierCompany,
     supplierAddress: row.supplierAddress,
     customerName: row.customerName || 'לקוח לא מזוהה',
     customerCompany: row.customerCompany,
     customerAddress: row.customerAddress,
-    productName: row.productName ? `${row.productName} - ${row.variantName}` : 'מוצר לא מזוהה',
+    productName: row.productName ? `${row.productName} - ${row.sizeName}` : 'מוצר לא מזוהה',
+    sizeName: row.sizeName,
+    dimensions: row.dimensions,
   }));
 }
 
@@ -3170,7 +3269,7 @@ export async function updateJobStatus(jobId: number, status: string, userId?: nu
 
 // ==================== PRODUCT SIZES, QUANTITIES, ADDONS ====================
 
-import { productSizes, productQuantities, productAddons } from '../drizzle/schema';
+// productSizes and sizeQuantities already imported at top
 
 // Get product with all details (sizes, quantities, addons)
 export async function getProductWithDetails(productId: number) {
@@ -3189,10 +3288,12 @@ export async function getProductWithDetails(productId: number) {
     .where(and(eq(productSizes.productId, productId), eq(productSizes.isActive, true)))
     .orderBy(productSizes.displayOrder);
 
-  const quantities = await db.select()
-    .from(productQuantities)
-    .where(and(eq(productQuantities.productId, productId), eq(productQuantities.isActive, true)))
-    .orderBy(productQuantities.displayOrder);
+  // Get all size quantities for all sizes of this product
+  const sizeIds = sizes.map(s => s.id);
+  const quantities = sizeIds.length > 0 ? await db.select()
+    .from(sizeQuantities)
+    .where(inArray(sizeQuantities.sizeId, sizeIds))
+    .orderBy(sizeQuantities.displayOrder) : [];
 
   const addons = await db.select()
     .from(productAddons)
@@ -3230,10 +3331,12 @@ export async function getProductsWithDetails(categoryId?: number) {
       .where(and(eq(productSizes.productId, product.id), eq(productSizes.isActive, true)))
       .orderBy(productSizes.displayOrder);
 
-    const quantities = await db.select()
-      .from(productQuantities)
-      .where(and(eq(productQuantities.productId, product.id), eq(productQuantities.isActive, true)))
-      .orderBy(productQuantities.displayOrder);
+    // Get quantities for all sizes of this product
+    const sizeIds = sizes.map(s => s.id);
+    const quantities = sizeIds.length > 0 ? await db.select()
+      .from(sizeQuantities)
+      .where(inArray(sizeQuantities.sizeId, sizeIds))
+      .orderBy(sizeQuantities.displayOrder) : [];
 
     const addons = await db.select()
       .from(productAddons)
@@ -3313,20 +3416,21 @@ export async function deleteProductSize(sizeId: number) {
   return { success: true };
 }
 
-// ===== QUANTITIES =====
+// ===== SIZE QUANTITIES =====
 export async function createProductQuantity(input: {
-  productId: number;
+  productId: number; // actually sizeId now
   quantity: number;
-  priceMultiplier: number;
+  priceMultiplier: number; // actually price now
   displayOrder?: number;
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  await db.insert(productQuantities).values({
-    productId: input.productId,
+  // Note: productId is actually sizeId in the new schema
+  await db.insert(sizeQuantities).values({
+    sizeId: input.productId,
     quantity: input.quantity,
-    priceMultiplier: input.priceMultiplier.toString(),
+    price: input.priceMultiplier.toString(),
     displayOrder: input.displayOrder || 0,
     isActive: true,
   });
@@ -3337,7 +3441,7 @@ export async function createProductQuantity(input: {
 export async function updateProductQuantity(input: {
   id: number;
   quantity?: number;
-  priceMultiplier?: number;
+  priceMultiplier?: number; // actually price
   displayOrder?: number;
   isActive?: boolean;
 }) {
@@ -3346,13 +3450,13 @@ export async function updateProductQuantity(input: {
 
   const updateData: Record<string, unknown> = {};
   if (input.quantity !== undefined) updateData.quantity = input.quantity;
-  if (input.priceMultiplier !== undefined) updateData.priceMultiplier = input.priceMultiplier.toString();
+  if (input.priceMultiplier !== undefined) updateData.price = input.priceMultiplier.toString();
   if (input.displayOrder !== undefined) updateData.displayOrder = input.displayOrder;
   if (input.isActive !== undefined) updateData.isActive = input.isActive;
 
-  await db.update(productQuantities)
+  await db.update(sizeQuantities)
     .set(updateData)
-    .where(eq(productQuantities.id, input.id));
+    .where(eq(sizeQuantities.id, input.id));
 
   return { success: true };
 }
@@ -3361,9 +3465,9 @@ export async function deleteProductQuantity(quantityId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  await db.update(productQuantities)
+  await db.update(sizeQuantities)
     .set({ isActive: false })
-    .where(eq(productQuantities.id, quantityId));
+    .where(eq(sizeQuantities.id, quantityId));
 
   return { success: true };
 }
@@ -3452,15 +3556,17 @@ export async function calculateProductPrice(input: {
   let multiplier = 1;
   let isCustomQuantity = false;
 
-  // Get quantity multiplier
+  // Get quantity price from sizeQuantities
   if (input.quantityId) {
     const [quantity] = await db.select()
-      .from(productQuantities)
-      .where(eq(productQuantities.id, input.quantityId))
+      .from(sizeQuantities)
+      .where(eq(sizeQuantities.id, input.quantityId))
       .limit(1);
 
     if (quantity) {
-      multiplier = parseFloat(quantity.priceMultiplier || '1');
+      // In new schema, price is direct not multiplier
+      basePrice = parseFloat(quantity.price || '0');
+      multiplier = 1;
     }
   } else if (input.customQuantity) {
     isCustomQuantity = true;

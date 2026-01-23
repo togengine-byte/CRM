@@ -13,11 +13,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, FileText } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 
 interface QuoteItem {
-  productVariantId: number;
+  sizeQuantityId: number;
   quantity: number;
+  productName?: string;
+  sizeName?: string;
 }
 
 export default function CustomerSignup() {
@@ -31,7 +33,7 @@ export default function CustomerSignup() {
   });
 
   const [quoteItems, setQuoteItems] = useState<QuoteItem[]>([]);
-  const [selectedVariantId, setSelectedVariantId] = useState<string>("");
+  const [selectedSizeQuantityId, setSelectedSizeQuantityId] = useState<string>("");
   const [itemQuantity, setItemQuantity] = useState<number>(1);
   const [notes, setNotes] = useState("");
 
@@ -51,19 +53,39 @@ export default function CustomerSignup() {
   });
 
   const handleAddItem = () => {
-    if (!selectedVariantId || itemQuantity < 1) {
+    if (!selectedSizeQuantityId || itemQuantity < 1) {
       toast.error("יש לבחור מוצר וכמות");
       return;
+    }
+
+    // Find the product and size info for display
+    let productName = "";
+    let sizeName = "";
+    const allProducts = products as any[];
+    for (const product of allProducts) {
+      for (const size of product.sizes || []) {
+        // quantities might be nested in size or in product.quantities
+        const quantities = (size as any).quantities || product.quantities || [];
+        const sq = quantities.find((q: any) => q.id === parseInt(selectedSizeQuantityId) || q.sizeId === size.id);
+        if (sq && sq.id === parseInt(selectedSizeQuantityId)) {
+          productName = product.name;
+          sizeName = `${size.name} (${sq.quantity} יח')`;
+          break;
+        }
+      }
+      if (productName) break;
     }
 
     setQuoteItems([
       ...quoteItems,
       {
-        productVariantId: parseInt(selectedVariantId),
+        sizeQuantityId: parseInt(selectedSizeQuantityId),
         quantity: itemQuantity,
+        productName,
+        sizeName,
       },
     ]);
-    setSelectedVariantId("");
+    setSelectedSizeQuantityId("");
     setItemQuantity(1);
   };
 
@@ -84,19 +106,12 @@ export default function CustomerSignup() {
 
     createCustomerAndQuoteMutation.mutate({
       customerInfo,
-      quoteItems,
+      quoteItems: quoteItems.map(item => ({
+        sizeQuantityId: item.sizeQuantityId,
+        quantity: item.quantity,
+      })),
       notes: notes || undefined,
     });
-  };
-
-  const getVariantName = (variantId: number) => {
-    for (const product of products) {
-      const variant = product.variants?.find((v) => v.id === variantId);
-      if (variant) {
-        return `${product.name} - ${variant.name}`;
-      }
-    }
-    return `וריאנט #${variantId}`;
   };
 
   return (
@@ -197,20 +212,23 @@ export default function CustomerSignup() {
               <div className="space-y-3">
                 <Label>בחר מוצרים</Label>
                 <div className="grid gap-3 md:grid-cols-2">
-                  <Select value={selectedVariantId} onValueChange={setSelectedVariantId}>
+                  <Select value={selectedSizeQuantityId} onValueChange={setSelectedSizeQuantityId}>
                     <SelectTrigger>
-                      <SelectValue placeholder="בחר מוצר" />
+                      <SelectValue placeholder="בחר מוצר וגודל" />
                     </SelectTrigger>
                     <SelectContent>
-                      {products.map((product) =>
-                        product.variants?.map((variant) => (
-                          <SelectItem
-                            key={variant.id}
-                            value={variant.id.toString()}
-                          >
-                            {product.name} - {variant.name}
-                          </SelectItem>
-                        ))
+                      {(products as any[]).map((product) =>
+                        (product.sizes || []).map((size: any) => {
+                          const quantities = (size as any).quantities || product.quantities?.filter((q: any) => q.sizeId === size.id) || [];
+                          return quantities.map((sq: any) => (
+                            <SelectItem
+                              key={sq.id}
+                              value={sq.id.toString()}
+                            >
+                              {product.name} - {size.name} ({sq.quantity} יח')
+                            </SelectItem>
+                          ));
+                        })
                       )}
                     </SelectContent>
                   </Select>
@@ -247,7 +265,7 @@ export default function CustomerSignup() {
                       >
                         <div>
                           <p className="font-medium">
-                            {getVariantName(item.productVariantId)}
+                            {item.productName} - {item.sizeName}
                           </p>
                           <p className="text-sm text-gray-600">
                             כמות: {item.quantity}

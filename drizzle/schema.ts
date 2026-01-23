@@ -11,17 +11,16 @@ export const users = pgTable("users", {
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
-  password: varchar("password", { length: 255 }), // Hashed password for email login
+  password: varchar("password", { length: 255 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: userRoleEnum("role").default("customer").notNull(),
   status: userStatusEnum("status").default("pending_approval").notNull(),
   phone: varchar("phone", { length: 20 }),
   companyName: text("companyName"),
   address: text("address"),
-  // Permissions for employees - JSON object with permission flags
   permissions: jsonb("permissions").default('{}'),
-  customerNumber: integer("customerNumber"), // Auto-generated number for customers starting at 1001
-  supplierNumber: integer("supplierNumber"), // Auto-generated number for suppliers starting at 1001
+  customerNumber: integer("customerNumber"),
+  supplierNumber: integer("supplierNumber"),
   totalRatingPoints: integer("totalRatingPoints").default(0),
   ratedDealsCount: integer("ratedDealsCount").default(0),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -46,11 +45,11 @@ export const baseProducts = pgTable("base_products", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
-  productNumber: integer("productNumber"), // Auto-generated product number starting at 1001
+  productNumber: integer("productNumber"),
   category: varchar("category", { length: 100 }),
-  categoryId: integer("categoryId"), // Reference to categories table
-  imageUrl: text("image_url"), // Product image URL
-  allowCustomQuantity: boolean("allow_custom_quantity").default(true), // Allow custom quantity input
+  categoryId: integer("categoryId"),
+  imageUrl: text("image_url"),
+  allowCustomQuantity: boolean("allow_custom_quantity").default(true),
   isActive: boolean("isActive").default(true),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
@@ -63,18 +62,6 @@ export const productSizes = pgTable("product_sizes", {
   name: varchar("name", { length: 100 }).notNull(),
   dimensions: varchar("dimensions", { length: 50 }),
   basePrice: decimal("base_price", { precision: 10, scale: 2 }).notNull().default("0"),
-  displayOrder: integer("display_order").default(0),
-  isActive: boolean("is_active").default(true),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-// Product quantities table
-export const productQuantities = pgTable("product_quantities", {
-  id: serial("id").primaryKey(),
-  productId: integer("product_id").notNull(),
-  quantity: integer("quantity").notNull(),
-  priceMultiplier: decimal("price_multiplier", { precision: 5, scale: 2 }).notNull().default("1.0"),
   displayOrder: integer("display_order").default(0),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
@@ -99,26 +86,11 @@ export const productAddons = pgTable("product_addons", {
   categoryId: integer("category_id"),
   name: varchar("name", { length: 100 }).notNull(),
   description: text("description"),
-  priceType: varchar("price_type", { length: 20 }).notNull().default("fixed"), // fixed, percentage, per_unit
+  priceType: varchar("price_type", { length: 20 }).notNull().default("fixed"),
   price: decimal("price", { precision: 10, scale: 2 }).notNull().default("0"),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-// Product variants table
-export const productVariants = pgTable("product_variants", {
-  id: serial("id").primaryKey(),
-  baseProductId: integer("baseProductId").notNull(),
-  sku: varchar("sku", { length: 100 }).notNull().unique(),
-  name: varchar("name", { length: 255 }).notNull(),
-  price: decimal("price", { precision: 10, scale: 2 }),
-  pricingType: varchar("pricingType", { length: 20 }).default("fixed"), // 'fixed' or 'per_sqm'
-  attributes: jsonb("attributes"),
-  validationProfileId: integer("validationProfileId"),
-  isActive: boolean("isActive").default(true),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
 // Validation profiles for file validation
@@ -148,13 +120,11 @@ export const pricelists = pgTable("pricelists", {
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
-// Pricelist items table
+// Pricelist items table - עובד עם sizeQuantityId
 export const pricelistItems = pgTable("pricelist_items", {
   id: serial("id").primaryKey(),
   pricelistId: integer("pricelistId").notNull(),
-  productVariantId: integer("productVariantId").notNull(),
-  minQuantity: integer("minQuantity").default(1),
-  maxQuantity: integer("maxQuantity"),
+  sizeQuantityId: integer("sizeQuantityId").notNull(),
   pricePerUnit: decimal("pricePerUnit", { precision: 10, scale: 2 }).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
@@ -175,7 +145,7 @@ export const quotes = pgTable("quotes", {
   employeeId: integer("employeeId"),
   status: quoteStatusEnum("status").default("draft").notNull(),
   version: integer("version").default(1).notNull(),
-  quoteNumber: integer("quoteNumber"), // Auto-generated quote number starting at 1001
+  quoteNumber: integer("quoteNumber"),
   parentQuoteId: integer("parentQuoteId"),
   finalValue: decimal("finalValue", { precision: 12, scale: 2 }),
   rejectionReason: text("rejectionReason"),
@@ -184,18 +154,17 @@ export const quotes = pgTable("quotes", {
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
-// Quote items table
+// Quote items table - עובד עם sizeQuantityId
 export const quoteItems = pgTable("quote_items", {
   id: serial("id").primaryKey(),
   quoteId: integer("quoteId").notNull(),
-  productVariantId: integer("productVariantId").notNull(),
+  sizeQuantityId: integer("sizeQuantityId").notNull(),
   quantity: integer("quantity").notNull(),
   priceAtTimeOfQuote: decimal("priceAtTimeOfQuote", { precision: 10, scale: 2 }).notNull(),
   isUpsell: boolean("isUpsell").default(false),
   supplierId: integer("supplierId"),
   supplierCost: decimal("supplierCost", { precision: 10, scale: 2 }),
   deliveryDays: integer("deliveryDays"),
-  // Courier tracking fields
   pickedUp: boolean("pickedUp").default(false),
   pickedUpAt: timestamp("pickedUpAt"),
   pickedUpBy: integer("pickedUpBy"),
@@ -234,16 +203,35 @@ export const quoteFileWarnings = pgTable("quote_file_warnings", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
-// Supplier prices table
+// Supplier jobs table - עבודות ספקים לדירוג
+export const supplierJobs = pgTable("supplier_jobs", {
+  id: serial("id").primaryKey(),
+  supplierId: integer("supplierId").notNull(),
+  customerId: integer("customerId"),
+  quoteId: integer("quoteId"),
+  quoteItemId: integer("quoteItemId"),
+  sizeQuantityId: integer("sizeQuantityId"),
+  quantity: integer("quantity").notNull(),
+  pricePerUnit: decimal("pricePerUnit", { precision: 10, scale: 2 }).notNull(),
+  status: varchar("status", { length: 50 }).default("pending").notNull(),
+  supplierMarkedReady: boolean("supplierMarkedReady").default(false),
+  supplierReadyAt: timestamp("supplierReadyAt"),
+  courierConfirmedReady: boolean("courierConfirmedReady").default(false),
+  supplierRating: decimal("supplierRating", { precision: 3, scale: 1 }),
+  fileValidationWarnings: jsonb("fileValidationWarnings").default('[]'),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+});
+
+// Supplier prices table - מחירי ספקים לפי שילוב גודל+כמות
 export const supplierPrices = pgTable("supplier_prices", {
   id: serial("id").primaryKey(),
   supplierId: integer("supplierId").notNull(),
-  productVariantId: integer("productVariantId").notNull(),
-  minQuantity: integer("minQuantity").default(1),
-  maxQuantity: integer("maxQuantity"),
+  sizeQuantityId: integer("sizeQuantityId").notNull(),
   pricePerUnit: decimal("pricePerUnit", { precision: 10, scale: 2 }).notNull(),
   deliveryDays: integer("deliveryDays").default(3),
   qualityRating: decimal("qualityRating", { precision: 3, scale: 2 }),
+  isPreferred: boolean("isPreferred").default(false),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
@@ -284,8 +272,11 @@ export const systemSettings = pgTable("system_settings", {
 // Type exports
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
+export type Category = typeof categories.$inferSelect;
 export type BaseProduct = typeof baseProducts.$inferSelect;
-export type ProductVariant = typeof productVariants.$inferSelect;
+export type ProductSize = typeof productSizes.$inferSelect;
+export type SizeQuantity = typeof sizeQuantities.$inferSelect;
+export type ProductAddon = typeof productAddons.$inferSelect;
 export type ValidationProfile = typeof validationProfiles.$inferSelect;
 export type Pricelist = typeof pricelists.$inferSelect;
 export type PricelistItem = typeof pricelistItems.$inferSelect;
@@ -293,6 +284,8 @@ export type Quote = typeof quotes.$inferSelect;
 export type QuoteItem = typeof quoteItems.$inferSelect;
 export type QuoteAttachment = typeof quoteAttachments.$inferSelect;
 export type SupplierPrice = typeof supplierPrices.$inferSelect;
+export type SupplierJob = typeof supplierJobs.$inferSelect;
+export type InsertSupplierJob = typeof supplierJobs.$inferInsert;
 export type InternalNote = typeof internalNotes.$inferSelect;
 export type ActivityLog = typeof activityLog.$inferSelect;
 export type SystemSetting = typeof systemSettings.$inferSelect;
@@ -306,11 +299,11 @@ export const customerSignupRequests = pgTable("customer_signup_requests", {
   phone: varchar("phone", { length: 20 }).notNull(),
   companyName: text("companyName"),
   description: text("description").notNull(),
-  productId: integer("productId"), // Reference to base_products
-  status: varchar("status", { length: 20 }).default("pending").notNull(), // pending, approved, rejected
-  queueNumber: serial("queueNumber").notNull(), // מספר המתנה
+  productId: integer("productId"),
+  status: varchar("status", { length: 20 }).default("pending").notNull(),
+  queueNumber: serial("queueNumber").notNull(),
   files: jsonb("files").default('[]'),
-  fileValidationWarnings: jsonb("fileValidationWarnings").default('[]'), // אזהרות ולידציה לקבצים
+  fileValidationWarnings: jsonb("fileValidationWarnings").default('[]'),
   processedAt: timestamp("processedAt"),
   processedBy: integer("processedBy"),
   notes: text("notes"),

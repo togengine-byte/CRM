@@ -1,4 +1,5 @@
 import { useState } from "react";
+import React from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -293,16 +294,14 @@ interface SignupRequest {
   name: string;
   email: string;
   phone: string;
-  companyName?: string;
+  companyName?: string | null;
   description: string;
-  productId?: number;
-  files?: any[];
-  fileValidationWarnings?: Array<{
-    fileName: string;
-    warnings: string[];
-    passed: boolean;
-  }>;
-  createdAt?: string;
+  productId?: number | null;
+  queueNumber?: number;
+  status?: string;
+  files?: unknown;
+  fileValidationWarnings?: unknown;
+  createdAt?: string | Date;
 }
 
 function PendingSignupsCard({ 
@@ -524,7 +523,7 @@ function PendingSignupsCard({
                     <Building2 className="h-4 w-4 text-slate-400" />
                     <div>
                       <p className="text-xs text-slate-500">שם החברה</p>
-                      <p className="text-sm font-medium text-slate-900">{selectedSignup.companyName}</p>
+                      <p className="text-sm font-medium text-slate-900">{String(selectedSignup.companyName || '')}</p>
                     </div>
                   </div>
                 )}
@@ -534,7 +533,7 @@ function PendingSignupsCard({
                     <Package className="h-4 w-4 text-blue-600" />
                     <div>
                       <p className="text-xs text-blue-600">מוצר מבוקש</p>
-                      <p className="text-sm font-medium text-blue-700">מוצר #{selectedSignup.productId}</p>
+                      <p className="text-sm font-medium text-blue-700">מוצר #{String(selectedSignup.productId || '')}</p>
                     </div>
                   </div>
                 )}
@@ -543,56 +542,20 @@ function PendingSignupsCard({
                   <Calendar className="h-4 w-4 text-slate-400" />
                   <div>
                     <p className="text-xs text-slate-500">תאריך הבקשה</p>
-                    <p className="text-sm font-medium text-slate-900">{selectedSignup.createdAt ? formatFullDate(selectedSignup.createdAt) : 'לא זמין'}</p>
+                    <p className="text-sm font-medium text-slate-900">{selectedSignup.createdAt ? formatFullDate(String(selectedSignup.createdAt)) : 'לא זמין'}</p>
                   </div>
                 </div>
               </div>
-              
-              {/* Description */}
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-slate-700 flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-slate-400" />
-                  תיאור הפרויקט
-                </p>
-                <div className="p-3 rounded-lg bg-slate-50 text-sm text-slate-700 whitespace-pre-wrap">
-                  {selectedSignup.description}
-                </div>
-              </div>
-              
-              {/* Saved File Validation Warnings */}
-              {selectedSignup.fileValidationWarnings && selectedSignup.fileValidationWarnings.length > 0 && (
-                <div className="p-3 rounded-lg bg-amber-50 border border-amber-200">
-                  <div className="flex items-center gap-2 mb-2">
-                    <AlertTriangle className="h-4 w-4 text-amber-600" />
-                    <span className="font-medium text-amber-800">אזהרות ולידציה לקבצים</span>
-                  </div>
-                  <div className="space-y-2">
-                    {selectedSignup.fileValidationWarnings.map((fileWarning, idx) => (
-                      <div key={idx} className="text-sm">
-                        <div className="flex items-center gap-1 text-amber-700 font-medium">
-                          <FileText className="h-3 w-3" />
-                          {fileWarning.fileName}
-                        </div>
-                        <ul className="mr-5 mt-1 space-y-0.5">
-                          {fileWarning.warnings.map((warning, wIdx) => (
-                            <li key={wIdx} className="text-amber-600 text-xs">• {warning}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
 
               {/* Files */}
-              {selectedSignup.files && selectedSignup.files.length > 0 && (
+              {Array.isArray(selectedSignup.files) && (selectedSignup.files as any[]).length > 0 && (
                 <div className="space-y-2">
                   <p className="text-sm font-medium text-slate-700 flex items-center gap-2">
                     <FileText className="h-4 w-4 text-slate-400" />
-                    קבצים מצורפים ({selectedSignup.files.length})
+                    קבצים מצורפים ({(selectedSignup.files as any[]).length})
                   </p>
                   <div className="space-y-2">
-                    {selectedSignup.files.map((file: any, index: number) => (
+                    {(selectedSignup.files as any[]).map((file: any, index: number) => (
                       <div 
                         key={index} 
                         className="flex items-center justify-between p-3 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer border border-slate-200"
@@ -673,7 +636,7 @@ function PendingSignupsCard({
       <SupplierRecommendationsModal 
         isOpen={showSupplierModal}
         onClose={() => setShowSupplierModal(false)}
-        productId={selectedSignup?.productId}
+        productId={selectedSignup?.productId ?? undefined}
       />
 
       {/* File Preview Modal */}
@@ -789,12 +752,17 @@ function PendingSignupsCard({
 interface SupplierRecommendation {
   supplierId: number;
   supplierName: string;
-  companyName?: string;
-  pricePerUnit: number;
-  rating: number;
-  deliveryDays: number;
-  reliabilityScore: number;
-  totalScore: number;
+  companyName?: string | null;
+  pricePerUnit?: number;
+  rating?: number;
+  deliveryDays?: number;
+  reliabilityScore?: number;
+  totalScore?: number;
+  // Alternative field names from API
+  price?: number;
+  avgRating?: number;
+  avgDeliveryDays?: number;
+  score?: number;
 }
 
 function SupplierRecommendationsModal({ 
@@ -846,7 +814,8 @@ function SupplierRecommendationsModal({
             </div>
           ) : (
             recommendations.map((supplier: SupplierRecommendation, index: number) => {
-              const scoreBadge = getScoreBadge(supplier.totalScore);
+              const score = supplier.totalScore || supplier.score || 0;
+              const scoreBadge = getScoreBadge(score);
               return (
                 <div 
                   key={supplier.supplierId}
@@ -878,22 +847,22 @@ function SupplierRecommendationsModal({
                   <div className="grid grid-cols-4 gap-2 text-center">
                     <div className="p-2 rounded bg-white">
                       <p className="text-xs text-slate-500">מחיר</p>
-                      <p className="text-sm font-semibold text-slate-900">₪{supplier.pricePerUnit}</p>
+                      <p className="text-sm font-semibold text-slate-900">₪{supplier.pricePerUnit || supplier.price || 0}</p>
                     </div>
                     <div className="p-2 rounded bg-white">
                       <p className="text-xs text-slate-500">דירוג</p>
                       <p className="text-sm font-semibold text-slate-900 flex items-center justify-center gap-1">
                         <Star className="h-3 w-3 text-amber-500 fill-amber-500" />
-                        {supplier.rating.toFixed(1)}
+                        {(supplier.rating || supplier.avgRating || 0).toFixed(1)}
                       </p>
                     </div>
                     <div className="p-2 rounded bg-white">
                       <p className="text-xs text-slate-500">אספקה</p>
-                      <p className="text-sm font-semibold text-slate-900">{supplier.deliveryDays} ימים</p>
+                      <p className="text-sm font-semibold text-slate-900">{supplier.deliveryDays || supplier.avgDeliveryDays || 0} ימים</p>
                     </div>
                     <div className="p-2 rounded bg-white">
                       <p className="text-xs text-slate-500">אמינות</p>
-                      <p className="text-sm font-semibold text-slate-900">{supplier.reliabilityScore}%</p>
+                      <p className="text-sm font-semibold text-slate-900">{supplier.reliabilityScore || 0}%</p>
                     </div>
                   </div>
                   

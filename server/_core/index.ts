@@ -170,11 +170,18 @@ async function seedSuppliersData(db: any, sql: any) {
             const basePrice = Number(product.basePrice) || 100;
             const supplierPrice = Math.round(basePrice * supplierData.priceMultiplier * 100) / 100;
             
-            await db.execute(sql`
-              INSERT INTO supplier_prices ("supplierId", "productVariantId", "pricePerUnit", "deliveryDays", "minQuantity", "isPreferred")
-              VALUES (${supplierId}, ${product.size_id}, ${supplierPrice}, ${supplierData.deliveryDays}, 1, false)
-              ON CONFLICT DO NOTHING
+            // Get size quantities for this product size
+            const sizeQuantities = await db.execute(sql`
+              SELECT id FROM size_quantities WHERE size_id = ${product.size_id}
             `);
+            
+            for (const sq of sizeQuantities.rows) {
+              await db.execute(sql`
+                INSERT INTO supplier_prices ("supplierId", "sizeQuantityId", "pricePerUnit", "deliveryDays")
+                VALUES (${supplierId}, ${(sq as any).id}, ${supplierPrice}, ${supplierData.deliveryDays})
+                ON CONFLICT DO NOTHING
+              `);
+            }
           }
         }
         
@@ -191,14 +198,18 @@ async function seedSuppliersData(db: any, sql: any) {
             ? Math.min(5, supplierData.rating + (Math.random() - 0.5))
             : Math.max(1, supplierData.rating - 1 - Math.random());
           
+          // Get a random sizeQuantityId
+          const randomSQ = await db.execute(sql`SELECT id FROM size_quantities LIMIT 1`);
+          const sqId = randomSQ.rows?.[0]?.id || 1;
+          
           await db.execute(sql`
             INSERT INTO supplier_jobs (
-              "supplierId", "customerId", "productVariantId", quantity, "pricePerUnit", status,
+              "supplierId", "customerId", "sizeQuantityId", quantity, "pricePerUnit", status,
               "supplierMarkedReady", "supplierReadyAt", "courierConfirmedReady", "supplierRating",
               "createdAt", "updatedAt"
             )
             VALUES (
-              ${supplierId}, 1, 1, ${Math.floor(Math.random() * 500) + 100}, 
+              ${supplierId}, 1, ${sqId}, ${Math.floor(Math.random() * 500) + 100}, 
               ${Math.round(100 * supplierData.priceMultiplier)}, 'delivered',
               true, ${readyAt.toISOString()}, ${isReliable}, ${Math.round(rating * 10) / 10},
               ${createdAt.toISOString()}, ${readyAt.toISOString()}

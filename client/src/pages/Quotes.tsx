@@ -51,9 +51,11 @@ import { cn } from "@/lib/utils";
 type QuoteStatus = "draft" | "sent" | "approved" | "rejected" | "superseded" | "in_production" | "ready";
 
 interface QuoteItem {
-  productVariantId: number;
+  sizeQuantityId: number;
   quantity: number;
   notes?: string;
+  productName?: string;
+  sizeName?: string;
 }
 
 export default function Quotes() {
@@ -74,7 +76,7 @@ export default function Quotes() {
     notes: "",
     items: [] as QuoteItem[],
   });
-  const [selectedVariantId, setSelectedVariantId] = useState<string>("");
+  const [selectedSizeQuantityId, setSelectedSizeQuantityId] = useState<string>("");
   const [itemQuantity, setItemQuantity] = useState<number>(1);
   const [itemNotes, setItemNotes] = useState("");
 
@@ -188,9 +190,25 @@ export default function Quotes() {
   };
 
   const handleAddItem = () => {
-    if (!selectedVariantId || itemQuantity < 1) {
+    if (!selectedSizeQuantityId || itemQuantity < 1) {
       toast.error("יש לבחור מוצר וכמות");
       return;
+    }
+    
+    // Find product and size info for display
+    let productName = "";
+    let sizeName = "";
+    for (const product of (products || []) as any[]) {
+      for (const size of product.sizes || []) {
+        const quantities = (size as any).quantities || product.quantities?.filter((q: any) => q.sizeId === size.id) || [];
+        const sq = quantities.find((q: any) => q.id === parseInt(selectedSizeQuantityId));
+        if (sq) {
+          productName = product.name;
+          sizeName = `${size.name} (${sq.quantity} יח')`;
+          break;
+        }
+      }
+      if (productName) break;
     }
     
     setCreateForm({
@@ -198,13 +216,15 @@ export default function Quotes() {
       items: [
         ...createForm.items,
         {
-          productVariantId: parseInt(selectedVariantId),
+          sizeQuantityId: parseInt(selectedSizeQuantityId),
           quantity: itemQuantity,
           notes: itemNotes || undefined,
+          productName,
+          sizeName,
         },
       ],
     });
-    setSelectedVariantId("");
+    setSelectedSizeQuantityId("");
     setItemQuantity(1);
     setItemNotes("");
   };
@@ -282,14 +302,17 @@ export default function Quotes() {
     }
   };
 
-  const getVariantName = (variantId: number) => {
-    for (const product of products || []) {
-      const variant = product.variants?.find((v) => v.id === variantId);
-      if (variant) {
-        return `${product.name} - ${variant.name}`;
+  const getSizeQuantityName = (sizeQuantityId: number) => {
+    for (const product of (products || []) as any[]) {
+      for (const size of product.sizes || []) {
+        const quantities = (size as any).quantities || product.quantities?.filter((q: any) => q.sizeId === size.id) || [];
+        const sq = quantities.find((q: any) => q.id === sizeQuantityId);
+        if (sq) {
+          return `${product.name} - ${size.name} (${sq.quantity} יח')`;
+        }
       }
     }
-    return `וריאנט #${variantId}`;
+    return `מוצר #${sizeQuantityId}`;
   };
 
   // Filter quotes by search
@@ -577,13 +600,13 @@ export default function Quotes() {
                                 פריטים בהצעה
                               </h4>
                               <div className="grid gap-2">
-                                {quoteDetails.items.map((item, index) => (
+                                {quoteDetails.items.map((item: any, index: number) => (
                                   <div
                                     key={index}
                                     className="flex justify-between items-center p-3 bg-background rounded-lg border"
                                   >
                                     <div>
-                                      <p className="font-medium">{getVariantName(item.productVariantId)}</p>
+                                      <p className="font-medium">{item.productName || getSizeQuantityName(item.sizeQuantityId)}</p>
                                       <p className="text-sm text-muted-foreground">כמות: {item.quantity}</p>
                                     </div>
                                     {item.priceAtTimeOfQuote && (
@@ -605,7 +628,7 @@ export default function Quotes() {
                                 קבצים מצורפים
                               </h4>
                               <div className="grid gap-2">
-                                {quoteDetails.attachments.map((attachment: { id: number; fileName: string; fileUrl: string; uploadedAt: string }) => (
+                                {quoteDetails.attachments.map((attachment: any) => (
                                   <a
                                     key={attachment.id}
                                     href={attachment.fileUrl}
@@ -711,17 +734,19 @@ export default function Quotes() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <Label>מוצר</Label>
-                  <Select value={selectedVariantId} onValueChange={setSelectedVariantId}>
+                  <Select value={selectedSizeQuantityId} onValueChange={setSelectedSizeQuantityId}>
                     <SelectTrigger>
-                      <SelectValue placeholder="בחר מוצר" />
+                      <SelectValue placeholder="בחר מוצר וגודל" />
                     </SelectTrigger>
                     <SelectContent>
                       {products?.map((product) =>
-                        product.variants?.map((variant) => (
-                          <SelectItem key={variant.id} value={variant.id.toString()}>
-                            {product.name} - {variant.name} ({variant.sku})
-                          </SelectItem>
-                        ))
+                        product.sizes?.map((size: any) =>
+                          size.quantities?.map((sq: any) => (
+                            <SelectItem key={sq.id} value={sq.id.toString()}>
+                              {product.name} - {size.name} ({sq.quantity} יח')
+                            </SelectItem>
+                          ))
+                        )
                       )}
                     </SelectContent>
                   </Select>
@@ -760,7 +785,7 @@ export default function Quotes() {
                     className="flex items-center justify-between p-3 bg-muted rounded-lg"
                   >
                     <div>
-                      <p className="font-medium">{getVariantName(item.productVariantId)}</p>
+                      <p className="font-medium">{item.productName || 'מוצר'} - {item.sizeName || 'גודל'}</p>
                       <p className="text-sm text-muted-foreground">
                         כמות: {item.quantity}
                         {item.notes && ` | ${item.notes}`}
@@ -867,12 +892,16 @@ export default function Quotes() {
 interface SupplierRecommendation {
   supplierId: number;
   supplierName: string;
-  companyName?: string;
-  pricePerUnit: number;
-  deliveryDays: number;
-  rating: number;
-  reliabilityScore: number;
-  totalScore: number;
+  companyName?: string | null;
+  pricePerUnit?: number;
+  deliveryDays?: number;
+  rating?: number;
+  reliabilityScore?: number;
+  totalScore?: number;
+  price?: number;
+  avgRating?: number;
+  avgDeliveryDays?: number;
+  score?: number;
 }
 
 function SupplierSelectionModal({ 
@@ -891,12 +920,12 @@ function SupplierSelectionModal({
     { enabled: isOpen && !!quoteId }
   );
 
-  // Get first product variant ID from quote items
-  const productVariantId = quoteDetails?.items?.[0]?.productVariantId;
+  // Get first sizeQuantityId from quote items to find product
+  const sizeQuantityId = quoteDetails?.items?.[0]?.sizeQuantityId;
 
   const { data: recommendations, isLoading } = trpc.suppliers.enhancedRecommendations.useQuery(
-    { productId: productVariantId || 0, limit: 5 },
-    { enabled: isOpen && !!productVariantId }
+    { productId: undefined, limit: 5 },
+    { enabled: isOpen && !!sizeQuantityId }
   );
 
   const assignSupplierMutation = trpc.quotes.assignSupplier.useMutation({
@@ -953,7 +982,8 @@ function SupplierSelectionModal({
             </div>
           ) : (
             recommendations.map((supplier: SupplierRecommendation, index: number) => {
-              const scoreBadge = getScoreBadge(supplier.totalScore);
+              const score = supplier.totalScore || supplier.score || 0;
+              const scoreBadge = getScoreBadge(score);
               return (
                 <div 
                   key={supplier.supplierId}
@@ -985,21 +1015,21 @@ function SupplierSelectionModal({
                   <div className="grid grid-cols-4 gap-2 text-center mb-3">
                     <div className="p-2 rounded bg-white">
                       <p className="text-xs text-slate-500">מחיר</p>
-                      <p className="text-sm font-semibold text-slate-900">₪{supplier.pricePerUnit}</p>
+                      <p className="text-sm font-semibold text-slate-900">₪{supplier.pricePerUnit || supplier.price || 0}</p>
                     </div>
                     <div className="p-2 rounded bg-white">
                       <p className="text-xs text-slate-500">דירוג</p>
                       <p className="text-sm font-semibold text-slate-900 flex items-center justify-center gap-1">
-                        {supplier.rating.toFixed(1)}
+                        {(supplier.rating || supplier.avgRating || 0).toFixed(1)}
                       </p>
                     </div>
                     <div className="p-2 rounded bg-white">
                       <p className="text-xs text-slate-500">אספקה</p>
-                      <p className="text-sm font-semibold text-slate-900">{supplier.deliveryDays} ימים</p>
+                      <p className="text-sm font-semibold text-slate-900">{supplier.deliveryDays || supplier.avgDeliveryDays || 0} ימים</p>
                     </div>
                     <div className="p-2 rounded bg-white">
                       <p className="text-xs text-slate-500">אמינות</p>
-                      <p className="text-sm font-semibold text-slate-900">{supplier.reliabilityScore}%</p>
+                      <p className="text-sm font-semibold text-slate-900">{supplier.reliabilityScore || 0}%</p>
                     </div>
                   </div>
                   

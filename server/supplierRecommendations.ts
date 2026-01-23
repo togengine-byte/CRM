@@ -137,15 +137,16 @@ export async function getSupplierPriceData(supplierId: number, productId?: numbe
   try {
     let query;
     if (productId) {
-      // Get average price for specific product
+      // Get average price for specific product via sizeQuantities
       query = sql`
         SELECT 
-          AVG("pricePerUnit") as avg_price,
+          AVG(sj."pricePerUnit") as avg_price,
           COUNT(*) as total_jobs
         FROM supplier_jobs sj
-        JOIN product_variants pv ON sj."productVariantId" = pv.id
+        JOIN size_quantities sq ON sj."sizeQuantityId" = sq.id
+        JOIN product_sizes ps ON sq.size_id = ps.id
         WHERE sj."supplierId" = ${supplierId}
-          AND pv."baseProductId" = ${productId}
+          AND ps.product_id = ${productId}
           AND sj."pricePerUnit" IS NOT NULL
       `;
     } else {

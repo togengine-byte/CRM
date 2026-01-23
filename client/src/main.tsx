@@ -9,15 +9,6 @@ import App from "./App";
 import { getLoginUrl } from "./const";
 import "./index.css";
 
-// Clean up Clerk data from localStorage
-if (typeof window !== 'undefined') {
-  const keysToRemove = Object.keys(localStorage).filter(key => 
-    key.startsWith('__clerk') || key.includes('clerk')
-  );
-  keysToRemove.forEach(key => localStorage.removeItem(key));
-  console.log('[App] Cleaned up Clerk data from localStorage');
-}
-
 const queryClient = new QueryClient();
 
 const redirectToLoginIfUnauthorized = (error: unknown) => {
