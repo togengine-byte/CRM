@@ -37,10 +37,20 @@ import {
   ChevronUp,
   AlertTriangle,
   FileWarning,
+  Mail,
+  MailX,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type JobStatus = "in_production" | "ready" | "picked_up" | "delivered" | "all";
+type JobStatus = "pending" | "in_progress" | "in_production" | "ready" | "picked_up" | "delivered" | "all";
+
+const allStatuses = [
+  { value: "pending", label: "ממתין", color: "bg-gray-50 text-gray-700 border-gray-200" },
+  { value: "in_progress", label: "בביצוע", color: "bg-orange-50 text-orange-700 border-orange-200" },
+  { value: "ready", label: "מוכן לאיסוף", color: "bg-green-50 text-green-700 border-green-200" },
+  { value: "picked_up", label: "נאסף", color: "bg-blue-50 text-blue-700 border-blue-200" },
+  { value: "delivered", label: "נמסר", color: "bg-teal-50 text-teal-700 border-teal-200" },
+];
 
 interface FileWarning {
   fileName: string;
@@ -70,9 +80,13 @@ export default function Jobs() {
   const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [newStatus, setNewStatus] = useState<string>("");
+  const [sendEmail, setSendEmail] = useState(false);
 
   // Fetch jobs from supplier_jobs table
   const { data: jobs, isLoading, refetch } = trpc.jobs.list.useQuery();
+  
+  // Fetch email setting
+  const { data: emailSetting } = trpc.settings.emailOnStatusChange.get.useQuery();
   
   // Mutation for updating job status
   const updateStatusMutation = trpc.jobs.updateStatus.useMutation({
@@ -86,43 +100,19 @@ export default function Jobs() {
   });
 
   const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "in_production":
-        return (
-          <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
-            <Factory className="ml-1 h-3 w-3" />
-            בייצור
-          </Badge>
-        );
-      case "ready":
-        return (
-          <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-            <Package className="ml-1 h-3 w-3" />
-            מוכן לאיסוף
-          </Badge>
-        );
-      case "picked_up":
-        return (
-          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-            <Truck className="ml-1 h-3 w-3" />
-            נאסף
-          </Badge>
-        );
-      case "delivered":
-        return (
-          <Badge variant="outline" className="bg-teal-50 text-teal-700 border-teal-200">
-            <CheckCircle className="ml-1 h-3 w-3" />
-            נמסר
-          </Badge>
-        );
-      default:
-        return (
-          <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
-            <Clock className="ml-1 h-3 w-3" />
-            {status}
-          </Badge>
-        );
-    }
+    const statusConfig = allStatuses.find(s => s.value === status);
+    const Icon = status === "pending" ? Clock : 
+                 status === "in_progress" ? Factory :
+                 status === "ready" ? Package :
+                 status === "picked_up" ? Truck :
+                 status === "delivered" ? CheckCircle : Clock;
+    
+    return (
+      <Badge variant="outline" className={statusConfig?.color || "bg-gray-50 text-gray-700 border-gray-200"}>
+        <Icon className="ml-1 h-3 w-3" />
+        {statusConfig?.label || status}
+      </Badge>
+    );
   };
 
   const handleRowClick = (jobId: number) => {
@@ -135,24 +125,40 @@ export default function Jobs() {
     setIsStatusDialogOpen(true);
   };
 
-  const confirmStatusUpdate = () => {
+  const confirmStatusUpdate = (withEmail: boolean = false) => {
     if (selectedJob && newStatus) {
+      const shouldSendEmail = emailSetting === 'auto' ? true : 
+                              emailSetting === 'never' ? false : withEmail;
       updateStatusMutation.mutate({
         jobId: selectedJob.id,
-        status: newStatus as 'in_production' | 'ready' | 'picked_up' | 'delivered',
+        status: newStatus as 'pending' | 'in_progress' | 'ready' | 'picked_up' | 'delivered',
+        notifyCustomer: shouldSendEmail,
       });
       setIsStatusDialogOpen(false);
+      setSendEmail(false);
+    }
+  };
+
+  const handleStatusChange = (job: Job, status: string) => {
+    setSelectedJob(job);
+    setNewStatus(status);
+    
+    // If setting is 'auto' or 'never', update directly without dialog
+    if (emailSetting === 'auto' || emailSetting === 'never') {
+      updateStatusMutation.mutate({
+        jobId: job.id,
+        status: status as 'pending' | 'in_progress' | 'ready' | 'picked_up' | 'delivered',
+        notifyCustomer: emailSetting === 'auto',
+      });
+    } else {
+      // Show dialog to ask about email
+      setIsStatusDialogOpen(true);
     }
   };
 
   const getStatusLabel = (status: string) => {
-    switch (status) {
-      case "in_production": return "בייצור";
-      case "ready": return "מוכן לאיסוף";
-      case "picked_up": return "נאסף";
-      case "delivered": return "נמסר";
-      default: return status;
-    }
+    const found = allStatuses.find(s => s.value === status);
+    return found?.label || status;
   };
 
   // Filter jobs
@@ -212,10 +218,9 @@ export default function Jobs() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">כל הסטטוסים</SelectItem>
-                <SelectItem value="in_production">בייצור</SelectItem>
-                <SelectItem value="ready">מוכן לאיסוף</SelectItem>
-                <SelectItem value="picked_up">נאסף</SelectItem>
-                <SelectItem value="delivered">נמסר</SelectItem>
+                {allStatuses.map((s) => (
+                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -347,50 +352,41 @@ export default function Jobs() {
                         </div>
                       )}
 
-                      {/* Action Buttons */}
-                      <div className="flex flex-wrap gap-2 pt-2 border-t">
-                        {job.status === "in_production" && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-green-600 border-green-200 hover:bg-green-50"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleUpdateStatus(job, "ready");
-                            }}
+                      {/* Status Change Dropdown */}
+                      <div className="flex items-center gap-3 pt-2 border-t">
+                        <span className="text-sm text-muted-foreground">שנה סטטוס:</span>
+                        <Select
+                          value={job.status}
+                          onValueChange={(value) => {
+                            if (value !== job.status) {
+                              handleStatusChange(job, value);
+                            }
+                          }}
+                        >
+                          <SelectTrigger 
+                            className="w-[160px] h-9"
+                            onClick={(e) => e.stopPropagation()}
                           >
-                            <Package className="ml-1 h-3 w-3" />
-                            סמן כמוכן
-                          </Button>
-                        )}
-                        {job.status === "ready" && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-blue-600 border-blue-200 hover:bg-blue-50"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleUpdateStatus(job, "picked_up");
-                            }}
-                          >
-                            <Truck className="ml-1 h-3 w-3" />
-                            סמן כנאסף
-                          </Button>
-                        )}
-                        {job.status === "picked_up" && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-teal-600 border-teal-200 hover:bg-teal-50"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleUpdateStatus(job, "delivered");
-                            }}
-                          >
-                            <CheckCircle className="ml-1 h-3 w-3" />
-                            סמן כנמסר
-                          </Button>
-                        )}
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {allStatuses.map((s) => (
+                              <SelectItem key={s.value} value={s.value}>
+                                <span className={cn(
+                                  "flex items-center gap-2",
+                                  s.value === job.status && "font-medium"
+                                )}>
+                                  {s.value === "pending" && <Clock className="h-3 w-3" />}
+                                  {s.value === "in_progress" && <Factory className="h-3 w-3" />}
+                                  {s.value === "ready" && <Package className="h-3 w-3" />}
+                                  {s.value === "picked_up" && <Truck className="h-3 w-3" />}
+                                  {s.value === "delivered" && <CheckCircle className="h-3 w-3" />}
+                                  {s.label}
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
                   )}
@@ -401,21 +397,44 @@ export default function Jobs() {
         </CardContent>
       </Card>
 
-      {/* Status Update Dialog */}
+      {/* Status Update Dialog with Email Option */}
       <Dialog open={isStatusDialogOpen} onOpenChange={setIsStatusDialogOpen}>
         <DialogContent className="sm:max-w-md" dir="rtl">
           <DialogHeader>
             <DialogTitle>עדכון סטטוס עבודה</DialogTitle>
             <DialogDescription>
-              האם לעדכן את סטטוס העבודה #{selectedJob?.id} ל{getStatusLabel(newStatus)}?
+              עדכון סטטוס עבודה #{selectedJob?.id} ל{getStatusLabel(newStatus)}
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => setIsStatusDialogOpen(false)}>
+          
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground mb-4">
+              האם לשלוח עדכון במייל ללקוח?
+            </p>
+          </div>
+
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setIsStatusDialogOpen(false)}
+              className="w-full sm:w-auto"
+            >
               ביטול
             </Button>
-            <Button onClick={confirmStatusUpdate}>
-              אישור
+            <Button 
+              variant="outline"
+              onClick={() => confirmStatusUpdate(false)}
+              className="w-full sm:w-auto gap-2"
+            >
+              <MailX className="h-4 w-4" />
+              עדכן ללא מייל
+            </Button>
+            <Button 
+              onClick={() => confirmStatusUpdate(true)}
+              className="w-full sm:w-auto gap-2"
+            >
+              <Mail className="h-4 w-4" />
+              עדכן ושלח מייל
             </Button>
           </DialogFooter>
         </DialogContent>

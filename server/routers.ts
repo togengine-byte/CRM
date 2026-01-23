@@ -128,6 +128,9 @@ import {
   getActiveJobs,
   getJobsReadyForPickup,
   updateJobStatus,
+  getEmailOnStatusChangeSetting,
+  setEmailOnStatusChangeSetting,
+  type EmailOnStatusChange,
 } from "./db";
 
 export const appRouter = router({
@@ -1531,6 +1534,23 @@ export const appRouter = router({
           return await updateSupplierWeights(input, ctx.user.id);
         }),
     }),
+
+    emailOnStatusChange: router({
+      get: protectedProcedure
+        .query(async ({ ctx }) => {
+          if (!ctx.user) throw new Error("Not authenticated");
+          return await getEmailOnStatusChangeSetting();
+        }),
+
+      update: adminProcedure
+        .input(z.object({
+          value: z.enum(['ask', 'auto', 'never']),
+        }))
+        .mutation(async ({ ctx, input }) => {
+          if (!ctx.user) throw new Error("Not authenticated");
+          return await setEmailOnStatusChangeSetting(input.value as EmailOnStatusChange, ctx.user.id);
+        }),
+    }),
   }),
 
   // ==================== USER MANAGEMENT API ====================
@@ -1724,10 +1744,19 @@ export const appRouter = router({
     updateStatus: protectedProcedure
       .input(z.object({
         jobId: z.number(),
-        status: z.enum(['in_production', 'ready', 'picked_up', 'delivered']),
+        status: z.enum(['pending', 'in_progress', 'ready', 'picked_up', 'delivered']),
+        notifyCustomer: z.boolean().optional().default(false),
       }))
       .mutation(async ({ ctx, input }) => {
-        return await updateJobStatus(input.jobId, input.status, ctx.user?.id);
+        const result = await updateJobStatus(input.jobId, input.status, ctx.user?.id);
+        
+        // Send email notification if requested
+        if (input.notifyCustomer) {
+          // TODO: Implement email sending when Gmail API key is configured
+          console.log(`[Email] Would send status update email for job ${input.jobId} to customer`);
+        }
+        
+        return result;
       }),
   }),
 });

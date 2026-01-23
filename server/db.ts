@@ -3606,3 +3606,56 @@ export async function calculateProductPrice(input: {
     requiresManualPricing: isCustomQuantity,
   };
 }
+
+
+// ==================== EMAIL SETTINGS ====================
+
+export type EmailOnStatusChange = 'ask' | 'auto' | 'never';
+
+export async function getEmailOnStatusChangeSetting(): Promise<EmailOnStatusChange> {
+  const db = await getDb();
+  if (!db) return 'ask';
+
+  const result = await db.select()
+    .from(systemSettings)
+    .where(eq(systemSettings.key, 'email_on_status_change'))
+    .limit(1);
+
+  if (result.length === 0) {
+    return 'ask';
+  }
+
+  const value = result[0].value as string;
+  if (value === 'auto' || value === 'never' || value === 'ask') {
+    return value;
+  }
+  return 'ask';
+}
+
+export async function setEmailOnStatusChangeSetting(value: EmailOnStatusChange, updatedBy?: number): Promise<{ success: boolean }> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const existing = await db.select()
+    .from(systemSettings)
+    .where(eq(systemSettings.key, 'email_on_status_change'))
+    .limit(1);
+
+  if (existing.length === 0) {
+    await db.insert(systemSettings).values({
+      key: 'email_on_status_change',
+      value: value,
+      description: 'התנהגות שליחת מייל בשינוי סטטוס: ask (לשאול), auto (אוטומטי), never (לא לשלוח)',
+      updatedBy,
+    });
+  } else {
+    await db.update(systemSettings)
+      .set({ 
+        value: value,
+        updatedBy,
+      })
+      .where(eq(systemSettings.key, 'email_on_status_change'));
+  }
+
+  return { success: true };
+}
