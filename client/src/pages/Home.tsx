@@ -1,8 +1,16 @@
+import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { 
   FileText, 
   Users, 
@@ -16,7 +24,12 @@ import {
   ChevronLeft,
   Clock,
   AlertCircle,
-  Inbox
+  Inbox,
+  Phone,
+  Mail,
+  Building2,
+  Calendar,
+  X
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -38,6 +51,17 @@ function formatDate(dateString: string): string {
   return new Intl.DateTimeFormat('he-IL', {
     day: '2-digit',
     month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+}
+
+function formatFullDate(dateString: string): string {
+  const date = new Date(dateString);
+  return new Intl.DateTimeFormat('he-IL', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
   }).format(date);
@@ -105,139 +129,185 @@ function OpenJobsCard({ isLoading }: { isLoading: boolean }) {
   );
 }
 
-function PendingQuotesCard({ quotes, isLoading }: { quotes: any[]; isLoading: boolean }) {
-  const getStatusStyle = (status: string) => {
-    const styles: Record<string, string> = {
-      draft: 'bg-slate-50 text-slate-600 border-slate-200',
-      sent: 'bg-blue-50 text-blue-700 border-blue-200',
-      approved: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-      rejected: 'bg-red-50 text-red-600 border-red-200',
-      in_production: 'bg-amber-50 text-amber-700 border-amber-200',
-      ready: 'bg-purple-50 text-purple-700 border-purple-200',
-    };
-    return styles[status] || 'bg-slate-50 text-slate-600 border-slate-200';
-  };
-
-  const statusLabels: Record<string, string> = {
-    draft: 'טיוטה',
-    sent: 'נשלח',
-    approved: 'אושר',
-    rejected: 'נדחה',
-    in_production: 'בייצור',
-    ready: 'מוכן',
-  };
-
-  return (
-    <Card className="animate-slide-up opacity-0 stagger-2">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base font-medium flex items-center gap-2 text-foreground">
-            <FileText className="h-4 w-4 text-muted-foreground" />
-            הצעות מחיר ממתינות
-          </CardTitle>
-          <span className="text-xs text-muted-foreground">{quotes.length || 0}</span>
-        </div>
-      </CardHeader>
-      <CardContent className="pt-0">
-        {isLoading ? (
-          <div className="space-y-2">
-            {[...Array(3)].map((_, i) => (
-              <Skeleton key={i} className="h-12 w-full" />
-            ))}
-          </div>
-        ) : quotes.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <CheckCircle2 className="h-8 w-8 text-muted-foreground/40 mb-2" />
-            <p className="text-sm text-muted-foreground">אין הצעות ממתינות</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {quotes.slice(0, 4).map((quote) => (
-              <div 
-                key={quote.id} 
-                className="flex items-center justify-between py-2.5 px-3 rounded-lg border border-border hover:bg-accent/30 transition-colors cursor-pointer"
-              >
-                <div>
-                  <p className="text-sm font-medium text-foreground">{quote.customerName || 'לקוח לא ידוע'}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {quote.finalValue ? formatCurrency(parseFloat(quote.finalValue)) : 'ממתין לתמחור'}
-                  </p>
-                </div>
-                <Badge variant="outline" className={`text-[11px] font-normal ${getStatusStyle(quote.status)}`}>
-                  {statusLabels[quote.status] || quote.status}
-                </Badge>
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-// New component for pending quote requests from landing page
+// Component for pending quote requests from landing page with modal
 function PendingSignupsCard({ signups, isLoading }: { signups: any[]; isLoading: boolean }) {
+  const [selectedSignup, setSelectedSignup] = useState<any>(null);
+
   return (
-    <Card className="animate-slide-up opacity-0 stagger-2">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base font-medium flex items-center gap-2 text-foreground">
-            <Inbox className="h-4 w-4 text-muted-foreground" />
-            בקשות הצעות מחיר חדשות
-          </CardTitle>
-          {signups.length > 0 && (
-            <Badge variant="outline" className="text-[11px] font-normal bg-blue-50 text-blue-700 border-blue-200">
-              {signups.length} חדשות
-            </Badge>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent className="pt-0">
-        {isLoading ? (
-          <div className="space-y-2">
-            {[...Array(3)].map((_, i) => (
-              <Skeleton key={i} className="h-14 w-full" />
-            ))}
+    <>
+      <Card className="animate-slide-up opacity-0 stagger-2">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base font-medium flex items-center gap-2 text-foreground">
+              <Inbox className="h-4 w-4 text-muted-foreground" />
+              בקשות הצעות מחיר חדשות
+            </CardTitle>
+            {signups.length > 0 && (
+              <Badge variant="outline" className="text-[11px] font-normal bg-blue-50 text-blue-700 border-blue-200">
+                {signups.length} חדשות
+              </Badge>
+            )}
           </div>
-        ) : signups.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <Inbox className="h-8 w-8 text-muted-foreground/40 mb-2" />
-            <p className="text-sm text-muted-foreground">אין בקשות חדשות</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {signups.slice(0, 4).map((signup) => (
-              <div 
-                key={signup.id} 
-                className="flex items-center justify-between py-2.5 px-3 rounded-lg border border-border hover:bg-accent/30 transition-colors cursor-pointer"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
-                    <span className="text-xs font-medium text-blue-700">
-                      #{signup.queueNumber || signup.id}
+        </CardHeader>
+        <CardContent className="pt-0">
+          {isLoading ? (
+            <div className="space-y-2">
+              {[...Array(3)].map((_, i) => (
+                <Skeleton key={i} className="h-14 w-full" />
+              ))}
+            </div>
+          ) : signups.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <Inbox className="h-8 w-8 text-muted-foreground/40 mb-2" />
+              <p className="text-sm text-muted-foreground">אין בקשות חדשות</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {signups.slice(0, 4).map((signup) => (
+                <div 
+                  key={signup.id} 
+                  className="flex items-center justify-between py-2.5 px-3 rounded-lg border border-border hover:bg-accent/30 transition-colors cursor-pointer"
+                  onClick={() => setSelectedSignup(signup)}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
+                      <span className="text-xs font-medium text-blue-700">
+                        #{signup.queueNumber || signup.id}
+                      </span>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{signup.name}</p>
+                      <p className="text-xs text-muted-foreground truncate max-w-[160px]">
+                        {signup.companyName || signup.email}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <Badge variant="outline" className="text-[11px] font-normal bg-amber-50 text-amber-700 border-amber-200">
+                      ממתין
+                    </Badge>
+                    <span className="text-[10px] text-muted-foreground">
+                      {signup.createdAt ? formatDate(signup.createdAt) : ''}
                     </span>
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{signup.name}</p>
-                    <p className="text-xs text-muted-foreground truncate max-w-[160px]">
-                      {signup.companyName || signup.email}
-                    </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Modal for viewing signup details */}
+      <Dialog open={!!selectedSignup} onOpenChange={() => setSelectedSignup(null)}>
+        <DialogContent className="sm:max-w-lg" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-full bg-blue-50 flex items-center justify-center">
+                <span className="text-sm font-medium text-blue-700">
+                  #{selectedSignup?.queueNumber || selectedSignup?.id}
+                </span>
+              </div>
+              בקשת הצעת מחיר
+            </DialogTitle>
+            <DialogDescription>
+              פרטי הבקשה שהתקבלה מהלקוח
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedSignup && (
+            <div className="space-y-4 mt-4">
+              {/* Customer Info */}
+              <div className="grid gap-3">
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-accent/30">
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">שם מלא</p>
+                    <p className="text-sm font-medium">{selectedSignup.name}</p>
                   </div>
                 </div>
-                <div className="flex flex-col items-end gap-1">
-                  <Badge variant="outline" className="text-[11px] font-normal bg-amber-50 text-amber-700 border-amber-200">
-                    ממתין
-                  </Badge>
-                  <span className="text-[10px] text-muted-foreground">
-                    {signup.createdAt ? formatDate(signup.createdAt) : ''}
-                  </span>
+                
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-accent/30">
+                  <Mail className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">אימייל</p>
+                    <p className="text-sm font-medium" dir="ltr">{selectedSignup.email}</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-accent/30">
+                  <Phone className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">טלפון</p>
+                    <p className="text-sm font-medium" dir="ltr">{selectedSignup.phone}</p>
+                  </div>
+                </div>
+                
+                {selectedSignup.companyName && (
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-accent/30">
+                    <Building2 className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">שם החברה</p>
+                      <p className="text-sm font-medium">{selectedSignup.companyName}</p>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-accent/30">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">תאריך הבקשה</p>
+                    <p className="text-sm font-medium">{selectedSignup.createdAt ? formatFullDate(selectedSignup.createdAt) : ''}</p>
+                  </div>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+              
+              {/* Description */}
+              <div className="space-y-2">
+                <p className="text-sm font-medium flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  תיאור הפרויקט
+                </p>
+                <div className="p-3 rounded-lg bg-accent/30 text-sm whitespace-pre-wrap">
+                  {selectedSignup.description}
+                </div>
+              </div>
+              
+              {/* Files if any */}
+              {selectedSignup.files && selectedSignup.files.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">קבצים מצורפים ({selectedSignup.files.length})</p>
+                  <div className="space-y-1">
+                    {selectedSignup.files.map((file: any, index: number) => (
+                      <div key={index} className="flex items-center gap-2 p-2 rounded bg-accent/30 text-sm">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <span className="truncate">{file.originalName}</span>
+                        <span className="text-xs text-muted-foreground">
+                          ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Action Buttons */}
+              <div className="flex gap-2 pt-4 border-t">
+                <Button className="flex-1" onClick={() => {
+                  toast.info("בקרוב - יצירת הצעת מחיר מהבקשה");
+                  setSelectedSignup(null);
+                }}>
+                  <Plus className="h-4 w-4 ml-2" />
+                  צור הצעת מחיר
+                </Button>
+                <Button variant="outline" onClick={() => setSelectedSignup(null)}>
+                  סגור
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -267,7 +337,7 @@ function PendingApprovalsCard({ customers, isLoading }: { customers: any[]; isLo
         ) : customers.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <CheckCircle2 className="h-8 w-8 text-muted-foreground/40 mb-2" />
-            <p className="text-sm text-muted-foreground">הכל מאושר</p>
+            <p className="text-sm text-muted-foreground">אין לקוחות ממתינים</p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -277,17 +347,15 @@ function PendingApprovalsCard({ customers, isLoading }: { customers: any[]; isLo
                 className="flex items-center justify-between py-2.5 px-3 rounded-lg border border-border hover:bg-accent/30 transition-colors cursor-pointer"
               >
                 <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-full bg-accent flex items-center justify-center shrink-0">
-                    <span className="text-xs font-medium text-foreground">
-                      {customer.name?.charAt(0).toUpperCase() || '?'}
-                    </span>
+                  <div className="h-8 w-8 rounded-full bg-amber-50 flex items-center justify-center shrink-0">
+                    <Clock className="h-4 w-4 text-amber-600" />
                   </div>
-                  <div>
-                    <p className="text-sm font-medium text-foreground">{customer.name || 'לא ידוע'}</p>
-                    <p className="text-xs text-muted-foreground truncate max-w-[140px]">{customer.email || 'אין אימייל'}</p>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{customer.name || 'לקוח חדש'}</p>
+                    <p className="text-xs text-muted-foreground truncate max-w-[160px]">{customer.email}</p>
                   </div>
                 </div>
-                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => toast.info("בקרוב")}>
+                <Button variant="ghost" size="sm" className="h-7 text-xs">
                   אשר
                 </Button>
               </div>
@@ -299,97 +367,72 @@ function PendingApprovalsCard({ customers, isLoading }: { customers: any[]; isLo
   );
 }
 
-function KPICard({ 
-  title, 
-  value, 
-  trend,
-  trendValue,
-}: { 
-  title: string;
-  value: string | number;
-  trend?: 'up' | 'down' | 'neutral';
-  trendValue?: string;
+function KPICard({ title, value, trend, trendValue }: { 
+  title: string; 
+  value: string; 
+  trend: 'up' | 'down' | 'neutral';
+  trendValue: string;
 }) {
+  const trendColors = {
+    up: 'text-emerald-600',
+    down: 'text-red-500',
+    neutral: 'text-muted-foreground'
+  };
+
+  const TrendIcon = trend === 'up' ? ArrowUpLeft : trend === 'down' ? ArrowDownLeft : TrendingUp;
+
   return (
-    <div className="p-4 rounded-lg border border-border bg-card">
-      <p className="text-xs text-muted-foreground mb-1">{title}</p>
-      <div className="flex items-baseline gap-2">
-        <span className="text-2xl font-semibold text-foreground">{value}</span>
-        {trend && trendValue && (
-          <span className={`flex items-center text-xs ${
-            trend === 'up' ? 'text-emerald-600' : 
-            trend === 'down' ? 'text-red-500' : 'text-muted-foreground'
-          }`}>
-            {trend === 'up' ? <ArrowUpLeft className="h-3 w-3" /> : 
-             trend === 'down' ? <ArrowDownLeft className="h-3 w-3" /> : null}
-            {trendValue}
-          </span>
-        )}
-      </div>
-    </div>
+    <Card className="animate-slide-up opacity-0 stagger-1">
+      <CardContent className="p-4">
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-muted-foreground">{title}</span>
+          <div className="flex items-end justify-between">
+            <span className="text-2xl font-semibold text-foreground">{value}</span>
+            <div className={`flex items-center gap-0.5 text-xs ${trendColors[trend]}`}>
+              <TrendIcon className="h-3 w-3" />
+              <span>{trendValue}</span>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
-// Hebrew translations for action types
-const actionTypeLabels: Record<string, string> = {
-  QUOTE_REQUESTED: "בקשת הצעת מחיר",
-  QUOTE_UPDATED: "עדכון הצעת מחיר",
-  QUOTE_REVISED: "גרסה חדשה להצעה",
-  QUOTE_SENT: "הצעה נשלחה",
-  QUOTE_APPROVED: "הצעה אושרה",
-  QUOTE_REJECTED: "הצעה נדחתה",
-  QUOTE_IN_PRODUCTION: "הצעה בייצור",
-  QUOTE_READY: "הצעה מוכנה",
-  DEAL_RATED: "דירוג עסקה",
-  product_created: "מוצר נוצר",
-  product_updated: "מוצר עודכן",
-  product_deleted: "מוצר נמחק",
-  variant_created: "וריאנט נוצר",
-  variant_updated: "וריאנט עודכן",
-  variant_deleted: "וריאנט נמחק",
-  customer_approved: "לקוח אושר",
-  customer_rejected: "לקוח נדחה",
-  customer_updated: "לקוח עודכן",
-  supplier_created: "ספק נוצר",
-  supplier_updated: "ספק עודכן",
-  supplier_deleted: "ספק נמחק",
-  user_login: "התחברות",
-  user_logout: "התנתקות",
-};
-
 function ActivityFeedCard({ activities, isLoading }: { activities: any[]; isLoading: boolean }) {
+  const actionTypeLabels: Record<string, string> = {
+    quote_created: 'נוצרה הצעת מחיר חדשה',
+    quote_sent: 'הצעת מחיר נשלחה ללקוח',
+    quote_approved: 'הצעת מחיר אושרה',
+    quote_rejected: 'הצעת מחיר נדחתה',
+    customer_created: 'לקוח חדש נוסף למערכת',
+    customer_approved: 'לקוח אושר',
+    supplier_created: 'ספק חדש נוסף',
+    product_created: 'מוצר חדש נוסף',
+    file_validated: 'קובץ עבר ולידציה',
+    customer_signup_request: 'התקבלה בקשת הצעת מחיר חדשה',
+  };
+
   const getActivityIcon = (actionType: string) => {
-    if (actionType.includes('QUOTE')) return <FileText className="h-3 w-3" />;
-    if (actionType.includes('customer') || actionType.includes('user')) return <Users className="h-3 w-3" />;
-    if (actionType.includes('product') || actionType.includes('variant')) return <TrendingUp className="h-3 w-3" />;
-    return <Activity className="h-3 w-3" />;
+    if (actionType.includes('quote')) return <FileText className="h-3 w-3 text-muted-foreground" />;
+    if (actionType.includes('customer')) return <Users className="h-3 w-3 text-muted-foreground" />;
+    if (actionType.includes('supplier')) return <Truck className="h-3 w-3 text-muted-foreground" />;
+    return <Activity className="h-3 w-3 text-muted-foreground" />;
   };
 
   return (
     <Card className="animate-slide-up opacity-0 stagger-4">
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base font-medium flex items-center gap-2 text-foreground">
-            <Activity className="h-4 w-4 text-muted-foreground" />
-            פעילות אחרונה
-          </CardTitle>
-          <Button variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground hover:text-foreground" onClick={() => toast.info("בקרוב")}>
-            צפה בהכל
-            <ChevronLeft className="h-3 w-3 mr-1" />
-          </Button>
-        </div>
+        <CardTitle className="text-base font-medium flex items-center gap-2 text-foreground">
+          <Activity className="h-4 w-4 text-muted-foreground" />
+          פעילות אחרונה
+        </CardTitle>
       </CardHeader>
       <CardContent className="pt-0">
         {isLoading ? (
           <div className="space-y-3">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="flex items-start gap-3">
-                <Skeleton className="h-6 w-6 rounded-full shrink-0" />
-                <div className="flex-1 space-y-1">
-                  <Skeleton className="h-4 w-3/4" />
-                  <Skeleton className="h-3 w-1/2" />
-                </div>
-              </div>
+              <Skeleton key={i} className="h-10 w-full" />
             ))}
           </div>
         ) : activities.length === 0 ? (
@@ -459,7 +502,6 @@ function QuickActionsCard() {
 
 export default function Home() {
   const { data: kpis, isLoading: kpisLoading } = trpc.dashboard.kpis.useQuery();
-  const { data: quotes, isLoading: quotesLoading } = trpc.dashboard.recentQuotes.useQuery();
   const { data: customers, isLoading: customersLoading } = trpc.dashboard.pendingCustomers.useQuery();
   const { data: signups, isLoading: signupsLoading } = trpc.dashboard.pendingSignups.useQuery();
   const { data: activities, isLoading: activitiesLoading } = trpc.dashboard.recentActivity.useQuery();
@@ -517,10 +559,9 @@ export default function Home() {
         <QuickActionsCard />
       </div>
 
-      {/* Secondary Grid - Now with 4 columns on large screens */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      {/* Secondary Grid - Now with 3 columns on large screens */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <PendingSignupsCard signups={signups || []} isLoading={signupsLoading} />
-        <PendingQuotesCard quotes={quotes || []} isLoading={quotesLoading} />
         <PendingApprovalsCard customers={customers || []} isLoading={customersLoading} />
         <ActivityFeedCard activities={activities || []} isLoading={activitiesLoading} />
       </div>
