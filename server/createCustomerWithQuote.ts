@@ -22,8 +22,8 @@ export async function createCustomerWithQuote(input: CreateCustomerWithQuoteInpu
   if (!db) throw new Error("Database not available");
 
   // Get next customer number from sequence
-  const [customerSeqResult] = await db.execute(sql`SELECT nextval('customer_number_seq') as next_num`);
-  const customerNumber = Number((customerSeqResult as any).next_num);
+  const customerSeqResult = await db.execute(sql`SELECT nextval('customer_number_seq') as next_num`) as any;
+  const customerNumber = Number(customerSeqResult.rows?.[0]?.next_num || customerSeqResult[0]?.next_num || Date.now());
 
   // Create customer with pending_approval status
   const customerResult = await db
@@ -44,8 +44,8 @@ export async function createCustomerWithQuote(input: CreateCustomerWithQuoteInpu
   const customerId = customerResult[0].id;
 
   // Get next quote number from sequence
-  const [quoteSeqResult] = await db.execute(sql`SELECT nextval('quote_number_seq') as next_num`);
-  const quoteNumber = Number((quoteSeqResult as any).next_num);
+  const quoteSeqResult = await db.execute(sql`SELECT nextval('quote_number_seq') as next_num`) as any;
+  const quoteNumber = Number(quoteSeqResult.rows?.[0]?.next_num || quoteSeqResult[0]?.next_num || Date.now());
 
   // Create quote request with pending_approval status
   const quoteResult = await db

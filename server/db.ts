@@ -555,17 +555,17 @@ export async function createQuoteRequest(data: CreateQuoteRequest) {
   if (!db) throw new Error("Database not available");
 
   // Get next quote number from sequence
-  const [seqResult] = await db.execute(sql`SELECT nextval('quote_number_seq') as next_num`);
-  const quoteNumber = Number((seqResult as any).next_num);
+  const seqResult = await db.execute(sql`SELECT nextval('quote_number_seq') as next_num`) as any;
+  const quoteNumber = Number(seqResult.rows?.[0]?.next_num || seqResult[0]?.next_num || 1);
 
-  const [result] = await db.insert(quotes).values({
+  const result = await db.insert(quotes).values({
     customerId: data.customerId,
     status: "draft",
     version: 1,
     quoteNumber: quoteNumber,
   });
 
-  const quoteId = result.insertId;
+  const quoteId = (result as any).insertId || (result as any)[0]?.id || (result as any).rows?.[0]?.id;
 
   if (data.items && data.items.length > 0) {
     for (const item of data.items) {
@@ -931,9 +931,9 @@ export async function createProduct(input: CreateProductInput) {
     description: input.description || null,
     category: input.category || null,
     isActive: true,
-  });
+  }).returning({ id: baseProducts.id });
 
-  const insertId = result[0].insertId;
+  const insertId = result[0]?.id;
   
   await logActivity(null, "product_created", { productId: insertId, name: input.name });
 
@@ -1507,8 +1507,8 @@ export async function createSupplier(input: {
   if (!db) throw new Error("Database not available");
 
   // Get next supplier number from sequence
-  const [seqResult] = await db.execute(sql`SELECT nextval('supplier_number_seq') as next_num`);
-  const supplierNumber = Number((seqResult as any).next_num);
+  const seqResult = await db.execute(sql`SELECT nextval('supplier_number_seq') as next_num`) as any;
+  const supplierNumber = Number(seqResult.rows?.[0]?.next_num || seqResult[0]?.next_num || Date.now());
 
   const result = await db.insert(users).values({
     openId: `supplier_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -1943,14 +1943,14 @@ export async function createNote(input: {
     entityType: input.targetType,
     entityId: input.targetId,
     content: input.content,
-  });
+  }).returning({ id: internalNotes.id });
 
   await logActivity(input.userId, "note_created", { 
     targetType: input.targetType, 
     targetId: input.targetId 
   });
 
-  return { id: Number(result[0].insertId) };
+  return { id: result[0]?.id };
 }
 
 export async function getNotes(targetType: 'customer' | 'quote', targetId: number) {
@@ -2275,9 +2275,9 @@ export async function createValidationProfile(data: {
     maxFileSizeMb: data.maxFileSizeMb,
     allowedFormats: JSON.stringify(data.allowedFormats),
     isDefault: data.isDefault || false,
-  });
+  }).returning({ id: validationProfiles.id });
   
-  return { id: result[0].insertId };
+  return { id: result[0]?.id };
 }
 
 export async function updateValidationProfile(id: number, data: {

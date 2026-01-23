@@ -36,17 +36,17 @@ async function runMigrations() {
   }
   
   try {
-    const { drizzle } = await import('drizzle-orm/neon-http');
-    const { sql } = await import('drizzle-orm');
-    const db = drizzle(process.env.DATABASE_URL);
+    // @ts-ignore - pg types not needed for dynamic import
+    const { Pool } = await import('pg');
+    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
     
     console.log('[Migration] Running database migrations...');
     
     // Add fileValidationWarnings column to customer_signup_requests if not exists
     try {
-      await db.execute(sql`
+      await pool.query(`
         ALTER TABLE customer_signup_requests 
-        ADD COLUMN IF NOT EXISTS "fileValidationWarnings" jsonb
+        ADD COLUMN IF NOT EXISTS "fileValidationWarnings" jsonb DEFAULT '[]'
       `);
       console.log('[Migration] Added fileValidationWarnings to customer_signup_requests');
     } catch (e: any) {
@@ -57,9 +57,9 @@ async function runMigrations() {
     
     // Add fileValidationWarnings column to supplier_jobs if not exists
     try {
-      await db.execute(sql`
+      await pool.query(`
         ALTER TABLE supplier_jobs 
-        ADD COLUMN IF NOT EXISTS "fileValidationWarnings" jsonb
+        ADD COLUMN IF NOT EXISTS "fileValidationWarnings" jsonb DEFAULT '[]'
       `);
       console.log('[Migration] Added fileValidationWarnings to supplier_jobs');
     } catch (e: any) {
@@ -69,8 +69,9 @@ async function runMigrations() {
     }
     
     // Seed suppliers with prices and job history for rating system
-    await seedSuppliersData(db, sql);
+    await seedSuppliersData(pool);
     
+    await pool.end();
     console.log('[Migration] Migrations completed successfully');
   } catch (error) {
     console.error('[Migration] Error running migrations:', error);
@@ -78,10 +79,10 @@ async function runMigrations() {
 }
 
 // Seed suppliers with prices and historical jobs for rating system
-async function seedSuppliersData(db: any, sql: any) {
+async function seedSuppliersData(pool: any) {
   try {
     // Check if we already have suppliers
-    const existingSuppliers = await db.execute(sql`SELECT COUNT(*) as count FROM users WHERE role = 'supplier'`);
+    const existingSuppliers = await pool.query(`SELECT COUNT(*) as count FROM users WHERE role = 'supplier'`);
     const supplierCount = Number(existingSuppliers.rows?.[0]?.count || 0);
     
     if (supplierCount >= 9) {
@@ -92,14 +93,14 @@ async function seedSuppliersData(db: any, sql: any) {
     console.log('[Seed] Creating suppliers with prices and job history...');
     
     // Get categories
-    const categories = await db.execute(sql`SELECT id, name FROM categories ORDER BY id`);
+    const categories = await pool.query(`SELECT id, name FROM categories ORDER BY id`);
     if (!categories.rows || categories.rows.length === 0) {
       console.log('[Seed] No categories found, skipping supplier seed');
       return;
     }
     
     // Get products with sizes
-    const products = await db.execute(sql`
+    const products = await pool.query(`
       SELECT bp.id as product_id, bp.name as product_name, bp."categoryId", 
              ps.id as size_id, ps.name as size_name, ps."basePrice"
       FROM base_products bp
@@ -109,9 +110,9 @@ async function seedSuppliersData(db: any, sql: any) {
     
     // Delete existing suppliers and related data
     console.log('[Seed] Cleaning existing supplier data...');
-    await db.execute(sql`DELETE FROM supplier_jobs WHERE "supplierId" IN (SELECT id FROM users WHERE role = 'supplier')`);
-    await db.execute(sql`DELETE FROM supplier_prices WHERE "supplierId" IN (SELECT id FROM users WHERE role = 'supplier')`);
-    await db.execute(sql`DELETE FROM users WHERE role = 'supplier'`);
+    await pool.query(`DELETE FROM supplier_jobs WHERE "supplierId" IN (SELECT id FROM users WHERE role = 'supplier')`);
+    await pool.query(`DELETE FROM supplier_prices WHERE "supplierId" IN (SELECT id FROM users WHERE role = 'supplier')`);
+    await pool.query(`DELETE FROM users WHERE role = 'supplier'`);
     
     // Supplier data per category
     const suppliersByCategory: Record<string, { name: string; company: string; priceMultiplier: number; deliveryDays: number; rating: number; reliability: number }[]> = {
@@ -152,11 +153,11 @@ async function seedSuppliersData(db: any, sql: any) {
         const email = `${supplierData.name.replace(/\s/g, '.').toLowerCase()}@supplier.com`;
         
         // Create supplier
-        const supplierResult = await db.execute(sql`
+        const supplierResult = await pool.query(`
           INSERT INTO users ("openId", name, email, phone, "companyName", role, status, "passwordHash", "supplierNumber")
-          VALUES (${openId}, ${supplierData.name}, ${email}, '050-${supplierNumber}', ${supplierData.company}, 'supplier', 'active', ${hashedPassword}, ${supplierNumber})
+          VALUES ($1, $2, $3, $4, $5, 'supplier', 'active', $6, $7)
           RETURNING id
-        `);
+        `, [openId, supplierData.name, email, `050-${supplierNumber}`, supplierData.company, hashedPassword, supplierNumber]);
         
         const supplierId = supplierResult.rows[0].id;
         console.log(`[Seed] Created supplier: ${supplierData.name} (ID: ${supplierId})`);
@@ -171,16 +172,16 @@ async function seedSuppliersData(db: any, sql: any) {
             const supplierPrice = Math.round(basePrice * supplierData.priceMultiplier * 100) / 100;
             
             // Get size quantities for this product size
-            const sizeQuantities = await db.execute(sql`
-              SELECT id FROM size_quantities WHERE size_id = ${product.size_id}
-            `);
+            const sizeQuantities = await pool.query(`
+              SELECT id FROM size_quantities WHERE size_id = $1
+            `, [product.size_id]);
             
             for (const sq of sizeQuantities.rows) {
-              await db.execute(sql`
+              await pool.query(`
                 INSERT INTO supplier_prices ("supplierId", "sizeQuantityId", "pricePerUnit", "deliveryDays")
-                VALUES (${supplierId}, ${(sq as any).id}, ${supplierPrice}, ${supplierData.deliveryDays})
+                VALUES ($1, $2, $3, $4)
                 ON CONFLICT DO NOTHING
-              `);
+              `, [supplierId, (sq as any).id, supplierPrice, supplierData.deliveryDays]);
             }
           }
         }
@@ -199,22 +200,20 @@ async function seedSuppliersData(db: any, sql: any) {
             : Math.max(1, supplierData.rating - 1 - Math.random());
           
           // Get a random sizeQuantityId
-          const randomSQ = await db.execute(sql`SELECT id FROM size_quantities LIMIT 1`);
+          const randomSQ = await pool.query(`SELECT id FROM size_quantities LIMIT 1`);
           const sqId = randomSQ.rows?.[0]?.id || 1;
+          const quantity = Math.floor(Math.random() * 500) + 100;
+          const pricePerUnit = Math.round(100 * supplierData.priceMultiplier);
+          const roundedRating = Math.round(rating * 10) / 10;
           
-          await db.execute(sql`
+          await pool.query(`
             INSERT INTO supplier_jobs (
               "supplierId", "customerId", "sizeQuantityId", quantity, "pricePerUnit", status,
               "supplierMarkedReady", "supplierReadyAt", "courierConfirmedReady", "supplierRating",
               "createdAt", "updatedAt"
             )
-            VALUES (
-              ${supplierId}, 1, ${sqId}, ${Math.floor(Math.random() * 500) + 100}, 
-              ${Math.round(100 * supplierData.priceMultiplier)}, 'delivered',
-              true, ${readyAt.toISOString()}, ${isReliable}, ${Math.round(rating * 10) / 10},
-              ${createdAt.toISOString()}, ${readyAt.toISOString()}
-            )
-          `);
+            VALUES ($1, 1, $2, $3, $4, 'delivered', true, $5, $6, $7, $8, $9)
+          `, [supplierId, sqId, quantity, pricePerUnit, readyAt.toISOString(), isReliable, roundedRating, createdAt.toISOString(), readyAt.toISOString()]);
         }
         
         console.log(`[Seed] Added ${numJobs} historical jobs for ${supplierData.name}`);
