@@ -37,7 +37,11 @@ import {
   Award,
   Loader2,
   Factory,
-  MapPin
+  MapPin,
+  XCircle,
+  Eye,
+  AlertTriangle,
+  Download
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -308,11 +312,15 @@ function PendingSignupsCard({
   const [selectedSignup, setSelectedSignup] = useState<SignupRequest | null>(null);
   const [showSupplierModal, setShowSupplierModal] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
+  const [isRejecting, setIsRejecting] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<any | null>(null);
+  const [fileValidation, setFileValidation] = useState<{warnings: string[], errors: string[]} | null>(null);
+  const [isValidating, setIsValidating] = useState(false);
   const utils = trpc.useUtils();
 
   const approveSignupMutation = trpc.admin.approveSignupRequest.useMutation({
     onSuccess: () => {
-      toast.success("הלקוח אושר בהצלחה!");
+      toast.success("הלקוח אושר והועבר לרשימת הלקוחות!");
       setSelectedSignup(null);
       onRefresh();
       utils.dashboard.pendingSignups.invalidate();
@@ -322,18 +330,89 @@ function PendingSignupsCard({
     },
   });
 
+  const rejectSignupMutation = trpc.userManagement.signupRequests.reject.useMutation({
+    onSuccess: () => {
+      toast.success("הבקשה נדחתה");
+      setSelectedSignup(null);
+      onRefresh();
+      utils.dashboard.pendingSignups.invalidate();
+    },
+    onError: (error) => {
+      toast.error("שגיאה בדחיית הבקשה: " + error.message);
+    },
+  });
+
   const handleApproveCustomer = async () => {
     if (!selectedSignup) return;
     setIsApproving(true);
     try {
-      await approveSignupMutation.mutateAsync({ signupId: selectedSignup.id });
+      await approveSignupMutation.mutateAsync({ requestId: selectedSignup.id });
     } finally {
       setIsApproving(false);
     }
   };
 
+  const handleRejectCustomer = async () => {
+    if (!selectedSignup) return;
+    setIsRejecting(true);
+    try {
+      await rejectSignupMutation.mutateAsync({ id: selectedSignup.id });
+    } finally {
+      setIsRejecting(false);
+    }
+  };
+
   const handleFindSupplier = () => {
     setShowSupplierModal(true);
+  };
+
+  // Check if file is an image
+  const isImageFile = (filename: string) => {
+    const ext = filename.toLowerCase().split('.').pop();
+    return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'tiff', 'tif'].includes(ext || '');
+  };
+
+  // Open file preview with validation
+  const handleFileClick = async (file: any, e: React.MouseEvent) => {
+    e.preventDefault();
+    setSelectedFile(file);
+    setFileValidation(null);
+    
+    // Run validation on the file
+    if (isImageFile(file.originalName || file.name)) {
+      setIsValidating(true);
+      try {
+        // Get file size in MB
+        const fileSizeMb = file.size ? file.size / (1024 * 1024) : 0;
+        const filename = file.originalName || file.name;
+        const format = filename.split('.').pop()?.toLowerCase() || '';
+        
+        // Simple client-side validation warnings
+        const warnings: string[] = [];
+        const errors: string[] = [];
+        
+        // Check file size
+        if (fileSizeMb > 100) {
+          errors.push(`קובץ גדול מדי (${fileSizeMb.toFixed(1)}MB) - מקסימום 100MB`);
+        } else if (fileSizeMb > 50) {
+          warnings.push(`קובץ גדול (${fileSizeMb.toFixed(1)}MB)`);
+        }
+        
+        // Check format for print
+        if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(format)) {
+          warnings.push('פורמט לא אידיאלי להדפסה - מומלץ PDF/AI/EPS');
+        }
+        
+        // Note about DPI - we can't check real DPI client-side
+        warnings.push('יש לוודא שהרזולוציה לפחות 300 DPI להדפסה איכותית');
+        
+        setFileValidation({ warnings, errors });
+      } catch (err) {
+        console.error('Validation error:', err);
+      } finally {
+        setIsValidating(false);
+      }
+    }
   };
 
   return (
@@ -484,17 +563,25 @@ function PendingSignupsCard({
                   </p>
                   <div className="space-y-2">
                     {selectedSignup.files.map((file: any, index: number) => (
-                      <a 
+                      <div 
                         key={index} 
-                        href={file.url || file.path}
-                        target="_blank"
-                        rel="noopener noreferrer"
                         className="flex items-center justify-between p-3 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer border border-slate-200"
+                        onClick={(e) => handleFileClick(file, e)}
                       >
                         <div className="flex items-center gap-3">
-                          <div className="h-8 w-8 rounded bg-blue-50 flex items-center justify-center">
-                            <FileText className="h-4 w-4 text-blue-600" />
-                          </div>
+                          {isImageFile(file.originalName || file.name) ? (
+                            <div className="h-10 w-10 rounded bg-slate-200 overflow-hidden">
+                              <img 
+                                src={file.url || file.path} 
+                                alt="" 
+                                className="h-full w-full object-cover"
+                              />
+                            </div>
+                          ) : (
+                            <div className="h-10 w-10 rounded bg-blue-50 flex items-center justify-center">
+                              <FileText className="h-5 w-5 text-blue-600" />
+                            </div>
+                          )}
                           <div>
                             <p className="text-sm font-medium text-slate-900 truncate max-w-[200px]">{file.originalName || file.name}</p>
                             <p className="text-xs text-slate-500">
@@ -502,39 +589,60 @@ function PendingSignupsCard({
                             </p>
                           </div>
                         </div>
-                        <Inbox className="h-4 w-4 text-slate-400" />
-                      </a>
+                        <Eye className="h-4 w-4 text-slate-400" />
+                      </div>
                     ))}
                   </div>
                 </div>
               )}
               
               {/* Action Buttons */}
-              <div className="flex gap-3 pt-4 border-t border-slate-200">
+              <div className="flex flex-col gap-3 pt-4 border-t border-slate-200">
+                <div className="flex gap-3">
+                  <Button 
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white" 
+                    onClick={handleApproveCustomer}
+                    disabled={isApproving || isRejecting}
+                  >
+                    {isApproving ? (
+                      <>
+                        <Loader2 className="h-4 w-4 ml-2 animate-spin" />
+                        מאשר...
+                      </>
+                    ) : (
+                      <>
+                        <UserCheck className="h-4 w-4 ml-2" />
+                        אשר לקוח
+                      </>
+                    )}
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    className="flex-1 border-slate-300 text-slate-700 hover:bg-slate-50"
+                    onClick={handleFindSupplier}
+                    disabled={isApproving || isRejecting}
+                  >
+                    <Search className="h-4 w-4 ml-2" />
+                    חפש ספק
+                  </Button>
+                </div>
                 <Button 
-                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white" 
-                  onClick={handleApproveCustomer}
-                  disabled={isApproving}
+                  variant="outline"
+                  className="w-full border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300"
+                  onClick={handleRejectCustomer}
+                  disabled={isApproving || isRejecting}
                 >
-                  {isApproving ? (
+                  {isRejecting ? (
                     <>
                       <Loader2 className="h-4 w-4 ml-2 animate-spin" />
-                      מאשר...
+                      דוחה...
                     </>
                   ) : (
                     <>
-                      <UserCheck className="h-4 w-4 ml-2" />
-                      אשר לקוח
+                      <XCircle className="h-4 w-4 ml-2" />
+                      דחה בקשה
                     </>
                   )}
-                </Button>
-                <Button 
-                  variant="outline"
-                  className="flex-1 border-slate-300 text-slate-700 hover:bg-slate-50"
-                  onClick={handleFindSupplier}
-                >
-                  <Search className="h-4 w-4 ml-2" />
-                  חפש ספק
                 </Button>
               </div>
             </div>
@@ -548,6 +656,111 @@ function PendingSignupsCard({
         onClose={() => setShowSupplierModal(false)}
         productId={selectedSignup?.productId}
       />
+
+      {/* File Preview Modal */}
+      <Dialog open={!!selectedFile} onOpenChange={() => setSelectedFile(null)}>
+        <DialogContent className="sm:max-w-2xl" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+              <Eye className="h-5 w-5 text-blue-600" />
+              תצוגת קובץ
+            </DialogTitle>
+            <DialogDescription className="text-slate-500">
+              {selectedFile?.originalName || selectedFile?.name}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedFile && (
+            <div className="space-y-4">
+              {/* Image Preview */}
+              {isImageFile(selectedFile.originalName || selectedFile.name) ? (
+                <div className="relative rounded-lg overflow-hidden bg-slate-100 border border-slate-200">
+                  <img 
+                    src={selectedFile.url || selectedFile.path} 
+                    alt={selectedFile.originalName || selectedFile.name}
+                    className="w-full h-auto max-h-[400px] object-contain"
+                  />
+                </div>
+              ) : (
+                <div className="flex items-center justify-center p-12 bg-slate-50 rounded-lg border border-slate-200">
+                  <div className="text-center">
+                    <FileText className="h-16 w-16 text-slate-300 mx-auto mb-3" />
+                    <p className="text-slate-500">תצוגה מקדימה לא זמינה לקובץ זה</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Validation Results */}
+              {isValidating ? (
+                <div className="flex items-center justify-center p-4 bg-slate-50 rounded-lg">
+                  <Loader2 className="h-5 w-5 animate-spin text-blue-600 ml-2" />
+                  <span className="text-slate-600">בודק קובץ...</span>
+                </div>
+              ) : fileValidation && (
+                <div className="space-y-3">
+                  <p className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                    <Shield className="h-4 w-4 text-slate-400" />
+                    בדיקת איכות להדפסה
+                  </p>
+                  
+                  {/* Errors */}
+                  {fileValidation.errors.length > 0 && (
+                    <div className="space-y-2">
+                      {fileValidation.errors.map((error, idx) => (
+                        <div key={idx} className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                          <XCircle className="h-4 w-4 text-red-600 mt-0.5 shrink-0" />
+                          <span className="text-sm text-red-700">{error}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Warnings */}
+                  {fileValidation.warnings.length > 0 && (
+                    <div className="space-y-2">
+                      {fileValidation.warnings.map((warning, idx) => (
+                        <div key={idx} className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                          <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                          <span className="text-sm text-amber-700">{warning}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {fileValidation.errors.length === 0 && fileValidation.warnings.length === 0 && (
+                    <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      <span className="text-sm text-green-700">הקובץ תקין להדפסה</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex gap-3 pt-2">
+                <Button 
+                  variant="outline" 
+                  className="flex-1"
+                  onClick={() => setSelectedFile(null)}
+                >
+                  סגור
+                </Button>
+                <a 
+                  href={selectedFile.url || selectedFile.path}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1"
+                >
+                  <Button className="w-full bg-blue-600 hover:bg-blue-700">
+                    <Download className="h-4 w-4 ml-2" />
+                    הורד קובץ
+                  </Button>
+                </a>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
