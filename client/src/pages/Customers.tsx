@@ -110,9 +110,9 @@ export default function Customers() {
   const approveMutation = trpc.customers.approve.useMutation({
     onSuccess: () => {
       toast.success("הלקוח אושר בהצלחה");
-      utils.customers.list.invalidate();
-      utils.customers.stats.invalidate();
-      utils.customers.getById.invalidate();
+      refetch();
+      utils.customers.stats.refetch();
+      utils.customers.getById.refetch();
     },
     onError: (error) => {
       toast.error(`שגיאה באישור הלקוח: ${error.message}`);
@@ -122,9 +122,9 @@ export default function Customers() {
   const rejectMutation = trpc.customers.reject.useMutation({
     onSuccess: () => {
       toast.success("הלקוח נדחה");
-      utils.customers.list.invalidate();
-      utils.customers.stats.invalidate();
-      utils.customers.getById.invalidate();
+      refetch();
+      utils.customers.stats.refetch();
+      utils.customers.getById.refetch();
       setIsRejectDialogOpen(false);
       setRejectReason("");
     },
@@ -136,8 +136,8 @@ export default function Customers() {
   const updateMutation = trpc.customers.update.useMutation({
     onSuccess: () => {
       toast.success("פרטי הלקוח עודכנו");
-      utils.customers.list.invalidate();
-      utils.customers.getById.invalidate();
+      refetch();
+      utils.customers.getById.refetch();
       setIsEditDialogOpen(false);
     },
     onError: (error) => {
@@ -148,7 +148,7 @@ export default function Customers() {
   const assignPricelistMutation = trpc.customers.assignPricelist.useMutation({
     onSuccess: () => {
       toast.success("המחירון הוקצה ללקוח");
-      utils.customers.getById.invalidate();
+      utils.customers.getById.refetch();
     },
     onError: (error) => {
       toast.error(`שגיאה בהקצאת המחירון: ${error.message}`);
@@ -158,7 +158,7 @@ export default function Customers() {
   const removePricelistMutation = trpc.customers.removePricelist.useMutation({
     onSuccess: () => {
       toast.success("המחירון הוסר מהלקוח");
-      utils.customers.getById.invalidate();
+      utils.customers.getById.refetch();
     },
     onError: (error) => {
       toast.error(`שגיאה בהסרת המחירון: ${error.message}`);

@@ -91,7 +91,7 @@ export default function Products() {
   const createProductMutation = trpc.products.create.useMutation({
     onSuccess: () => {
       toast.success("המוצר נוצר בהצלחה");
-      utils.products.list.invalidate();
+      refetch();
       setIsProductDialogOpen(false);
       resetProductForm();
     },
@@ -103,7 +103,7 @@ export default function Products() {
   const updateProductMutation = trpc.products.update.useMutation({
     onSuccess: () => {
       toast.success("המוצר עודכן בהצלחה");
-      utils.products.list.invalidate();
+      refetch();
       setIsProductDialogOpen(false);
       resetProductForm();
     },
@@ -115,7 +115,7 @@ export default function Products() {
   const deleteProductMutation = trpc.products.delete.useMutation({
     onSuccess: () => {
       toast.success("המוצר נמחק בהצלחה");
-      utils.products.list.invalidate();
+      refetch();
     },
     onError: (error) => {
       toast.error(`שגיאה במחיקת המוצר: ${error.message}`);
@@ -125,7 +125,7 @@ export default function Products() {
   const createVariantMutation = trpc.products.createVariant.useMutation({
     onSuccess: () => {
       toast.success("הוריאנט נוצר בהצלחה");
-      utils.products.list.invalidate();
+      refetch();
       setIsVariantDialogOpen(false);
       resetVariantForm();
     },
@@ -137,7 +137,7 @@ export default function Products() {
   const updateVariantMutation = trpc.products.updateVariant.useMutation({
     onSuccess: () => {
       toast.success("הוריאנט עודכן בהצלחה");
-      utils.products.list.invalidate();
+      refetch();
       setIsVariantDialogOpen(false);
       resetVariantForm();
     },
@@ -149,7 +149,7 @@ export default function Products() {
   const deleteVariantMutation = trpc.products.deleteVariant.useMutation({
     onSuccess: () => {
       toast.success("הוריאנט נמחק בהצלחה");
-      utils.products.list.invalidate();
+      refetch();
     },
     onError: (error) => {
       toast.error(`שגיאה במחיקת הוריאנט: ${error.message}`);

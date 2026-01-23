@@ -101,6 +101,7 @@ export default function Suppliers() {
       setIsCreateDialogOpen(false);
       setCreateForm({ name: "", email: "", phone: "", companyName: "", address: "" });
       refetchSuppliers();
+      utils.suppliers.stats.refetch();
     },
     onError: (error) => {
       toast.error(error.message || "שגיאה ביצירת ספק");
@@ -111,6 +112,8 @@ export default function Suppliers() {
     onSuccess: () => {
       toast.success("ספק עודכן בהצלחה");
       refetchSuppliers();
+      utils.suppliers.getById.refetch();
+      utils.suppliers.stats.refetch();
     },
     onError: (error) => {
       toast.error(error.message || "שגיאה בעדכון ספק");

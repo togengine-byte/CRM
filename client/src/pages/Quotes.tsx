@@ -97,7 +97,7 @@ export default function Quotes() {
   const createMutation = trpc.quotes.request.useMutation({
     onSuccess: () => {
       toast.success("בקשת הצעת מחיר נשלחה בהצלחה");
-      utils.quotes.list.invalidate();
+      refetch();
       setIsCreateDialogOpen(false);
       setCreateForm({ notes: "", items: [] });
     },
@@ -109,8 +109,8 @@ export default function Quotes() {
   const updateStatusMutation = trpc.quotes.updateStatus.useMutation({
     onSuccess: () => {
       toast.success("סטטוס ההצעה עודכן");
-      utils.quotes.list.invalidate();
-      utils.quotes.getById.invalidate();
+      refetch();
+      utils.quotes.getById.refetch();
       setIsStatusDialogOpen(false);
     },
     onError: (error) => {
@@ -120,9 +120,9 @@ export default function Quotes() {
 
   const rejectMutation = trpc.quotes.reject.useMutation({
     onSuccess: () => {
-      toast.success("ההצעה נדחתה");
-      utils.quotes.list.invalidate();
-      utils.quotes.getById.invalidate();
+      toast.success("ההצעה נדחת");
+      refetch();
+      utils.quotes.getById.refetch();
       setIsStatusDialogOpen(false);
       setRejectReason("");
     },
@@ -134,8 +134,8 @@ export default function Quotes() {
   const reviseMutation = trpc.quotes.revise.useMutation({
     onSuccess: () => {
       toast.success("גרסה חדשה נוצרה");
-      utils.quotes.list.invalidate();
-      utils.quotes.getById.invalidate();
+      refetch();
+      utils.quotes.getById.refetch();
     },
     onError: (error) => {
       toast.error(`שגיאה ביצירת גרסה חדשה: ${error.message}`);
