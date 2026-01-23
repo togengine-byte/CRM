@@ -248,10 +248,6 @@ export const customerSignupRequests = pgTable("customer_signup_requests", {
 export type CustomerSignupRequest = typeof customerSignupRequests.$inferSelect;
 export type InsertCustomerSignupRequest = typeof customerSignupRequests.$inferInsert;
 
-// Create index on queueNumber for faster queries
-export const customerSignupRequestsQueueIndex = pgTable.index('idx_customer_signup_requests_queue')
-  .on(customerSignupRequests.queueNumber);
-
 // Developer logs table for debugging and monitoring
 export const developerLogs = pgTable("developer_logs", {
   id: serial("id").primaryKey(),
