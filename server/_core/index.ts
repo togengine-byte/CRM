@@ -28,7 +28,56 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
   throw new Error(`No available port found starting from ${startPort}`);
 }
 
+// Run database migrations
+async function runMigrations() {
+  if (!process.env.DATABASE_URL) {
+    console.log('[Migration] Skipping - no DATABASE_URL');
+    return;
+  }
+  
+  try {
+    const { drizzle } = await import('drizzle-orm/neon-http');
+    const { sql } = await import('drizzle-orm');
+    const db = drizzle(process.env.DATABASE_URL);
+    
+    console.log('[Migration] Running database migrations...');
+    
+    // Add fileValidationWarnings column to customer_signup_requests if not exists
+    try {
+      await db.execute(sql`
+        ALTER TABLE customer_signup_requests 
+        ADD COLUMN IF NOT EXISTS "fileValidationWarnings" jsonb
+      `);
+      console.log('[Migration] Added fileValidationWarnings to customer_signup_requests');
+    } catch (e: any) {
+      if (!e.message?.includes('already exists')) {
+        console.log('[Migration] customer_signup_requests column may already exist:', e.message);
+      }
+    }
+    
+    // Add fileValidationWarnings column to supplier_jobs if not exists
+    try {
+      await db.execute(sql`
+        ALTER TABLE supplier_jobs 
+        ADD COLUMN IF NOT EXISTS "fileValidationWarnings" jsonb
+      `);
+      console.log('[Migration] Added fileValidationWarnings to supplier_jobs');
+    } catch (e: any) {
+      if (!e.message?.includes('already exists')) {
+        console.log('[Migration] supplier_jobs column may already exist:', e.message);
+      }
+    }
+    
+    console.log('[Migration] Migrations completed successfully');
+  } catch (error) {
+    console.error('[Migration] Error running migrations:', error);
+  }
+}
+
 async function startServer() {
+  // Run migrations first
+  await runMigrations();
+  
   // Log environment variables for debugging
   console.log('[Server] Environment variables check:');
   console.log('[Server] JWT_SECRET:', process.env.JWT_SECRET ? 'SET' : 'NOT SET');

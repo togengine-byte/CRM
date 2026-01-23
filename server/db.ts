@@ -215,26 +215,51 @@ export async function getPendingSignups(limit: number = 5) {
     return [];
   }
 
-  const pending = await db.select({
-    id: customerSignupRequests.id,
-    name: customerSignupRequests.name,
-    email: customerSignupRequests.email,
-    phone: customerSignupRequests.phone,
-    companyName: customerSignupRequests.companyName,
-    description: customerSignupRequests.description,
-    productId: customerSignupRequests.productId,
-    queueNumber: customerSignupRequests.queueNumber,
-    status: customerSignupRequests.status,
-    files: customerSignupRequests.files,
-    fileValidationWarnings: customerSignupRequests.fileValidationWarnings,
-    createdAt: customerSignupRequests.createdAt,
-  })
-    .from(customerSignupRequests)
-    .where(eq(customerSignupRequests.status, "pending"))
-    .orderBy(customerSignupRequests.queueNumber)
-    .limit(limit);
+  try {
+    // Try with fileValidationWarnings column
+    const pending = await db.select({
+      id: customerSignupRequests.id,
+      name: customerSignupRequests.name,
+      email: customerSignupRequests.email,
+      phone: customerSignupRequests.phone,
+      companyName: customerSignupRequests.companyName,
+      description: customerSignupRequests.description,
+      productId: customerSignupRequests.productId,
+      queueNumber: customerSignupRequests.queueNumber,
+      status: customerSignupRequests.status,
+      files: customerSignupRequests.files,
+      fileValidationWarnings: customerSignupRequests.fileValidationWarnings,
+      createdAt: customerSignupRequests.createdAt,
+    })
+      .from(customerSignupRequests)
+      .where(eq(customerSignupRequests.status, "pending"))
+      .orderBy(customerSignupRequests.queueNumber)
+      .limit(limit);
 
-  return pending;
+    return pending;
+  } catch (error) {
+    // Fallback without fileValidationWarnings if column doesn't exist
+    console.log('[getPendingSignups] Falling back without fileValidationWarnings column');
+    const pending = await db.select({
+      id: customerSignupRequests.id,
+      name: customerSignupRequests.name,
+      email: customerSignupRequests.email,
+      phone: customerSignupRequests.phone,
+      companyName: customerSignupRequests.companyName,
+      description: customerSignupRequests.description,
+      productId: customerSignupRequests.productId,
+      queueNumber: customerSignupRequests.queueNumber,
+      status: customerSignupRequests.status,
+      files: customerSignupRequests.files,
+      createdAt: customerSignupRequests.createdAt,
+    })
+      .from(customerSignupRequests)
+      .where(eq(customerSignupRequests.status, "pending"))
+      .orderBy(customerSignupRequests.queueNumber)
+      .limit(limit);
+
+    return pending.map(p => ({ ...p, fileValidationWarnings: null }));
+  }
 }
 
 // Get pending customer approvals (existing users waiting for approval)
@@ -2554,18 +2579,48 @@ export async function createCustomerSignupRequest(data: {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  const [result] = await db.insert(customerSignupRequests).values({
-    requestId: data.requestId,
-    name: data.name,
-    email: data.email,
-    phone: data.phone,
-    companyName: data.companyName,
-    description: data.description,
-    files: data.files,
-    fileValidationWarnings: data.fileValidationWarnings || [],
-    status: 'pending',
-    productId: data.productId || null,
-  }).returning();
+  // Try to insert with fileValidationWarnings, fallback without it if column doesn't exist
+  try {
+    const [result] = await db.insert(customerSignupRequests).values({
+      requestId: data.requestId,
+      name: data.name,
+      email: data.email,
+      phone: data.phone,
+      companyName: data.companyName,
+      description: data.description,
+      files: data.files,
+      fileValidationWarnings: data.fileValidationWarnings || [],
+      status: 'pending',
+      productId: data.productId || null,
+    }).returning();
+    return result;
+  } catch (error: any) {
+    // If column doesn't exist, try without it
+    if (error.message?.includes('fileValidationWarnings') || error.code === '42703') {
+      console.log('[createCustomerSignupRequest] Falling back without fileValidationWarnings column');
+      const [result] = await db.insert(customerSignupRequests).values({
+        requestId: data.requestId,
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        companyName: data.companyName,
+        description: data.description,
+        files: data.files,
+        status: 'pending',
+        productId: data.productId || null,
+      } as any).returning();
+
+      await logActivity(null, 'customer_signup_request', {
+        requestId: data.requestId,
+        name: data.name,
+        email: data.email,
+        filesCount: data.files.length,
+      });
+
+      return result;
+    }
+    throw error;
+  }
 
   await logActivity(null, 'customer_signup_request', {
     requestId: data.requestId,
