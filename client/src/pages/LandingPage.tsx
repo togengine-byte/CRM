@@ -171,9 +171,12 @@ export default function LandingPage() {
       }
 
       toast.success("התחברת בהצלחה!");
+      // Small delay to ensure cookie is properly set before refresh
+      await new Promise(resolve => setTimeout(resolve, 100));
       // Refresh auth context to update user state, then navigate
       await refresh();
-      setLocation("/dashboard");
+      // Navigate using window.location for a full page reload to ensure cookies are sent
+      window.location.href = "/dashboard";
     } catch (err) {
       toast.error("שגיאה בהתחברות, נסה שוב");
       console.error(err);
