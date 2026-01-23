@@ -20,6 +20,8 @@ export const users = pgTable("users", {
   address: text("address"),
   // Permissions for employees - JSON object with permission flags
   permissions: jsonb("permissions").default('{}'),
+  customerNumber: integer("customerNumber"), // Auto-generated number for customers starting at 1001
+  supplierNumber: integer("supplierNumber"), // Auto-generated number for suppliers starting at 1001
   totalRatingPoints: integer("totalRatingPoints").default(0),
   ratedDealsCount: integer("ratedDealsCount").default(0),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -32,6 +34,7 @@ export const baseProducts = pgTable("base_products", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
+  productNumber: integer("productNumber"), // Auto-generated product number starting at 1001
   category: varchar("category", { length: 100 }),
   isActive: boolean("isActive").default(true),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -105,6 +108,7 @@ export const quotes = pgTable("quotes", {
   employeeId: integer("employeeId"),
   status: quoteStatusEnum("status").default("draft").notNull(),
   version: integer("version").default(1).notNull(),
+  quoteNumber: integer("quoteNumber"), // Auto-generated quote number starting at 1001
   parentQuoteId: integer("parentQuoteId"),
   finalValue: decimal("finalValue", { precision: 12, scale: 2 }),
   rejectionReason: text("rejectionReason"),

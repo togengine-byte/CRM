@@ -524,10 +524,15 @@ export async function createQuoteRequest(data: CreateQuoteRequest) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
+  // Get next quote number from sequence
+  const [seqResult] = await db.execute(sql`SELECT nextval('quote_number_seq') as next_num`);
+  const quoteNumber = Number((seqResult as any).next_num);
+
   const [result] = await db.insert(quotes).values({
     customerId: data.customerId,
     status: "draft",
     version: 1,
+    quoteNumber: quoteNumber,
   });
 
   const quoteId = result.insertId;
@@ -1352,6 +1357,10 @@ export async function createSupplier(input: {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
+  // Get next supplier number from sequence
+  const [seqResult] = await db.execute(sql`SELECT nextval('supplier_number_seq') as next_num`);
+  const supplierNumber = Number((seqResult as any).next_num);
+
   const result = await db.insert(users).values({
     openId: `supplier_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
     name: input.name,
@@ -1361,6 +1370,7 @@ export async function createSupplier(input: {
     address: input.address || null,
     role: 'supplier',
     status: 'active',
+    supplierNumber: supplierNumber,
   }).returning();
 
   await logActivity(null, "supplier_created", { name: input.name, email: input.email });

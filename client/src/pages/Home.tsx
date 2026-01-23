@@ -144,7 +144,7 @@ function PendingSignupsCard({ signups, isLoading }: { signups: any[]; isLoading:
               בקשות הצעות מחיר חדשות
             </CardTitle>
             {signups.length > 0 && (
-              <Badge variant="outline" className="text-[11px] font-normal bg-blue-50 text-blue-700 border-blue-200">
+              <Badge variant="outline" className="text-[11px] font-normal bg-blue-50 text-blue-700 border-blue-200 animate-blink-badge">
                 {signups.length} חדשות
               </Badge>
             )}

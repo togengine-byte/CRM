@@ -1,6 +1,6 @@
 import { getDb } from "./db";
 import { users, quotes, quoteItems, activityLog } from "../drizzle/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 interface CreateCustomerWithQuoteInput {
   customerInfo: {
@@ -21,6 +21,10 @@ export async function createCustomerWithQuote(input: CreateCustomerWithQuoteInpu
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
+  // Get next customer number from sequence
+  const [customerSeqResult] = await db.execute(sql`SELECT nextval('customer_number_seq') as next_num`);
+  const customerNumber = Number((customerSeqResult as any).next_num);
+
   // Create customer with pending_approval status
   const customerResult = await db
     .insert(users)
@@ -33,10 +37,15 @@ export async function createCustomerWithQuote(input: CreateCustomerWithQuoteInpu
       address: input.customerInfo.address || null,
       role: "customer",
       status: "pending_approval",
+      customerNumber: customerNumber,
     })
     .returning();
 
   const customerId = customerResult[0].id;
+
+  // Get next quote number from sequence
+  const [quoteSeqResult] = await db.execute(sql`SELECT nextval('quote_number_seq') as next_num`);
+  const quoteNumber = Number((quoteSeqResult as any).next_num);
 
   // Create quote request with pending_approval status
   const quoteResult = await db
@@ -45,6 +54,7 @@ export async function createCustomerWithQuote(input: CreateCustomerWithQuoteInpu
       customerId: customerId,
       status: "draft",
       version: 1,
+      quoteNumber: quoteNumber,
     })
     .returning();
 
@@ -66,9 +76,11 @@ export async function createCustomerWithQuote(input: CreateCustomerWithQuoteInpu
     actionType: "customer_signup_quote_request",
     details: {
       customerId,
+      customerNumber,
       customerName: input.customerInfo.name,
       customerEmail: input.customerInfo.email,
       quoteId,
+      quoteNumber,
       itemCount: input.quoteItems.length,
     },
   });
@@ -76,7 +88,9 @@ export async function createCustomerWithQuote(input: CreateCustomerWithQuoteInpu
   return {
     success: true,
     customerId,
+    customerNumber,
     quoteId,
+    quoteNumber,
     message: "בקשתך התקבלה בהצלחה! נשלח לך מייל עם פרטים נוספים",
   };
 }
