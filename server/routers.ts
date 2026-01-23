@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { desc } from "drizzle-orm";
+import { developerLogs } from "../drizzle/schema";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
@@ -12,6 +14,9 @@ import {
   getRecentActivity,
   getRecentQuotes,
   getPendingCustomers,
+  getPendingSignups,
+  getPendingApprovals,
+  getDb,
   getFilteredActivity,
   getActivityActionTypes,
   getQuotes,
@@ -566,6 +571,14 @@ export const appRouter = router({
       .query(async ({ input }) => {
         return await getPendingCustomers(input?.limit || 20);
       }),
+    getLogs: adminProcedure.query(async () => {
+      const db = await getDb();
+      if (!db) return [];
+      return await db.select()
+        .from(developerLogs)
+        .orderBy(desc(developerLogs.createdAt))
+        .limit(100);
+    }),
   }),
 
   customers: router({
