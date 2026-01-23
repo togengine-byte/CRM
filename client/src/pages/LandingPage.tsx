@@ -1,44 +1,33 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { useLocation } from "wouter";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuthContext } from "@/contexts/AuthContext";
+import { trpc } from "@/lib/trpc";
 import { 
   Loader2, 
-  User, 
-  Phone, 
-  Building2, 
-  FileText,
   CheckCircle,
-  Star,
-  Zap,
-  Shield,
   LogIn,
   Upload,
   X,
   File,
-  AlertTriangle,
+  ArrowLeft,
   Mail,
+  Phone,
+  User,
+  Building2,
+  Printer,
+  Maximize,
+  SignpostBig,
+  Shirt,
+  Flame,
   Package,
-  ChevronDown
+  ChevronLeft,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 
-
 // Allowed file types for security
-const ALLOWED_FILE_TYPES = [
-  'application/pdf',
-  'image/jpeg',
-  'image/png',
-  'image/tiff',
-  'application/postscript',
-  'application/illustrator',
-  'image/vnd.adobe.photoshop',
-];
-
 const ALLOWED_EXTENSIONS = ['.pdf', '.jpg', '.jpeg', '.png', '.tiff', '.tif', '.ai', '.eps', '.psd'];
 const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
 const MAX_FILES = 10;
@@ -50,21 +39,85 @@ interface UploadedFile {
   error?: string;
 }
 
+// Icon mapping for categories
+const categoryIcons: Record<string, any> = {
+  'Printer': Printer,
+  'Maximize': Maximize,
+  'SignpostBig': SignpostBig,
+  'Shirt': Shirt,
+  'Flame': Flame,
+};
+
+interface Category {
+  id: number;
+  name: string;
+  description: string | null;
+  icon: string | null;
+}
+
 interface Product {
   id: number;
   name: string;
-  productNumber: number;
+  description: string | null;
+  categoryId: number | null;
 }
+
+interface ProductSize {
+  id: number;
+  name: string;
+  dimensions: string | null;
+}
+
+interface SizeQuantity {
+  id: number;
+  sizeId: number;
+  quantity: number;
+  price: string;
+}
+
+interface ProductAddon {
+  id: number;
+  name: string;
+  price: string;
+  priceType: string;
+}
+
+type Step = 'category' | 'product' | 'size' | 'quantity' | 'addons' | 'details' | 'success';
 
 export default function LandingPage() {
   const [, setLocation] = useLocation();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { isAuthenticated, loading: authLoading, refresh } = useAuthContext();
   
-  // Products state
-  const [products, setProducts] = useState<Product[]>([]);
-  const [productsLoading, setProductsLoading] = useState(true);
+  // Step state
+  const [step, setStep] = useState<Step>('category');
   
+  // Selection state
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
+  const [selectedSizeId, setSelectedSizeId] = useState<number | null>(null);
+  const [selectedQuantityId, setSelectedQuantityId] = useState<number | null>(null);
+  const [selectedAddons, setSelectedAddons] = useState<number[]>([]);
+  
+  // Customer details
+  const [customerName, setCustomerName] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [customerCompany, setCustomerCompany] = useState("");
+  const [notes, setNotes] = useState("");
+  
+  // Files
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  
+  // Loading states
+  const [submitLoading, setSubmitLoading] = useState(false);
+  
+  // Login modal
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
+
   // Redirect to dashboard if already authenticated
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
@@ -72,61 +125,65 @@ export default function LandingPage() {
     }
   }, [authLoading, isAuthenticated, setLocation]);
 
-  // Fetch products on mount
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        const response = await fetch("/api/products");
-        if (response.ok) {
-          const data = await response.json();
-          setProducts(data);
-        }
-      } catch (err) {
-        console.error("Error fetching products:", err);
-      } finally {
-        setProductsLoading(false);
+  // Fetch categories
+  const { data: categories } = trpc.products.getCategories.useQuery();
+  
+  // Fetch products for selected category
+  const { data: products } = trpc.products.list.useQuery(
+    { categoryId: selectedCategoryId || undefined },
+    { enabled: !!selectedCategoryId }
+  );
+  
+  // Fetch sizes for selected product
+  const { data: sizes } = trpc.products.getSizes.useQuery(
+    { productId: selectedProductId! },
+    { enabled: !!selectedProductId }
+  );
+  
+  // Fetch quantities for selected size
+  const { data: quantities } = trpc.products.getSizeQuantities.useQuery(
+    { sizeId: selectedSizeId! },
+    { enabled: !!selectedSizeId }
+  );
+  
+  // Fetch addons for selected product
+  const { data: addons } = trpc.products.getAddons.useQuery(
+    { productId: selectedProductId! },
+    { enabled: !!selectedProductId }
+  );
+
+  // Get selected items for display
+  const selectedCategory = categories?.find(c => c.id === selectedCategoryId);
+  const selectedProduct = products?.find(p => p.id === selectedProductId);
+  const selectedSize = sizes?.find(s => s.id === selectedSizeId);
+  const selectedQuantity = quantities?.find(q => q.id === selectedQuantityId);
+  const selectedAddonItems = addons?.filter(a => selectedAddons.includes(a.id)) || [];
+
+  // Calculate total price
+  const calculateTotal = () => {
+    if (!selectedQuantity) return 0;
+    let total = parseFloat(selectedQuantity.price);
+    
+    selectedAddonItems.forEach(addon => {
+      if (addon.priceType === 'fixed') {
+        total += parseFloat(addon.price);
+      } else if (addon.priceType === 'percentage') {
+        total += (parseFloat(selectedQuantity.price) * parseFloat(addon.price) / 100);
       }
-    };
-    fetchProducts();
-  }, []);
+    });
+    
+    return total;
+  };
 
-  // Customer signup form state
-  const [customerForm, setCustomerForm] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    companyName: "",
-    description: "",
-    productId: "" as string | number,
-  });
-  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
-  const [signupLoading, setSignupLoading] = useState(false);
-  const [signupSuccess, setSignupSuccess] = useState(false);
-  const [showProductDropdown, setShowProductDropdown] = useState(false);
-
-  // File validation function
+  // File handling
   const validateFile = (file: File): string | null => {
     const extension = '.' + file.name.split('.').pop()?.toLowerCase();
     if (!ALLOWED_EXTENSIONS.includes(extension)) {
-      return `סוג קובץ לא מורשה: ${extension}. קבצים מותרים: ${ALLOWED_EXTENSIONS.join(', ')}`;
+      return `סוג קובץ לא מורשה`;
     }
-
     if (file.size > MAX_FILE_SIZE) {
-      return `הקובץ גדול מדי (${(file.size / 1024 / 1024).toFixed(1)}MB). גודל מקסימלי: 100MB`;
+      return `הקובץ גדול מדי`;
     }
-
-    if (file.name.includes('..') || file.name.includes('/') || file.name.includes('\\')) {
-      return 'שם קובץ לא תקין';
-    }
-
-    const dangerousExtensions = ['.exe', '.bat', '.cmd', '.sh', '.php', '.js', '.html', '.htm'];
-    const lowerName = file.name.toLowerCase();
-    for (const ext of dangerousExtensions) {
-      if (lowerName.includes(ext)) {
-        return 'קובץ חשוד - לא ניתן להעלות';
-      }
-    }
-
     return null;
   };
 
@@ -140,18 +197,12 @@ export default function LandingPage() {
 
     const newFiles: UploadedFile[] = files.map(file => {
       const error = validateFile(file);
-      const id = Math.random().toString(36).substr(2, 9);
-      
       return {
         file,
-        id,
+        id: Math.random().toString(36).substr(2, 9),
         error: error || undefined,
         preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined,
       };
-    });
-
-    newFiles.filter(f => f.error).forEach(f => {
-      toast.error(`${f.file.name}: ${f.error}`);
     });
 
     const validFiles = newFiles.filter(f => !f.error);
@@ -165,77 +216,109 @@ export default function LandingPage() {
   const removeFile = (id: string) => {
     setUploadedFiles(prev => {
       const file = prev.find(f => f.id === id);
-      if (file?.preview) {
-        URL.revokeObjectURL(file.preview);
-      }
+      if (file?.preview) URL.revokeObjectURL(file.preview);
       return prev.filter(f => f.id !== id);
     });
   };
 
-  // Login form state
-  const [loginEmail, setLoginEmail] = useState("");
-  const [loginPassword, setLoginPassword] = useState("");
-  const [loginLoading, setLoginLoading] = useState(false);
-  const [showLoginForm, setShowLoginForm] = useState(false);
+  // Navigation
+  const handleCategorySelect = (categoryId: number) => {
+    setSelectedCategoryId(categoryId);
+    setSelectedProductId(null);
+    setSelectedSizeId(null);
+    setSelectedQuantityId(null);
+    setSelectedAddons([]);
+    setStep('product');
+  };
 
-  // Handle login
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoginLoading(true);
+  const handleProductSelect = (productId: number) => {
+    setSelectedProductId(productId);
+    setSelectedSizeId(null);
+    setSelectedQuantityId(null);
+    setSelectedAddons([]);
+    setStep('size');
+  };
 
-    try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({
-          email: loginEmail,
-          password: loginPassword,
-        }),
-      });
+  const handleSizeSelect = (sizeId: number) => {
+    setSelectedSizeId(sizeId);
+    setSelectedQuantityId(null);
+    setStep('quantity');
+  };
 
-      if (!response.ok) {
-        const data = await response.json();
-        toast.error(data.error || "התחברות נכשלה");
-        return;
-      }
-
-      toast.success("התחברת בהצלחה!");
-      // Small delay to ensure cookie is properly set before refresh
-      await new Promise(resolve => setTimeout(resolve, 100));
-      // Refresh auth context to update user state, then navigate
-      await refresh();
-      // Navigate using window.location for a full page reload to ensure cookies are sent
-      window.location.href = "/dashboard";
-    } catch (err) {
-      toast.error("שגיאה בהתחברות, נסה שוב");
-      console.error(err);
-    } finally {
-      setLoginLoading(false);
+  const handleQuantitySelect = (quantityId: number) => {
+    setSelectedQuantityId(quantityId);
+    // Check if there are addons
+    if (addons && addons.length > 0) {
+      setStep('addons');
+    } else {
+      setStep('details');
     }
   };
 
-  const handleGoToDashboard = () => {
-    setShowLoginForm(true);
+  const handleAddonToggle = (addonId: number) => {
+    setSelectedAddons(prev =>
+      prev.includes(addonId)
+        ? prev.filter(id => id !== addonId)
+        : [...prev, addonId]
+    );
   };
 
-  const handleCustomerSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSignupLoading(true);
+  const handleBack = () => {
+    switch (step) {
+      case 'product':
+        setStep('category');
+        break;
+      case 'size':
+        setStep('product');
+        break;
+      case 'quantity':
+        setStep('size');
+        break;
+      case 'addons':
+        setStep('quantity');
+        break;
+      case 'details':
+        if (addons && addons.length > 0) {
+          setStep('addons');
+        } else {
+          setStep('quantity');
+        }
+        break;
+    }
+  };
+
+  // Submit
+  const handleSubmit = async () => {
+    if (!customerName || !customerPhone) {
+      toast.error("נא למלא שם וטלפון");
+      return;
+    }
+
+    setSubmitLoading(true);
 
     try {
       const formData = new FormData();
-      formData.append('name', customerForm.name);
-      formData.append('email', customerForm.email);
-      formData.append('phone', customerForm.phone);
-      formData.append('companyName', customerForm.companyName);
-      formData.append('description', customerForm.description);
-      if (customerForm.productId && customerForm.productId !== 'other') {
-        formData.append('productId', String(customerForm.productId));
+      formData.append('name', customerName);
+      formData.append('email', customerEmail);
+      formData.append('phone', customerPhone);
+      formData.append('companyName', customerCompany);
+      formData.append('description', notes);
+      
+      // Add product selection info
+      if (selectedProductId) {
+        formData.append('productId', String(selectedProductId));
+      }
+      if (selectedSizeId) {
+        formData.append('sizeId', String(selectedSizeId));
+      }
+      if (selectedQuantityId) {
+        formData.append('quantityId', String(selectedQuantityId));
+      }
+      if (selectedAddons.length > 0) {
+        formData.append('addons', JSON.stringify(selectedAddons));
       }
       
+      // Add files
       uploadedFiles.forEach((uploadedFile) => {
         formData.append(`files`, uploadedFile.file);
       });
@@ -251,441 +334,529 @@ export default function LandingPage() {
         return;
       }
 
-      setSignupSuccess(true);
-      toast.success("הבקשה נשלחה בהצלחה! ניצור איתך קשר בהקדם.");
+      setStep('success');
+      toast.success("הבקשה נשלחה בהצלחה!");
     } catch (err) {
-      toast.error("שגיאה בשליחת הבקשה, נסה שוב");
+      toast.error("שגיאה בשליחת הבקשה");
       console.error(err);
     } finally {
-      setSignupLoading(false);
+      setSubmitLoading(false);
     }
   };
 
-  const features = [
-    { icon: Zap, title: "מהיר ויעיל", description: "קבלו הצעת מחיר תוך דקות" },
-    { icon: Shield, title: "אמינות מלאה", description: "ספקים מאומתים ואיכותיים" },
-    { icon: Star, title: "מחירים תחרותיים", description: "השוואת מחירים אוטומטית" },
-  ];
+  // Login
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginLoading(true);
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email: loginEmail, password: loginPassword }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        toast.error(data.error || "התחברות נכשלה");
+        return;
+      }
+
+      toast.success("התחברת בהצלחה!");
+      await refresh();
+      window.location.href = "/dashboard";
+    } catch (err) {
+      toast.error("שגיאה בהתחברות");
+    } finally {
+      setLoginLoading(false);
+    }
   };
 
-  const getSelectedProductName = () => {
-    if (!customerForm.productId) return "";
-    if (customerForm.productId === 'other') return "אחר - אין את המוצר ברשימה";
-    const product = products.find(p => p.id === Number(customerForm.productId));
-    return product ? product.name : "";
+  // Reset
+  const handleReset = () => {
+    setStep('category');
+    setSelectedCategoryId(null);
+    setSelectedProductId(null);
+    setSelectedSizeId(null);
+    setSelectedQuantityId(null);
+    setSelectedAddons([]);
+    setCustomerName("");
+    setCustomerEmail("");
+    setCustomerPhone("");
+    setCustomerCompany("");
+    setNotes("");
+    setUploadedFiles([]);
   };
 
-  if (signupSuccess) {
+  // Get icon for category
+  const getCategoryIcon = (iconName: string | null) => {
+    if (!iconName) return Package;
+    return categoryIcons[iconName] || Package;
+  };
+
+  // Render success screen
+  if (step === 'success') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center p-4" dir="rtl">
-        <Card className="w-full max-w-md text-center shadow-2xl border-0 bg-white/90 backdrop-blur-sm">
-          <CardContent className="pt-12 pb-8 space-y-6">
-            <div className="mx-auto w-20 h-20 bg-green-100 rounded-full flex items-center justify-center">
-              <CheckCircle className="h-10 w-10 text-green-600" />
-            </div>
-            <div className="space-y-2">
-              <h2 className="text-2xl font-bold text-gray-900">הבקשה נשלחה בהצלחה!</h2>
-              <p className="text-gray-600">
-                קיבלנו את פרטיך ונציג שלנו ייצור איתך קשר בהקדם עם הצעת מחיר מותאמת אישית.
-              </p>
-              {uploadedFiles.length > 0 && (
-                <p className="text-sm text-gray-500">
-                  {uploadedFiles.length} קבצים הועלו בהצלחה ויעברו בדיקה
-                </p>
-              )}
-            </div>
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                setSignupSuccess(false);
-                setCustomerForm({ name: "", email: "", phone: "", companyName: "", description: "", productId: "" });
-                setUploadedFiles([]);
-              }}
-              className="mt-4"
-            >
-              שליחת בקשה נוספת
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4" dir="rtl">
+        <div className="text-center max-w-md">
+          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <CheckCircle className="h-10 w-10 text-green-600" />
+          </div>
+          <h1 className="text-3xl font-bold text-slate-900 mb-3">הבקשה נשלחה!</h1>
+          <p className="text-slate-600 mb-8">
+            קיבלנו את הבקשה שלך ונחזור אליך בהקדם עם הצעת מחיר מותאמת.
+          </p>
+          <Button onClick={handleReset} variant="outline" className="gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            בקשה חדשה
+          </Button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50" dir="rtl">
-      {/* Background decoration */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-200 rounded-full mix-blend-multiply filter blur-xl opacity-70" />
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-200 rounded-full mix-blend-multiply filter blur-xl opacity-70" />
-        <div className="absolute top-1/2 left-1/2 w-80 h-80 bg-pink-200 rounded-full mix-blend-multiply filter blur-xl opacity-50" />
-      </div>
-
-      {/* Header with login button */}
-      <header className="relative z-20 flex items-center justify-between p-4 md:p-6">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-            <span className="text-lg font-bold text-white">QF</span>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100" dir="rtl">
+      {/* Header */}
+      <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200">
+        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center">
+              <span className="text-sm font-bold text-white">QF</span>
+            </div>
+            <span className="text-lg font-bold text-slate-800">QuoteFlow</span>
           </div>
-          <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-            QuoteFlow
-          </span>
+          
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="text-slate-600"
+            onClick={() => setShowLoginModal(true)}
+          >
+            <LogIn className="ml-2 h-4 w-4" />
+            התחברות
+          </Button>
         </div>
-        
-        {/* Login button - navigates directly to dashboard */}
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          className="text-gray-600 hover:text-gray-900"
-          onClick={handleGoToDashboard}
-        >
-          <LogIn className="ml-2 h-4 w-4" />
-          כניסה למשתמשים קיימים
-        </Button>
       </header>
 
-      {/* Main content */}
-      <main className="relative z-10 container mx-auto px-4 py-8 md:py-12">
-        <div className="grid lg:grid-cols-2 gap-12 items-start">
+      {/* Main Content */}
+      <main className="pt-24 pb-32 px-4">
+        <div className="container mx-auto max-w-4xl">
           
-          {/* Left side - Hero text */}
-          <div className="space-y-8 text-center lg:text-right lg:sticky lg:top-8">
-            <div className="space-y-4">
-              <h1 className="text-4xl md:text-5xl font-bold text-gray-900 leading-tight">
-                קבלו הצעות מחיר
-                <span className="block text-transparent bg-clip-text bg-gradient-to-l from-blue-600 to-indigo-600">
-                  בקליק אחד
-                </span>
-              </h1>
-              <p className="text-xl text-gray-600 max-w-lg mx-auto lg:mx-0">
-                מערכת חכמה להשוואת מחירים מספקי דפוס מובילים. חסכו זמן וכסף עם QuoteFlow.
-              </p>
+          {/* Progress indicator */}
+          {step !== 'category' && (
+            <div className="mb-8">
+              <button 
+                onClick={handleBack}
+                className="flex items-center gap-2 text-slate-500 hover:text-slate-700 transition-colors mb-4"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                חזרה
+              </button>
+              
+              {/* Selection summary */}
+              <div className="flex flex-wrap gap-2 text-sm">
+                {selectedCategory && (
+                  <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full">
+                    {selectedCategory.name}
+                  </span>
+                )}
+                {selectedProduct && (
+                  <span className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full">
+                    {selectedProduct.name}
+                  </span>
+                )}
+                {selectedSize && (
+                  <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full">
+                    {selectedSize.name}
+                  </span>
+                )}
+                {selectedQuantity && (
+                  <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full">
+                    {selectedQuantity.quantity} יח'
+                  </span>
+                )}
+              </div>
             </div>
+          )}
 
-            {/* Features */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {features.map((feature, index) => (
-                <div
-                  key={index}
-                  className="p-4 rounded-xl bg-white/60 backdrop-blur-sm border border-white/20 shadow-lg"
-                >
-                  <feature.icon className="h-8 w-8 text-blue-600 mb-2 mx-auto lg:mx-0" />
-                  <h3 className="font-semibold text-gray-900">{feature.title}</h3>
-                  <p className="text-sm text-gray-600">{feature.description}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Right side - Signup form */}
-          <Card className="shadow-2xl border-0 bg-white/90 backdrop-blur-sm">
-            <CardHeader className="text-center pb-2">
-              <CardTitle className="text-2xl">בקשת הצעת מחיר</CardTitle>
-              <CardDescription>
-                מלאו את הפרטים ונחזור אליכם עם הצעה מותאמת
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleCustomerSignup} className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">שם מלא *</Label>
-                    <div className="relative">
-                      <User className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <Input
-                        id="name"
-                        placeholder="ישראל ישראלי"
-                        value={customerForm.name}
-                        onChange={(e) => setCustomerForm({ ...customerForm, name: e.target.value })}
-                        className="pr-10"
-                        required
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">אימייל *</Label>
-                    <div className="relative">
-                      <Mail className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <Input
-                        id="email"
-                        type="email"
-                        placeholder="email@example.com"
-                        value={customerForm.email}
-                        onChange={(e) => setCustomerForm({ ...customerForm, email: e.target.value })}
-                        className="pr-10"
-                        required
-                        dir="ltr"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">טלפון *</Label>
-                    <div className="relative">
-                      <Phone className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <Input
-                        id="phone"
-                        type="tel"
-                        placeholder="050-1234567"
-                        value={customerForm.phone}
-                        onChange={(e) => setCustomerForm({ ...customerForm, phone: e.target.value })}
-                        className="pr-10"
-                        required
-                        dir="ltr"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="company">שם החברה</Label>
-                    <div className="relative">
-                      <Building2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <Input
-                        id="company"
-                        placeholder="שם החברה (אופציונלי)"
-                        value={customerForm.companyName}
-                        onChange={(e) => setCustomerForm({ ...customerForm, companyName: e.target.value })}
-                        className="pr-10"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Product Selection */}
-                <div className="space-y-2">
-                  <Label htmlFor="product">סוג המוצר *</Label>
-                  <div className="relative">
-                    <Package className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 z-10" />
-                    <div 
-                      className="w-full pr-10 pl-10 py-2 border rounded-md cursor-pointer bg-white hover:bg-gray-50 flex items-center justify-between"
-                      onClick={() => setShowProductDropdown(!showProductDropdown)}
+          {/* Step: Category */}
+          {step === 'category' && (
+            <div className="space-y-8">
+              <div className="text-center">
+                <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-3">
+                  מה תרצו להדפיס?
+                </h1>
+                <p className="text-slate-500 text-lg">בחרו תחום ונבנה יחד את ההזמנה</p>
+              </div>
+              
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                {categories?.map((category) => {
+                  const IconComponent = getCategoryIcon(category.icon);
+                  return (
+                    <button
+                      key={category.id}
+                      onClick={() => handleCategorySelect(category.id)}
+                      className="group p-6 rounded-2xl bg-white border-2 border-slate-200 hover:border-blue-400 hover:shadow-lg transition-all duration-200"
                     >
-                      <span className={customerForm.productId ? "text-gray-900" : "text-gray-400"}>
-                        {getSelectedProductName() || "בחר מוצר מהרשימה"}
-                      </span>
-                      <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${showProductDropdown ? 'rotate-180' : ''}`} />
-                    </div>
-                    
-                    {/* Dropdown */}
-                    {showProductDropdown && (
-                      <div className="absolute z-20 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-auto">
-                        {productsLoading ? (
-                          <div className="p-3 text-center text-gray-500">
-                            <Loader2 className="h-4 w-4 animate-spin mx-auto" />
-                          </div>
-                        ) : (
-                          <>
-                            {products.map((product) => (
-                              <div
-                                key={product.id}
-                                className={`p-3 cursor-pointer hover:bg-blue-50 flex items-center gap-2 ${
-                                  customerForm.productId === product.id ? 'bg-blue-100' : ''
-                                }`}
-                                onClick={() => {
-                                  setCustomerForm({ ...customerForm, productId: product.id });
-                                  setShowProductDropdown(false);
-                                }}
-                              >
-                                <Package className="h-4 w-4 text-blue-600" />
-                                <span>{product.name}</span>
-                                <span className="text-xs text-gray-400 mr-auto">#{product.productNumber}</span>
-                              </div>
-                            ))}
-                            <div
-                              className={`p-3 cursor-pointer hover:bg-orange-50 flex items-center gap-2 border-t ${
-                                customerForm.productId === 'other' ? 'bg-orange-100' : ''
-                              }`}
-                              onClick={() => {
-                                setCustomerForm({ ...customerForm, productId: 'other' });
-                                setShowProductDropdown(false);
-                              }}
-                            >
-                              <AlertTriangle className="h-4 w-4 text-orange-500" />
-                              <span className="text-orange-700">אין את המוצר הזה ברשימה</span>
-                            </div>
-                          </>
+                      <div className="w-14 h-14 rounded-xl bg-slate-100 group-hover:bg-blue-100 flex items-center justify-center mx-auto mb-4 transition-colors">
+                        <IconComponent className="h-7 w-7 text-slate-500 group-hover:text-blue-600 transition-colors" />
+                      </div>
+                      <h3 className="font-semibold text-slate-700 group-hover:text-blue-600 transition-colors">
+                        {category.name}
+                      </h3>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Step: Product */}
+          {step === 'product' && (
+            <div className="space-y-6">
+              <div className="text-center">
+                <h2 className="text-2xl font-bold text-slate-900 mb-2">בחרו מוצר</h2>
+                <p className="text-slate-500">מוצרים בתחום {selectedCategory?.name}</p>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {products?.map((product) => (
+                  <button
+                    key={product.id}
+                    onClick={() => handleProductSelect(product.id)}
+                    className="group p-5 rounded-xl bg-white border-2 border-slate-200 hover:border-blue-400 hover:shadow-md transition-all text-right"
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 rounded-lg bg-slate-100 group-hover:bg-blue-100 flex items-center justify-center shrink-0 transition-colors">
+                        <Package className="h-6 w-6 text-slate-400 group-hover:text-blue-600 transition-colors" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-slate-800 group-hover:text-blue-600 transition-colors">
+                          {product.name}
+                        </h3>
+                        {product.description && (
+                          <p className="text-sm text-slate-500 mt-1 line-clamp-2">
+                            {product.description}
+                          </p>
                         )}
                       </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Step: Size */}
+          {step === 'size' && (
+            <div className="space-y-6">
+              <div className="text-center">
+                <h2 className="text-2xl font-bold text-slate-900 mb-2">בחרו גודל</h2>
+                <p className="text-slate-500">גדלים זמינים ל{selectedProduct?.name}</p>
+              </div>
+              
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {sizes?.map((size) => (
+                  <button
+                    key={size.id}
+                    onClick={() => handleSizeSelect(size.id)}
+                    className="group p-5 rounded-xl bg-white border-2 border-slate-200 hover:border-blue-400 hover:shadow-md transition-all text-center"
+                  >
+                    <h3 className="font-bold text-lg text-slate-800 group-hover:text-blue-600 transition-colors">
+                      {size.name}
+                    </h3>
+                    {size.dimensions && (
+                      <p className="text-sm text-slate-400 mt-1">{size.dimensions}</p>
                     )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Step: Quantity */}
+          {step === 'quantity' && (
+            <div className="space-y-6">
+              <div className="text-center">
+                <h2 className="text-2xl font-bold text-slate-900 mb-2">בחרו כמות</h2>
+                <p className="text-slate-500">כמויות ומחירים ל{selectedSize?.name}</p>
+              </div>
+              
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {quantities?.map((qty) => (
+                  <button
+                    key={qty.id}
+                    onClick={() => handleQuantitySelect(qty.id)}
+                    className="group p-5 rounded-xl bg-white border-2 border-slate-200 hover:border-blue-400 hover:shadow-md transition-all text-center"
+                  >
+                    <div className="text-2xl font-bold text-slate-800 group-hover:text-blue-600 transition-colors">
+                      {qty.quantity}
+                    </div>
+                    <div className="text-sm text-slate-500">יחידות</div>
+                    <div className="mt-3 text-xl font-bold text-green-600">
+                      ₪{parseFloat(qty.price).toLocaleString()}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Step: Addons */}
+          {step === 'addons' && (
+            <div className="space-y-6">
+              <div className="text-center">
+                <h2 className="text-2xl font-bold text-slate-900 mb-2">תוספות</h2>
+                <p className="text-slate-500">בחרו תוספות לשדרוג ההזמנה (אופציונלי)</p>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
+                {addons?.filter(a => a.isActive !== false).map((addon) => {
+                  const isSelected = selectedAddons.includes(addon.id);
+                  return (
+                    <button
+                      key={addon.id}
+                      onClick={() => handleAddonToggle(addon.id)}
+                      className={`p-4 rounded-xl border-2 transition-all text-right flex items-center justify-between ${
+                        isSelected 
+                          ? 'border-blue-500 bg-blue-50' 
+                          : 'border-slate-200 bg-white hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                          isSelected ? 'bg-blue-100' : 'bg-slate-100'
+                        }`}>
+                          <Sparkles className={`h-5 w-5 ${isSelected ? 'text-blue-600' : 'text-slate-400'}`} />
+                        </div>
+                        <div>
+                          <h3 className={`font-medium ${isSelected ? 'text-blue-700' : 'text-slate-700'}`}>
+                            {addon.name}
+                          </h3>
+                          <p className="text-sm text-slate-500">
+                            {addon.priceType === 'percentage' 
+                              ? `+${addon.price}%` 
+                              : `+₪${parseFloat(addon.price).toLocaleString()}`
+                            }
+                          </p>
+                        </div>
+                      </div>
+                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+                        isSelected ? 'border-blue-500 bg-blue-500' : 'border-slate-300'
+                      }`}>
+                        {isSelected && <CheckCircle className="h-4 w-4 text-white" />}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              
+              <div className="text-center pt-4">
+                <Button 
+                  onClick={() => setStep('details')}
+                  size="lg"
+                  className="px-8"
+                >
+                  המשך
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Step: Details */}
+          {step === 'details' && (
+            <div className="space-y-8 max-w-xl mx-auto">
+              <div className="text-center">
+                <h2 className="text-2xl font-bold text-slate-900 mb-2">פרטים אחרונים</h2>
+                <p className="text-slate-500">איך ניצור איתך קשר?</p>
+              </div>
+
+              {/* Order summary */}
+              <div className="bg-white rounded-2xl p-6 border border-slate-200">
+                <h3 className="font-semibold text-slate-700 mb-4">סיכום ההזמנה</h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">מוצר:</span>
+                    <span className="font-medium">{selectedProduct?.name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">גודל:</span>
+                    <span className="font-medium">{selectedSize?.name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">כמות:</span>
+                    <span className="font-medium">{selectedQuantity?.quantity} יח'</span>
+                  </div>
+                  {selectedAddonItems.length > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">תוספות:</span>
+                      <span className="font-medium">{selectedAddonItems.map(a => a.name).join(', ')}</span>
+                    </div>
+                  )}
+                  <div className="border-t border-slate-200 pt-2 mt-2">
+                    <div className="flex justify-between text-lg">
+                      <span className="font-semibold">סה"כ:</span>
+                      <span className="font-bold text-green-600">₪{calculateTotal().toLocaleString()}</span>
+                    </div>
                   </div>
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="description">תיאור הפרויקט *</Label>
+              </div>
+              
+              {/* Contact form */}
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
                   <div className="relative">
-                    <FileText className="absolute right-3 top-3 h-4 w-4 text-gray-400" />
-                    <Textarea
-                      id="description"
-                      placeholder="תארו את הפרויקט שלכם: כמות, מידות, צבעים וכו'..."
-                      value={customerForm.description}
-                      onChange={(e) => setCustomerForm({ ...customerForm, description: e.target.value })}
-                      className="pr-10 min-h-[100px]"
+                    <User className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <Input
+                      placeholder="שם מלא *"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      className="pr-10 h-12 bg-white"
+                      required
+                    />
+                  </div>
+                  <div className="relative">
+                    <Phone className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <Input
+                      placeholder="טלפון *"
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      className="pr-10 h-12 bg-white"
+                      dir="ltr"
                       required
                     />
                   </div>
                 </div>
-
-                {/* File upload section */}
-                <div className="space-y-2">
-                  <Label>קבצים (אופציונלי)</Label>
-                  <div className="border-2 border-dashed border-gray-200 rounded-lg p-4 text-center hover:border-blue-400 transition-colors">
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      multiple
-                      accept={ALLOWED_EXTENSIONS.join(',')}
-                      onChange={handleFileSelect}
-                      className="hidden"
-                      id="file-upload"
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="relative">
+                    <Mail className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <Input
+                      placeholder="אימייל"
+                      type="email"
+                      value={customerEmail}
+                      onChange={(e) => setCustomerEmail(e.target.value)}
+                      className="pr-10 h-12 bg-white"
+                      dir="ltr"
                     />
-                    <label htmlFor="file-upload" className="cursor-pointer">
-                      <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                      <p className="text-sm text-gray-600">
-                        לחצו להעלאת קבצים או גררו לכאן
-                      </p>
-                      <p className="text-xs text-gray-400 mt-1">
-                        PDF, JPG, PNG, TIFF, AI, EPS, PSD (עד 100MB לקובץ)
-                      </p>
-                    </label>
                   </div>
-
-                  {/* Uploaded files list */}
+                  <div className="relative">
+                    <Building2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <Input
+                      placeholder="שם החברה"
+                      value={customerCompany}
+                      onChange={(e) => setCustomerCompany(e.target.value)}
+                      className="pr-10 h-12 bg-white"
+                    />
+                  </div>
+                </div>
+                
+                <textarea
+                  placeholder="הערות נוספות..."
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="w-full h-24 px-4 py-3 rounded-lg border border-slate-200 bg-white resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                
+                {/* File upload */}
+                <div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept={ALLOWED_EXTENSIONS.join(',')}
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    id="file-upload"
+                  />
+                  <label 
+                    htmlFor="file-upload" 
+                    className="flex items-center justify-center gap-2 p-4 border-2 border-dashed border-slate-200 rounded-xl cursor-pointer hover:border-blue-400 transition-colors"
+                  >
+                    <Upload className="h-5 w-5 text-slate-400" />
+                    <span className="text-slate-500">העלאת קבצים (אופציונלי)</span>
+                  </label>
+                  
                   {uploadedFiles.length > 0 && (
-                    <div className="space-y-2 mt-3">
-                      {uploadedFiles.map((uploadedFile) => (
-                        <div
-                          key={uploadedFile.id}
-                          className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg"
-                        >
-                          {uploadedFile.preview ? (
-                            <img
-                              src={uploadedFile.preview}
-                              alt={uploadedFile.file.name}
-                              className="w-10 h-10 object-cover rounded"
-                            />
+                    <div className="mt-3 space-y-2">
+                      {uploadedFiles.map((f) => (
+                        <div key={f.id} className="flex items-center gap-3 p-2 bg-slate-50 rounded-lg">
+                          {f.preview ? (
+                            <img src={f.preview} alt="" className="w-10 h-10 object-cover rounded" />
                           ) : (
-                            <File className="w-10 h-10 text-gray-400 p-2 bg-gray-100 rounded" />
+                            <File className="w-10 h-10 text-slate-400 p-2" />
                           )}
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">{uploadedFile.file.name}</p>
-                            <p className="text-xs text-gray-500">{formatFileSize(uploadedFile.file.size)}</p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => removeFile(uploadedFile.id)}
-                            className="p-1 hover:bg-gray-200 rounded"
-                          >
-                            <X className="h-4 w-4 text-gray-500" />
+                          <span className="flex-1 text-sm truncate">{f.file.name}</span>
+                          <button onClick={() => removeFile(f.id)} className="p-1 hover:bg-slate-200 rounded">
+                            <X className="h-4 w-4 text-slate-500" />
                           </button>
                         </div>
                       ))}
                     </div>
                   )}
                 </div>
-
-                <Button
-                  type="submit"
-                  className="w-full h-12 text-lg bg-gradient-to-l from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
-                  disabled={signupLoading || !customerForm.productId}
-                >
-                  {signupLoading ? (
-                    <>
-                      <Loader2 className="ml-2 h-5 w-5 animate-spin" />
-                      שולח...
-                    </>
-                  ) : (
-                    <>
-                      שליחת בקשה
-                      <CheckCircle className="mr-2 h-5 w-5" />
-                    </>
-                  )}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
+              </div>
+              
+              <Button 
+                onClick={handleSubmit}
+                disabled={submitLoading || !customerName || !customerPhone}
+                size="lg"
+                className="w-full h-14 text-lg bg-gradient-to-l from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+              >
+                {submitLoading ? (
+                  <>
+                    <Loader2 className="ml-2 h-5 w-5 animate-spin" />
+                    שולח...
+                  </>
+                ) : (
+                  <>
+                    שליחת בקשה
+                    <CheckCircle className="mr-2 h-5 w-5" />
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
         </div>
       </main>
 
-      {/* Footer */}
-      <footer className="relative z-10 text-center py-8 text-gray-500 text-sm">
-        <p>© 2024 QuoteFlow. כל הזכויות שמורות.</p>
-      </footer>
-
-
-
       {/* Login Modal */}
-      {showLoginForm && (
+      {showLoginModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" dir="rtl">
-          <Card className="w-full max-w-md shadow-2xl border-0 bg-white/95 backdrop-blur-sm">
-            <CardHeader className="text-center pb-2">
-              <CardTitle className="text-2xl">התחברות למערכת</CardTitle>
-              <CardDescription>הכנס את פרטיך כדי להתחבר</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleLogin} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="login-email">אימייל</Label>
-                  <div className="relative">
-                    <Mail className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <Input
-                      id="login-email"
-                      type="email"
-                      placeholder="your@email.com"
-                      value={loginEmail}
-                      onChange={(e) => setLoginEmail(e.target.value)}
-                      className="pr-10"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="login-password">סיסמה</Label>
-                  <div className="relative">
-                    <Input
-                      id="login-password"
-                      type="password"
-                      placeholder="••••••••"
-                      value={loginPassword}
-                      onChange={(e) => setLoginPassword(e.target.value)}
-                      className="pr-10"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="flex gap-2 pt-4">
-                  <Button
-                    type="submit"
-                    disabled={loginLoading}
-                    className="flex-1"
-                  >
-                    {loginLoading ? (
-                      <>
-                        <Loader2 className="ml-2 h-4 w-4 animate-spin" />
-                        מתחבר...
-                      </>
-                    ) : (
-                      "התחברות"
-                    )}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setShowLoginForm(false)}
-                    className="flex-1"
-                  >
-                    ביטול
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+            <h2 className="text-xl font-bold text-slate-900 mb-4 text-center">התחברות</h2>
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="relative">
+                <Mail className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input
+                  type="email"
+                  placeholder="אימייל"
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  className="pr-10"
+                  required
+                />
+              </div>
+              <Input
+                type="password"
+                placeholder="סיסמה"
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                required
+              />
+              <div className="flex gap-2">
+                <Button type="submit" disabled={loginLoading} className="flex-1">
+                  {loginLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "התחברות"}
+                </Button>
+                <Button type="button" variant="outline" onClick={() => setShowLoginModal(false)} className="flex-1">
+                  ביטול
+                </Button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>
