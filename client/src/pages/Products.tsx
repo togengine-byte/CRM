@@ -44,7 +44,6 @@ import {
   Shirt,
   Flame,
   Ruler,
-  Hash,
   Sparkles,
   DollarSign,
 } from "lucide-react";
@@ -347,7 +346,7 @@ export default function Products() {
     }
   };
 
-  // Toggle size expansion
+  // Toggle size expansion (for quantities)
   const toggleSize = (sizeId: number) => {
     if (expandedSizeId === sizeId) {
       setExpandedSizeId(null);
@@ -402,14 +401,14 @@ export default function Products() {
         id: selectedItemId,
         name: sizeForm.name,
         dimensions: sizeForm.dimensions || undefined,
-        basePrice: 0, // Not used anymore
+        basePrice: 0,
       });
     } else if (selectedProductId) {
       createSizeMutation.mutate({
         productId: selectedProductId,
         name: sizeForm.name,
         dimensions: sizeForm.dimensions || undefined,
-        basePrice: 0, // Not used anymore
+        basePrice: 0,
       });
     }
   };
@@ -527,13 +526,38 @@ export default function Products() {
     setIsAddonDialogOpen(true);
   };
 
+  // Handle delete with confirmation
+  const handleDeleteProduct = (productId: number) => {
+    if (window.confirm("האם אתה בטוח שברצונך למחוק את המוצר?")) {
+      deleteProductMutation.mutate({ id: productId });
+    }
+  };
+
+  const handleDeleteSize = (sizeId: number) => {
+    if (window.confirm("האם אתה בטוח שברצונך למחוק את הגודל?")) {
+      deleteSizeMutation.mutate({ id: sizeId });
+    }
+  };
+
+  const handleDeleteQuantity = (quantityId: number) => {
+    if (window.confirm("האם אתה בטוח שברצונך למחוק את הכמות?")) {
+      deleteQuantityMutation.mutate({ id: quantityId });
+    }
+  };
+
+  const handleDeleteAddon = (addonId: number) => {
+    if (window.confirm("האם אתה בטוח שברצונך למחוק את התוספת?")) {
+      deleteAddonMutation.mutate({ id: addonId });
+    }
+  };
+
   return (
     <div className="space-y-6 p-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">מוצרים</h1>
-          <p className="text-slate-500 text-sm mt-1">ניהול קטלוג המוצרים - לחץ על מוצר להרחבת גדלים, לחץ על גודל להצגת כמויות ומחירים</p>
+          <p className="text-slate-500 text-sm mt-1">ניהול קטלוג המוצרים</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => refetch()}>
@@ -597,7 +621,7 @@ export default function Products() {
             <Package className="h-12 w-12 mx-auto text-slate-300 mb-4" />
             <p className="text-slate-500">אין מוצרים בקטגוריה זו</p>
             <Button 
-              variant="outline" 
+              variant="outline"
               className="mt-4"
               onClick={() => {
                 resetProductForm();
@@ -611,15 +635,15 @@ export default function Products() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {filteredProducts.map((product: Product) => {
             const isExpanded = expandedProductId === product.id;
             return (
               <Card key={product.id} className="overflow-hidden">
-                {/* Product Header - Level 1 */}
+                {/* Product Header */}
                 <div 
                   className={`flex items-center justify-between p-4 cursor-pointer transition-colors ${
-                    isExpanded ? 'bg-blue-50' : 'hover:bg-slate-50'
+                    isExpanded ? 'bg-blue-50 border-b border-blue-100' : 'hover:bg-slate-50'
                   }`}
                   onClick={() => toggleProduct(product.id)}
                 >
@@ -657,9 +681,7 @@ export default function Products() {
                           className="text-red-600"
                           onClick={(e) => { 
                             e.stopPropagation(); 
-                            if (confirm("האם למחוק את המוצר?")) {
-                              deleteProductMutation.mutate({ id: product.id });
-                            }
+                            handleDeleteProduct(product.id);
                           }}
                         >
                           <Trash2 className="h-4 w-4 ml-2" />
@@ -675,198 +697,188 @@ export default function Products() {
                   </div>
                 </div>
 
-                {/* Expanded: Sizes - Level 2 */}
+                {/* Expanded Content - Sizes displayed flat */}
                 {isExpanded && (
-                  <div className="border-t border-slate-200 bg-slate-50">
-                    {/* Sizes Header */}
-                    <div className="flex items-center justify-between px-4 py-3 bg-slate-100">
-                      <div className="flex items-center gap-2 text-sm font-medium text-slate-600">
-                        <Ruler className="h-4 w-4" />
-                        גדלים
+                  <div className="bg-slate-50">
+                    {/* Sizes Section */}
+                    <div className="p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                          <Ruler className="h-4 w-4" />
+                          גדלים
+                        </div>
+                        <Button size="sm" variant="outline" onClick={() => openAddSize(product.id)} className="gap-1 h-8">
+                          <Plus className="h-3 w-3" />
+                          גודל חדש
+                        </Button>
                       </div>
-                      <Button size="sm" variant="outline" onClick={() => openAddSize(product.id)} className="gap-1">
-                        <Plus className="h-3 w-3" />
-                        גודל חדש
-                      </Button>
-                    </div>
 
-                    {/* Sizes List */}
-                    <div className="divide-y divide-slate-200">
+                      {/* Sizes Grid - Displayed flat */}
                       {!sizesData || sizesData.length === 0 ? (
-                        <div className="p-4 text-center text-slate-400 text-sm">
+                        <div className="text-center text-slate-400 text-sm py-4 bg-white rounded-lg border border-dashed">
                           אין גדלים למוצר זה. לחץ על "גודל חדש" להוספה.
                         </div>
                       ) : (
-                        sizesData.map((size: any) => {
-                          const isSizeExpanded = expandedSizeId === size.id;
-                          return (
-                            <div key={size.id}>
-                              {/* Size Row */}
-                              <div
-                                className={`flex items-center justify-between px-4 py-3 cursor-pointer transition-colors ${
-                                  isSizeExpanded ? 'bg-blue-50' : 'hover:bg-white'
-                                }`}
-                                onClick={() => toggleSize(size.id)}
-                              >
-                                <div className="flex items-center gap-3 mr-4">
-                                  <div className="font-medium text-slate-700">{size.name}</div>
-                                  {size.dimensions && (
-                                    <span className="text-sm text-slate-400">({size.dimensions})</span>
-                                  )}
+                        <div className="space-y-2">
+                          {sizesData.map((size: any) => {
+                            const isSizeExpanded = expandedSizeId === size.id;
+                            return (
+                              <div key={size.id} className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+                                {/* Size Row */}
+                                <div
+                                  className={`flex items-center justify-between px-4 py-3 cursor-pointer transition-colors ${
+                                    isSizeExpanded ? 'bg-slate-50' : 'hover:bg-slate-50'
+                                  }`}
+                                  onClick={() => toggleSize(size.id)}
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <div className="font-medium text-slate-800">{size.name}</div>
+                                    {size.dimensions && (
+                                      <span className="text-sm text-slate-400">({size.dimensions})</span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-7 w-7 p-0"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        openEditSize(size, product.id);
+                                      }}
+                                    >
+                                      <Pencil className="h-3 w-3" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-7 w-7 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteSize(size.id);
+                                      }}
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                    {isSizeExpanded ? (
+                                      <ChevronDown className="h-4 w-4 text-slate-400" />
+                                    ) : (
+                                      <ChevronLeft className="h-4 w-4 text-slate-400" />
+                                    )}
+                                  </div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      openEditSize(size, product.id);
-                                    }}
-                                  >
-                                    <Pencil className="h-3 w-3" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      if (confirm("האם למחוק את הגודל?")) {
-                                        deleteSizeMutation.mutate({ id: size.id });
-                                      }
-                                    }}
-                                    className="text-red-500 hover:text-red-600 hover:bg-red-50"
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
-                                  {isSizeExpanded ? (
-                                    <ChevronDown className="h-4 w-4 text-slate-400" />
-                                  ) : (
-                                    <ChevronLeft className="h-4 w-4 text-slate-400" />
-                                  )}
-                                </div>
-                              </div>
 
-                              {/* Expanded: Quantities - Level 3 */}
-                              {isSizeExpanded && (
-                                <div className="bg-white border-t border-slate-100">
-                                  {/* Quantities Section */}
-                                  <div className="px-6 py-3">
-                                    <div className="flex items-center justify-between mb-3">
-                                      <div className="flex items-center gap-2 text-sm font-medium text-slate-600">
-                                        <DollarSign className="h-4 w-4" />
+                                {/* Quantities - Expanded under size */}
+                                {isSizeExpanded && (
+                                  <div className="px-4 py-3 bg-slate-50 border-t border-slate-100">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <div className="flex items-center gap-2 text-xs font-medium text-slate-600">
+                                        <DollarSign className="h-3 w-3" />
                                         כמויות ומחירים
                                       </div>
-                                      <Button size="sm" variant="outline" onClick={() => openAddQuantity(size.id)} className="gap-1 h-7 text-xs">
+                                      <Button 
+                                        size="sm" 
+                                        variant="ghost" 
+                                        onClick={() => openAddQuantity(size.id)} 
+                                        className="gap-1 h-6 text-xs px-2"
+                                      >
                                         <Plus className="h-3 w-3" />
-                                        כמות חדשה
+                                        הוסף
                                       </Button>
                                     </div>
                                     
                                     {!quantitiesData || quantitiesData.length === 0 ? (
-                                      <div className="text-center text-slate-400 text-sm py-2">
-                                        אין כמויות מוגדרות. לחץ על "כמות חדשה" להוספה.
+                                      <div className="text-center text-slate-400 text-xs py-2">
+                                        אין כמויות מוגדרות
                                       </div>
                                     ) : (
-                                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                      <div className="flex flex-wrap gap-2">
                                         {quantitiesData.map((sq: SizeQuantity) => (
                                           <div
                                             key={sq.id}
-                                            className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2 group"
+                                            className="flex items-center gap-2 bg-white rounded-md px-3 py-2 border border-slate-200 group"
                                           >
-                                            <div>
-                                              <div className="font-medium text-slate-700">{sq.quantity} יח'</div>
-                                              <div className="text-green-600 font-semibold">₪{parseFloat(sq.price).toFixed(0)}</div>
+                                            <div className="text-sm">
+                                              <span className="font-medium text-slate-700">{sq.quantity} יח'</span>
+                                              <span className="mx-1 text-slate-300">|</span>
+                                              <span className="text-green-600 font-semibold">₪{parseFloat(sq.price).toFixed(0)}</span>
                                             </div>
                                             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                              <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="h-6 w-6 p-0"
+                                              <button
+                                                className="p-1 hover:bg-slate-100 rounded"
                                                 onClick={() => openEditQuantity(sq)}
                                               >
-                                                <Pencil className="h-3 w-3" />
-                                              </Button>
-                                              <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="h-6 w-6 p-0 text-red-500"
-                                                onClick={() => {
-                                                  if (confirm("האם למחוק?")) {
-                                                    deleteQuantityMutation.mutate({ id: sq.id });
-                                                  }
-                                                }}
+                                                <Pencil className="h-3 w-3 text-slate-400" />
+                                              </button>
+                                              <button
+                                                className="p-1 hover:bg-red-50 rounded"
+                                                onClick={() => handleDeleteQuantity(sq.id)}
                                               >
-                                                <Trash2 className="h-3 w-3" />
-                                              </Button>
+                                                <Trash2 className="h-3 w-3 text-red-400" />
+                                              </button>
                                             </div>
                                           </div>
                                         ))}
                                       </div>
                                     )}
                                   </div>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
                       )}
                     </div>
 
                     {/* Addons Section */}
-                    <div className="border-t border-slate-200 bg-slate-100">
-                      <div className="flex items-center justify-between px-4 py-3">
-                        <div className="flex items-center gap-2 text-sm font-medium text-slate-600">
+                    <div className="p-4 border-t border-slate-200">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
                           <Sparkles className="h-4 w-4" />
-                          תוספות למוצר
+                          תוספות
                         </div>
-                        <Button size="sm" variant="outline" onClick={() => openAddAddon(product.id)} className="gap-1">
+                        <Button size="sm" variant="outline" onClick={() => openAddAddon(product.id)} className="gap-1 h-8">
                           <Plus className="h-3 w-3" />
                           תוספת חדשה
                         </Button>
                       </div>
-                      <div className="px-4 pb-4">
-                        {!addonsData || addonsData.length === 0 ? (
-                          <div className="text-center text-slate-400 text-sm py-2">
-                            אין תוספות למוצר זה
-                          </div>
-                        ) : (
-                          <div className="flex flex-wrap gap-2">
-                            {addonsData.map((addon: any) => (
-                              <div
-                                key={addon.id}
-                                className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5 group"
-                              >
-                                <span className="text-sm text-slate-700">{addon.name}</span>
-                                <span className="text-sm font-medium text-amber-600">
-                                  {addon.price_type === "percentage" ? `+${addon.price}%` : `+₪${addon.price}`}
+
+                      {!addonsData || addonsData.length === 0 ? (
+                        <div className="text-center text-slate-400 text-sm py-4 bg-white rounded-lg border border-dashed">
+                          אין תוספות למוצר זה
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          {addonsData.filter((a: ProductAddon) => a.isActive !== false).map((addon: ProductAddon) => (
+                            <div
+                              key={addon.id}
+                              className="flex items-center gap-2 bg-white rounded-md px-3 py-2 border border-slate-200 group"
+                            >
+                              <div className="text-sm">
+                                <span className="font-medium text-slate-700">{addon.name}</span>
+                                <span className="mx-1 text-slate-300">|</span>
+                                <span className="text-blue-600 font-semibold">
+                                  {addon.priceType === 'percentage' ? `${addon.price}%` : `₪${parseFloat(addon.price).toFixed(0)}`}
                                 </span>
-                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-5 w-5 p-0"
-                                    onClick={() => openEditAddon(addon, product.id)}
-                                  >
-                                    <Pencil className="h-3 w-3" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-5 w-5 p-0 text-red-500"
-                                    onClick={() => {
-                                      if (confirm("האם למחוק?")) {
-                                        deleteAddonMutation.mutate({ id: addon.id });
-                                      }
-                                    }}
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
-                                </div>
                               </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  className="p-1 hover:bg-slate-100 rounded"
+                                  onClick={() => openEditAddon(addon, product.id)}
+                                >
+                                  <Pencil className="h-3 w-3 text-slate-400" />
+                                </button>
+                                <button
+                                  className="p-1 hover:bg-red-50 rounded"
+                                  onClick={() => handleDeleteAddon(addon.id)}
+                                >
+                                  <Trash2 className="h-3 w-3 text-red-400" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -882,7 +894,7 @@ export default function Products() {
           <DialogHeader>
             <DialogTitle>{isEditMode ? "עריכת מוצר" : "מוצר חדש"}</DialogTitle>
             <DialogDescription>
-              {isEditMode ? "עדכן את פרטי המוצר" : "הוסף מוצר חדש לקטלוג"}
+              {isEditMode ? "ערוך את פרטי המוצר" : "הוסף מוצר חדש לקטלוג"}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">

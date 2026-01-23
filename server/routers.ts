@@ -490,9 +490,12 @@ export const appRouter = router({
       .query(async ({ input }) => {
         const db = await getDb();
         const { sizeQuantities } = await import('../drizzle/schema');
-        const { eq, asc } = await import('drizzle-orm');
+        const { eq, asc, and } = await import('drizzle-orm');
         return await db.select().from(sizeQuantities)
-          .where(eq(sizeQuantities.sizeId, input.sizeId))
+          .where(and(
+            eq(sizeQuantities.sizeId, input.sizeId),
+            eq(sizeQuantities.isActive, true)
+          ))
           .orderBy(asc(sizeQuantities.displayOrder));
       }),
 
@@ -548,7 +551,10 @@ export const appRouter = router({
         const db = await getDb();
         const { sizeQuantities } = await import('../drizzle/schema');
         const { eq } = await import('drizzle-orm');
-        await db.delete(sizeQuantities).where(eq(sizeQuantities.id, input.id));
+        // Soft delete - set isActive to false
+        await db.update(sizeQuantities)
+          .set({ isActive: false })
+          .where(eq(sizeQuantities.id, input.id));
         return { success: true };
       }),
 
@@ -558,9 +564,12 @@ export const appRouter = router({
       .query(async ({ input }) => {
         const db = await getDb();
         const { productSizes } = await import('../drizzle/schema');
-        const { eq, asc } = await import('drizzle-orm');
+        const { eq, asc, and } = await import('drizzle-orm');
         return await db.select().from(productSizes)
-          .where(eq(productSizes.productId, input.productId))
+          .where(and(
+            eq(productSizes.productId, input.productId),
+            eq(productSizes.isActive, true)
+          ))
           .orderBy(asc(productSizes.displayOrder));
       }),
 
