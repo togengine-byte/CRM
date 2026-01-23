@@ -200,7 +200,7 @@ export function registerOAuthRoutes(app: Express) {
   // Customer signup with files
   app.post("/api/customers/signup-with-files", upload.array('files', MAX_FILES), async (req: Request, res: Response) => {
     try {
-      const { name, email, phone, companyName, description } = req.body;
+      const { name, email, phone, companyName, description, productId } = req.body;
       const files = req.files as Express.Multer.File[];
       // Generate requestId if not created by multer (when no files uploaded)
       const requestId = (req as any).requestId || crypto.randomUUID();
@@ -233,6 +233,7 @@ export function registerOAuthRoutes(app: Express) {
           mimeType: f.mimetype,
           path: f.path,
         })) || [],
+        productId: productId ? parseInt(productId) : null,
       });
 
       res.json({ 

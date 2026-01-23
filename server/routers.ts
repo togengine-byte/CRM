@@ -8,6 +8,7 @@ import { supplierPortalRouter } from "./supplierPortal";
 import { customerPortalRouter } from "./customerPortal";
 import { createCustomerWithQuote } from "./createCustomerWithQuote";
 import { publicProcedure, protectedProcedure, adminProcedure, router } from "./_core/trpc";
+import { getTopSupplierRecommendations, getEnhancedSupplierRecommendations } from './supplierRecommendations';
 import {
   getUserByEmail,
   getDashboardKPIs,
@@ -566,6 +567,14 @@ export const appRouter = router({
         return await approveCustomer(input.customerId, ctx.user.id);
       }),
 
+    // Approve customer from signup request (landing page)
+    approveSignupRequest: adminProcedure
+      .input(z.object({ requestId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new Error("Not authenticated");
+        return await approveCustomerSignupRequest(input.requestId, ctx.user.id);
+      }),
+
     pendingCustomers: adminProcedure
       .input(z.object({ limit: z.number().optional() }).optional())
       .query(async ({ input }) => {
@@ -837,6 +846,33 @@ export const appRouter = router({
           throw new Error("Only employees can view supplier recommendations");
         }
         return await getSupplierRecommendations(input.variantId, input.quantity);
+      }),
+
+    // Enhanced recommendations based on supplier_jobs history (reliability, speed, rating)
+    enhancedRecommendations: protectedProcedure
+      .input(z.object({
+        productId: z.number().optional(),
+        limit: z.number().int().positive().default(3),
+      }))
+      .query(async ({ ctx, input }) => {
+        if (!ctx.user) throw new Error("Not authenticated");
+        if (ctx.user.role !== 'admin' && ctx.user.role !== 'employee') {
+          throw new Error("Only employees can view supplier recommendations");
+        }
+        return await getTopSupplierRecommendations(input.productId, input.limit);
+      }),
+
+    // Get all supplier recommendations with full scoring
+    allRecommendations: protectedProcedure
+      .input(z.object({
+        productId: z.number().optional(),
+      }))
+      .query(async ({ ctx, input }) => {
+        if (!ctx.user) throw new Error("Not authenticated");
+        if (ctx.user.role !== 'admin' && ctx.user.role !== 'employee') {
+          throw new Error("Only employees can view supplier recommendations");
+        }
+        return await getEnhancedSupplierRecommendations(input.productId);
       }),
 
     assignToQuoteItem: protectedProcedure

@@ -239,6 +239,7 @@ export const customerSignupRequests = pgTable("customer_signup_requests", {
   phone: varchar("phone", { length: 20 }).notNull(),
   companyName: text("companyName"),
   description: text("description").notNull(),
+  productId: integer("productId"), // Reference to base_products
   status: varchar("status", { length: 20 }).default("pending").notNull(), // pending, approved, rejected
   queueNumber: serial("queueNumber").notNull(), // מספר המתנה
   files: jsonb("files").default('[]'),

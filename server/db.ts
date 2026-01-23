@@ -2530,6 +2530,7 @@ export async function createCustomerSignupRequest(data: {
   description: string;
   requestId: string;
   files: SignupRequestFile[];
+  productId?: number | null;
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -2543,6 +2544,7 @@ export async function createCustomerSignupRequest(data: {
     description: data.description,
     files: data.files,
     status: 'pending',
+    productId: data.productId || null,
   }).returning();
 
   await logActivity(null, 'customer_signup_request', {

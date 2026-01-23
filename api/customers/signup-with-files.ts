@@ -29,7 +29,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     // Parse JSON body
-    const { name, email, phone, companyName, description } = req.body || {};
+    const { name, email, phone, companyName, description, productId } = req.body || {};
 
     // Validate input
     if (!name || !email) {
@@ -47,6 +47,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       description: description || '',
       requestId,
       files: [],
+      productId: productId ? parseInt(productId) : null,
     });
 
     return res.status(200).json({

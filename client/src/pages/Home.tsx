@@ -30,7 +30,14 @@ import {
   Building2,
   Calendar,
   UserCheck,
-  X
+  X,
+  Search,
+  Star,
+  Zap,
+  Shield,
+  Package,
+  Award,
+  Loader2
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -130,9 +137,261 @@ function OpenJobsCard({ isLoading }: { isLoading: boolean }) {
   );
 }
 
+// Supplier Recommendations Modal Component
+interface SupplierRecommendation {
+  supplierId: number;
+  supplierNumber: number;
+  supplierName: string;
+  supplierCompany: string | null;
+  metrics: {
+    avgPrice: number;
+    avgRating: number;
+    avgDeliveryDays: number;
+    reliabilityPct: number;
+    totalJobs: number;
+  };
+  scores: {
+    price: number;
+    rating: number;
+    delivery: number;
+    reliability: number;
+    total: number;
+  };
+  weights: {
+    price: number;
+    rating: number;
+    deliveryTime: number;
+    reliability: number;
+  };
+  rank: number;
+}
+
+function SupplierRecommendationsModal({ 
+  isOpen, 
+  onClose, 
+  productId,
+  productName 
+}: { 
+  isOpen: boolean; 
+  onClose: () => void;
+  productId?: number;
+  productName?: string;
+}) {
+  const { data: recommendations, isLoading, error } = trpc.suppliers.enhancedRecommendations.useQuery(
+    { productId, limit: 3 },
+    { enabled: isOpen }
+  );
+
+  const getScoreColor = (score: number) => {
+    if (score >= 80) return "text-emerald-600 bg-emerald-50";
+    if (score >= 60) return "text-blue-600 bg-blue-50";
+    if (score >= 40) return "text-amber-600 bg-amber-50";
+    return "text-red-600 bg-red-50";
+  };
+
+  const getRankBadge = (rank: number) => {
+    if (rank === 1) return { icon: Award, color: "text-yellow-600 bg-yellow-50 border-yellow-200" };
+    if (rank === 2) return { icon: Star, color: "text-slate-500 bg-slate-50 border-slate-200" };
+    return { icon: Star, color: "text-amber-700 bg-amber-50 border-amber-200" };
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto" dir="rtl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Search className="h-5 w-5 text-blue-600" />
+            המלצות ספקים
+          </DialogTitle>
+          <DialogDescription>
+            {productName ? `3 הספקים המומלצים ביותר עבור ${productName}` : '3 הספקים המומלצים ביותר'}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="mt-4">
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-blue-600 mb-4" />
+              <p className="text-sm text-muted-foreground">מחשב המלצות...</p>
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <AlertCircle className="h-8 w-8 text-red-500 mb-4" />
+              <p className="text-sm text-red-600">שגיאה בטעינת המלצות</p>
+              <p className="text-xs text-muted-foreground mt-1">{error.message}</p>
+            </div>
+          ) : !recommendations || recommendations.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <Package className="h-8 w-8 text-muted-foreground/40 mb-4" />
+              <p className="text-sm text-muted-foreground">אין ספקים זמינים</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Weights Info */}
+              {recommendations[0]?.weights && (
+                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                  <p className="text-xs font-medium text-slate-600 mb-2">משקלות הניקוד:</p>
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    <span className="px-2 py-1 rounded bg-white border">מחיר: {recommendations[0].weights.price}%</span>
+                    <span className="px-2 py-1 rounded bg-white border">דירוג: {recommendations[0].weights.rating}%</span>
+                    <span className="px-2 py-1 rounded bg-white border">מהירות: {recommendations[0].weights.deliveryTime}%</span>
+                    <span className="px-2 py-1 rounded bg-white border">אמינות: {recommendations[0].weights.reliability}%</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Supplier Cards */}
+              {recommendations.map((supplier: SupplierRecommendation) => {
+                const rankBadge = getRankBadge(supplier.rank);
+                const RankIcon = rankBadge.icon;
+                
+                return (
+                  <div 
+                    key={supplier.supplierId}
+                    className={`p-4 rounded-xl border-2 ${supplier.rank === 1 ? 'border-yellow-300 bg-yellow-50/30' : 'border-border bg-white'}`}
+                  >
+                    {/* Header */}
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`h-10 w-10 rounded-full flex items-center justify-center border ${rankBadge.color}`}>
+                          <RankIcon className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold text-foreground">{supplier.supplierName}</h3>
+                            <Badge variant="outline" className="text-[10px]">#{supplier.supplierNumber}</Badge>
+                          </div>
+                          {supplier.supplierCompany && (
+                            <p className="text-xs text-muted-foreground">{supplier.supplierCompany}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className={`px-3 py-1.5 rounded-lg font-bold text-lg ${getScoreColor(supplier.scores.total)}`}>
+                        {supplier.scores.total}
+                      </div>
+                    </div>
+
+                    {/* Metrics Grid */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                      <div className="p-2 rounded-lg bg-accent/30 text-center">
+                        <p className="text-[10px] text-muted-foreground mb-1">מחיר ממוצע</p>
+                        <p className="text-sm font-semibold">₪{supplier.metrics.avgPrice.toFixed(2)}</p>
+                      </div>
+                      <div className="p-2 rounded-lg bg-accent/30 text-center">
+                        <p className="text-[10px] text-muted-foreground mb-1">דירוג ממוצע</p>
+                        <p className="text-sm font-semibold flex items-center justify-center gap-1">
+                          <Star className="h-3 w-3 text-yellow-500 fill-yellow-500" />
+                          {supplier.metrics.avgRating.toFixed(1)}
+                        </p>
+                      </div>
+                      <div className="p-2 rounded-lg bg-accent/30 text-center">
+                        <p className="text-[10px] text-muted-foreground mb-1">זמן אספקה</p>
+                        <p className="text-sm font-semibold">{supplier.metrics.avgDeliveryDays.toFixed(1)} ימים</p>
+                      </div>
+                      <div className="p-2 rounded-lg bg-accent/30 text-center">
+                        <p className="text-[10px] text-muted-foreground mb-1">אמינות</p>
+                        <p className="text-sm font-semibold">{supplier.metrics.reliabilityPct}%</p>
+                      </div>
+                    </div>
+
+                    {/* Score Breakdown */}
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground">פירוט ניקוד:</p>
+                      <div className="grid grid-cols-4 gap-2">
+                        <div className="text-center">
+                          <div className="h-2 rounded-full bg-slate-200 overflow-hidden">
+                            <div 
+                              className="h-full bg-emerald-500 transition-all" 
+                              style={{ width: `${supplier.scores.price}%` }}
+                            />
+                          </div>
+                          <p className="text-[10px] text-muted-foreground mt-1">מחיר {supplier.scores.price}</p>
+                        </div>
+                        <div className="text-center">
+                          <div className="h-2 rounded-full bg-slate-200 overflow-hidden">
+                            <div 
+                              className="h-full bg-blue-500 transition-all" 
+                              style={{ width: `${supplier.scores.rating}%` }}
+                            />
+                          </div>
+                          <p className="text-[10px] text-muted-foreground mt-1">דירוג {supplier.scores.rating}</p>
+                        </div>
+                        <div className="text-center">
+                          <div className="h-2 rounded-full bg-slate-200 overflow-hidden">
+                            <div 
+                              className="h-full bg-amber-500 transition-all" 
+                              style={{ width: `${supplier.scores.delivery}%` }}
+                            />
+                          </div>
+                          <p className="text-[10px] text-muted-foreground mt-1">מהירות {supplier.scores.delivery}</p>
+                        </div>
+                        <div className="text-center">
+                          <div className="h-2 rounded-full bg-slate-200 overflow-hidden">
+                            <div 
+                              className="h-full bg-purple-500 transition-all" 
+                              style={{ width: `${supplier.scores.reliability}%` }}
+                            />
+                          </div>
+                          <p className="text-[10px] text-muted-foreground mt-1">אמינות {supplier.scores.reliability}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Total Jobs */}
+                    <div className="mt-3 pt-3 border-t flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">
+                        מבוסס על {supplier.metrics.totalJobs} עבודות קודמות
+                      </span>
+                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => toast.info("בקרוב - בחירת ספק")}>
+                        בחר ספק
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="flex justify-end mt-4 pt-4 border-t">
+          <Button variant="outline" onClick={onClose}>סגור</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // Component for pending quote requests from landing page with modal
-function PendingSignupsCard({ signups, isLoading }: { signups: any[]; isLoading: boolean }) {
+function PendingSignupsCard({ signups, isLoading, onRefresh }: { signups: any[]; isLoading: boolean; onRefresh: () => void }) {
   const [selectedSignup, setSelectedSignup] = useState<any>(null);
+  const [showSupplierModal, setShowSupplierModal] = useState(false);
+  const [isApproving, setIsApproving] = useState(false);
+
+  // Mutation to approve customer from signup request
+  const approveFromRequestMutation = trpc.admin.approveSignupRequest.useMutation({
+    onSuccess: () => {
+      toast.success("הלקוח אושר בהצלחה ונוסף לרשימת הלקוחות");
+      setSelectedSignup(null);
+      onRefresh();
+    },
+    onError: (error) => {
+      toast.error("שגיאה באישור הלקוח: " + error.message);
+    },
+  });
+
+  const handleApproveCustomer = async () => {
+    if (!selectedSignup) return;
+    setIsApproving(true);
+    try {
+      await approveFromRequestMutation.mutateAsync({ requestId: selectedSignup.id });
+    } finally {
+      setIsApproving(false);
+    }
+  };
+
+  const handleFindSupplier = () => {
+    setShowSupplierModal(true);
+  };
 
   return (
     <>
@@ -199,7 +458,7 @@ function PendingSignupsCard({ signups, isLoading }: { signups: any[]; isLoading:
       </Card>
 
       {/* Modal for viewing signup details */}
-      <Dialog open={!!selectedSignup} onOpenChange={() => setSelectedSignup(null)}>
+      <Dialog open={!!selectedSignup && !showSupplierModal} onOpenChange={() => setSelectedSignup(null)}>
         <DialogContent className="sm:max-w-lg" dir="rtl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -252,12 +511,22 @@ function PendingSignupsCard({ signups, isLoading }: { signups: any[]; isLoading:
                     </div>
                   </div>
                 )}
+
+                {selectedSignup.productId && (
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-blue-50 border border-blue-200">
+                    <Package className="h-4 w-4 text-blue-600" />
+                    <div>
+                      <p className="text-xs text-blue-600">מוצר מבוקש</p>
+                      <p className="text-sm font-medium text-blue-700">מוצר #{selectedSignup.productId}</p>
+                    </div>
+                  </div>
+                )}
                 
                 <div className="flex items-center gap-3 p-3 rounded-lg bg-accent/30">
                   <Calendar className="h-4 w-4 text-muted-foreground" />
                   <div>
                     <p className="text-xs text-muted-foreground">תאריך הבקשה</p>
-                    <p className="text-sm font-medium">{selectedSignup.createdAt ? formatFullDate(selectedSignup.createdAt) : ''}</p>
+                    <p className="text-sm font-medium">{selectedSignup.createdAt ? formatFullDate(selectedSignup.createdAt) : 'לא זמין'}</p>
                   </div>
                 </div>
               </div>
@@ -291,15 +560,34 @@ function PendingSignupsCard({ signups, isLoading }: { signups: any[]; isLoading:
                 </div>
               )}
               
-              {/* Action Buttons */}
-              <div className="flex gap-2 pt-4 border-t">
-                <Button className="flex-1" onClick={() => {
-                  toast.info("בקרוב - יצירת הצעת מחיר מהבקשה");
-                  setSelectedSignup(null);
-                }}>
-                  <Plus className="h-4 w-4 ml-2" />
-                  צור הצעת מחיר
-                </Button>
+              {/* Action Buttons - Updated with new buttons */}
+              <div className="flex flex-col gap-2 pt-4 border-t">
+                <div className="flex gap-2">
+                  <Button 
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-700" 
+                    onClick={handleApproveCustomer}
+                    disabled={isApproving}
+                  >
+                    {isApproving ? (
+                      <>
+                        <Loader2 className="h-4 w-4 ml-2 animate-spin" />
+                        מאשר...
+                      </>
+                    ) : (
+                      <>
+                        <UserCheck className="h-4 w-4 ml-2" />
+                        אשר לקוח
+                      </>
+                    )}
+                  </Button>
+                  <Button 
+                    className="flex-1 bg-blue-600 hover:bg-blue-700"
+                    onClick={handleFindSupplier}
+                  >
+                    <Search className="h-4 w-4 ml-2" />
+                    חפש ספק
+                  </Button>
+                </div>
                 <Button variant="outline" onClick={() => setSelectedSignup(null)}>
                   סגור
                 </Button>
@@ -308,6 +596,14 @@ function PendingSignupsCard({ signups, isLoading }: { signups: any[]; isLoading:
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Supplier Recommendations Modal */}
+      <SupplierRecommendationsModal
+        isOpen={showSupplierModal}
+        onClose={() => setShowSupplierModal(false)}
+        productId={selectedSignup?.productId}
+        productName={selectedSignup?.productId ? `מוצר #${selectedSignup.productId}` : undefined}
+      />
     </>
   );
 }
@@ -632,11 +928,16 @@ function QuickActionsCard() {
 export default function Home() {
   const { data: kpis, isLoading: kpisLoading } = trpc.dashboard.kpis.useQuery();
   const { data: customers, isLoading: customersLoading, refetch: refetchCustomers } = trpc.dashboard.pendingCustomers.useQuery();
-  const { data: signups, isLoading: signupsLoading } = trpc.dashboard.pendingSignups.useQuery();
+  const { data: signups, isLoading: signupsLoading, refetch: refetchSignups } = trpc.dashboard.pendingSignups.useQuery();
   const { data: activities, isLoading: activitiesLoading, refetch: refetchActivities } = trpc.dashboard.recentActivity.useQuery();
 
   const handleCustomerRefresh = () => {
     refetchCustomers();
+    refetchActivities();
+  };
+
+  const handleSignupsRefresh = () => {
+    refetchSignups();
     refetchActivities();
   };
 
@@ -695,7 +996,7 @@ export default function Home() {
 
       {/* Secondary Grid - Now with 3 columns on large screens */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <PendingSignupsCard signups={signups || []} isLoading={signupsLoading} />
+        <PendingSignupsCard signups={signups || []} isLoading={signupsLoading} onRefresh={handleSignupsRefresh} />
         <PendingApprovalsCard customers={customers || []} isLoading={customersLoading} onRefresh={handleCustomerRefresh} />
         <ActivityFeedCard activities={activities || []} isLoading={activitiesLoading} />
       </div>

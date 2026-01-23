@@ -21,7 +21,9 @@ import {
   X,
   File,
   AlertTriangle,
-  Mail
+  Mail,
+  Package,
+  ChevronDown
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -48,10 +50,20 @@ interface UploadedFile {
   error?: string;
 }
 
+interface Product {
+  id: number;
+  name: string;
+  productNumber: number;
+}
+
 export default function LandingPage() {
   const [, setLocation] = useLocation();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { isAuthenticated, loading: authLoading, refresh } = useAuthContext();
+  
+  // Products state
+  const [products, setProducts] = useState<Product[]>([]);
+  const [productsLoading, setProductsLoading] = useState(true);
   
   // Redirect to dashboard if already authenticated
   useEffect(() => {
@@ -60,6 +72,24 @@ export default function LandingPage() {
     }
   }, [authLoading, isAuthenticated, setLocation]);
 
+  // Fetch products on mount
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const response = await fetch("/api/products");
+        if (response.ok) {
+          const data = await response.json();
+          setProducts(data);
+        }
+      } catch (err) {
+        console.error("Error fetching products:", err);
+      } finally {
+        setProductsLoading(false);
+      }
+    };
+    fetchProducts();
+  }, []);
+
   // Customer signup form state
   const [customerForm, setCustomerForm] = useState({
     name: "",
@@ -67,10 +97,12 @@ export default function LandingPage() {
     phone: "",
     companyName: "",
     description: "",
+    productId: "" as string | number,
   });
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [signupLoading, setSignupLoading] = useState(false);
   const [signupSuccess, setSignupSuccess] = useState(false);
+  const [showProductDropdown, setShowProductDropdown] = useState(false);
 
   // File validation function
   const validateFile = (file: File): string | null => {
@@ -200,6 +232,9 @@ export default function LandingPage() {
       formData.append('phone', customerForm.phone);
       formData.append('companyName', customerForm.companyName);
       formData.append('description', customerForm.description);
+      if (customerForm.productId && customerForm.productId !== 'other') {
+        formData.append('productId', String(customerForm.productId));
+      }
       
       uploadedFiles.forEach((uploadedFile) => {
         formData.append(`files`, uploadedFile.file);
@@ -238,6 +273,13 @@ export default function LandingPage() {
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   };
 
+  const getSelectedProductName = () => {
+    if (!customerForm.productId) return "";
+    if (customerForm.productId === 'other') return "אחר - אין את המוצר ברשימה";
+    const product = products.find(p => p.id === Number(customerForm.productId));
+    return product ? product.name : "";
+  };
+
   if (signupSuccess) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center p-4" dir="rtl">
@@ -261,7 +303,7 @@ export default function LandingPage() {
               variant="outline" 
               onClick={() => {
                 setSignupSuccess(false);
-                setCustomerForm({ name: "", email: "", phone: "", companyName: "", description: "" });
+                setCustomerForm({ name: "", email: "", phone: "", companyName: "", description: "", productId: "" });
                 setUploadedFiles([]);
               }}
               className="mt-4"
@@ -414,13 +456,72 @@ export default function LandingPage() {
                   </div>
                 </div>
 
+                {/* Product Selection */}
+                <div className="space-y-2">
+                  <Label htmlFor="product">סוג המוצר *</Label>
+                  <div className="relative">
+                    <Package className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 z-10" />
+                    <div 
+                      className="w-full pr-10 pl-10 py-2 border rounded-md cursor-pointer bg-white hover:bg-gray-50 flex items-center justify-between"
+                      onClick={() => setShowProductDropdown(!showProductDropdown)}
+                    >
+                      <span className={customerForm.productId ? "text-gray-900" : "text-gray-400"}>
+                        {getSelectedProductName() || "בחר מוצר מהרשימה"}
+                      </span>
+                      <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${showProductDropdown ? 'rotate-180' : ''}`} />
+                    </div>
+                    
+                    {/* Dropdown */}
+                    {showProductDropdown && (
+                      <div className="absolute z-20 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-auto">
+                        {productsLoading ? (
+                          <div className="p-3 text-center text-gray-500">
+                            <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+                          </div>
+                        ) : (
+                          <>
+                            {products.map((product) => (
+                              <div
+                                key={product.id}
+                                className={`p-3 cursor-pointer hover:bg-blue-50 flex items-center gap-2 ${
+                                  customerForm.productId === product.id ? 'bg-blue-100' : ''
+                                }`}
+                                onClick={() => {
+                                  setCustomerForm({ ...customerForm, productId: product.id });
+                                  setShowProductDropdown(false);
+                                }}
+                              >
+                                <Package className="h-4 w-4 text-blue-600" />
+                                <span>{product.name}</span>
+                                <span className="text-xs text-gray-400 mr-auto">#{product.productNumber}</span>
+                              </div>
+                            ))}
+                            <div
+                              className={`p-3 cursor-pointer hover:bg-orange-50 flex items-center gap-2 border-t ${
+                                customerForm.productId === 'other' ? 'bg-orange-100' : ''
+                              }`}
+                              onClick={() => {
+                                setCustomerForm({ ...customerForm, productId: 'other' });
+                                setShowProductDropdown(false);
+                              }}
+                            >
+                              <AlertTriangle className="h-4 w-4 text-orange-500" />
+                              <span className="text-orange-700">אין את המוצר הזה ברשימה</span>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="description">תיאור הפרויקט *</Label>
                   <div className="relative">
                     <FileText className="absolute right-3 top-3 h-4 w-4 text-gray-400" />
                     <Textarea
                       id="description"
-                      placeholder="תארו את הפרויקט שלכם: סוג המוצר, כמות, מידות, צבעים וכו'..."
+                      placeholder="תארו את הפרויקט שלכם: כמות, מידות, צבעים וכו'..."
                       value={customerForm.description}
                       onChange={(e) => setCustomerForm({ ...customerForm, description: e.target.value })}
                       className="pr-10 min-h-[100px]"
@@ -490,7 +591,7 @@ export default function LandingPage() {
                 <Button
                   type="submit"
                   className="w-full h-12 text-lg bg-gradient-to-l from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
-                  disabled={signupLoading}
+                  disabled={signupLoading || !customerForm.productId}
                 >
                   {signupLoading ? (
                     <>
