@@ -297,6 +297,11 @@ interface SignupRequest {
   description: string;
   productId?: number;
   files?: any[];
+  fileValidationWarnings?: Array<{
+    fileName: string;
+    warnings: string[];
+    passed: boolean;
+  }>;
   createdAt?: string;
 }
 
@@ -554,6 +559,31 @@ function PendingSignupsCard({
                 </div>
               </div>
               
+              {/* Saved File Validation Warnings */}
+              {selectedSignup.fileValidationWarnings && selectedSignup.fileValidationWarnings.length > 0 && (
+                <div className="p-3 rounded-lg bg-amber-50 border border-amber-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-600" />
+                    <span className="font-medium text-amber-800">אזהרות ולידציה לקבצים</span>
+                  </div>
+                  <div className="space-y-2">
+                    {selectedSignup.fileValidationWarnings.map((fileWarning, idx) => (
+                      <div key={idx} className="text-sm">
+                        <div className="flex items-center gap-1 text-amber-700 font-medium">
+                          <FileText className="h-3 w-3" />
+                          {fileWarning.fileName}
+                        </div>
+                        <ul className="mr-5 mt-1 space-y-0.5">
+                          {fileWarning.warnings.map((warning, wIdx) => (
+                            <li key={wIdx} className="text-amber-600 text-xs">• {warning}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Files */}
               {selectedSignup.files && selectedSignup.files.length > 0 && (
                 <div className="space-y-2">

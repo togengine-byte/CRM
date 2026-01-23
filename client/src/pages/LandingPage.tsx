@@ -278,6 +278,19 @@ export default function LandingPage() {
         formData.append(`files`, uploadedFile.file);
       });
 
+      // Collect all validation warnings from files
+      const allWarnings = uploadedFiles
+        .filter(f => f.validationWarnings && f.validationWarnings.length > 0)
+        .map(f => ({
+          fileName: f.file.name,
+          warnings: f.validationWarnings,
+          passed: f.validationPassed,
+        }));
+      
+      if (allWarnings.length > 0) {
+        formData.append('fileValidationWarnings', JSON.stringify(allWarnings));
+      }
+
       const response = await fetch("/api/customers/signup-with-files", {
         method: "POST",
         body: formData,

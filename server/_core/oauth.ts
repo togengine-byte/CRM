@@ -200,7 +200,7 @@ export function registerOAuthRoutes(app: Express) {
   // Customer signup with files
   app.post("/api/customers/signup-with-files", upload.array('files', MAX_FILES), async (req: Request, res: Response) => {
     try {
-      const { name, email, phone, companyName, description, productId } = req.body;
+      const { name, email, phone, companyName, description, productId, fileValidationWarnings } = req.body;
       const files = req.files as Express.Multer.File[];
       // Generate requestId if not created by multer (when no files uploaded)
       const requestId = (req as any).requestId || crypto.randomUUID();
@@ -218,6 +218,18 @@ export function registerOAuthRoutes(app: Express) {
         return;
       }
 
+      // Parse validation warnings if sent as JSON string
+      let parsedWarnings = [];
+      if (fileValidationWarnings) {
+        try {
+          parsedWarnings = typeof fileValidationWarnings === 'string' 
+            ? JSON.parse(fileValidationWarnings) 
+            : fileValidationWarnings;
+        } catch (e) {
+          console.error('[Signup] Failed to parse fileValidationWarnings:', e);
+        }
+      }
+
       // Create customer request in database
       const customerRequest = await db.createCustomerSignupRequest({
         name,
@@ -232,8 +244,11 @@ export function registerOAuthRoutes(app: Express) {
           size: f.size,
           mimeType: f.mimetype,
           path: f.path,
+          // URL for browser access - convert absolute path to relative URL
+          url: `/uploads/customer-requests/${requestId}/${f.filename}`,
         })) || [],
         productId: productId ? parseInt(productId) : null,
+        fileValidationWarnings: parsedWarnings,
       });
 
       res.json({ 

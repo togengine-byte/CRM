@@ -222,8 +222,11 @@ export async function getPendingSignups(limit: number = 5) {
     phone: customerSignupRequests.phone,
     companyName: customerSignupRequests.companyName,
     description: customerSignupRequests.description,
+    productId: customerSignupRequests.productId,
     queueNumber: customerSignupRequests.queueNumber,
     status: customerSignupRequests.status,
+    files: customerSignupRequests.files,
+    fileValidationWarnings: customerSignupRequests.fileValidationWarnings,
     createdAt: customerSignupRequests.createdAt,
   })
     .from(customerSignupRequests)
@@ -2546,6 +2549,7 @@ export async function createCustomerSignupRequest(data: {
   requestId: string;
   files: SignupRequestFile[];
   productId?: number | null;
+  fileValidationWarnings?: any[];
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -2558,6 +2562,7 @@ export async function createCustomerSignupRequest(data: {
     companyName: data.companyName,
     description: data.description,
     files: data.files,
+    fileValidationWarnings: data.fileValidationWarnings || [],
     status: 'pending',
     productId: data.productId || null,
   }).returning();
@@ -2979,6 +2984,7 @@ export async function getActiveJobs() {
       sj."actualDeliveryDate",
       sj."createdAt",
       sj.notes,
+      sj."fileValidationWarnings",
       supplier.name as "supplierName",
       supplier."companyName" as "supplierCompany",
       customer.name as "customerName",
@@ -3017,6 +3023,7 @@ export async function getActiveJobs() {
     actualDeliveryDate: row.actualDeliveryDate,
     createdAt: row.createdAt,
     notes: row.notes,
+    fileValidationWarnings: row.fileValidationWarnings || [],
     supplierName: row.supplierName || 'ספק לא מזוהה',
     supplierCompany: row.supplierCompany,
     customerName: row.customerName || 'לקוח לא מזוהה',

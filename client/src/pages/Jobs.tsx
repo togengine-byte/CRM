@@ -35,10 +35,18 @@ import {
   Calendar,
   ChevronDown,
   ChevronUp,
+  AlertTriangle,
+  FileWarning,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type JobStatus = "in_production" | "ready" | "picked_up" | "delivered" | "all";
+
+interface FileWarning {
+  fileName: string;
+  warnings: string[];
+  passed: boolean;
+}
 
 interface Job {
   id: number;
@@ -52,6 +60,7 @@ interface Job {
   readyAt?: string;
   pickedUpAt?: string;
   deliveredAt?: string;
+  fileValidationWarnings?: FileWarning[];
 }
 
 export default function Jobs() {
@@ -312,6 +321,31 @@ export default function Jobs() {
                           </div>
                         </div>
                       </div>
+
+                      {/* File Validation Warnings */}
+                      {job.fileValidationWarnings && job.fileValidationWarnings.length > 0 && (
+                        <div className="p-3 rounded-lg bg-amber-50 border border-amber-200">
+                          <div className="flex items-center gap-2 mb-2">
+                            <AlertTriangle className="h-4 w-4 text-amber-600" />
+                            <span className="font-medium text-amber-800">אזהרות לקבצים להדפסה</span>
+                          </div>
+                          <div className="space-y-2">
+                            {job.fileValidationWarnings.map((fileWarning, idx) => (
+                              <div key={idx} className="text-sm">
+                                <div className="flex items-center gap-1 text-amber-700 font-medium">
+                                  <FileWarning className="h-3 w-3" />
+                                  {fileWarning.fileName}
+                                </div>
+                                <ul className="mr-5 mt-1 space-y-0.5">
+                                  {fileWarning.warnings.map((warning, wIdx) => (
+                                    <li key={wIdx} className="text-amber-600 text-xs">• {warning}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
 
                       {/* Action Buttons */}
                       <div className="flex flex-wrap gap-2 pt-2 border-t">
