@@ -4,17 +4,19 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelRight, Users, FileText, Truck, Package, BarChart3, Settings, Menu, X, ShoppingBag } from "lucide-react";
+import { LayoutDashboard, LogOut, PanelRight, Users, FileText, Truck, Package, BarChart3, Settings, Menu, X, ShoppingBag, User, Shield } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
+import { Badge } from "./ui/badge";
 
-
+// Menu items for admin users - full access
 const adminMenuItems = [
   { icon: LayoutDashboard, label: "לוח בקרה", path: "/dashboard" },
   { icon: FileText, label: "הצעות מחיר", path: "/quotes" },
@@ -34,14 +36,17 @@ const employeeMenuItems = [
   { icon: Package, label: "מוצרים", path: "/products" },
 ];
 
+// Customer portal - only their quotes
 const customerMenuItems = [
   { icon: ShoppingBag, label: "הצעות המחיר שלי", path: "/customer-portal" },
 ];
 
+// Supplier portal - their products and prices
 const supplierMenuItems = [
   { icon: Package, label: "פורטל ספקים", path: "/supplier-portal" },
 ];
 
+// Courier portal - deliveries
 const courierMenuItems = [
   { icon: Truck, label: "פורטל שליחים", path: "/courier-portal" },
 ];
@@ -49,6 +54,30 @@ const courierMenuItems = [
 const SIDEBAR_WIDTH = 256;
 const SIDEBAR_COLLAPSED_WIDTH = 64;
 
+// Role display names in Hebrew
+const roleDisplayNames: Record<string, string> = {
+  admin: 'מנהל מערכת',
+  employee: 'עובד',
+  customer: 'לקוח',
+  supplier: 'ספק',
+  courier: 'שליח',
+};
+
+// Role badge colors
+const roleBadgeColors: Record<string, string> = {
+  admin: 'bg-red-100 text-red-800 border-red-200',
+  employee: 'bg-blue-100 text-blue-800 border-blue-200',
+  customer: 'bg-green-100 text-green-800 border-green-200',
+  supplier: 'bg-purple-100 text-purple-800 border-purple-200',
+  courier: 'bg-orange-100 text-orange-800 border-orange-200',
+};
+
+/**
+ * DashboardLayout - תבנית הדאשבורד הראשית
+ * 
+ * SECURITY NOTE: רכיב זה מניח שהמשתמש כבר עבר אימות דרך ProtectedRoute.
+ * אין להשתמש ברכיב זה ישירות ללא עטיפה ב-ProtectedRoute.
+ */
 export default function DashboardLayout({
   children,
 }: {
@@ -63,25 +92,28 @@ export default function DashboardLayout({
 
   const currentWidth = isCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH;
 
-  // Select menu items based on user role
+  /**
+   * Get menu items based on user role
+   * SECURITY: Returns empty array for unknown roles to prevent unauthorized access
+   */
   const getMenuItems = (userRole: string | undefined) => {
-    if (!userRole) return adminMenuItems;
     switch (userRole) {
+      case 'admin':
+        return adminMenuItems;
+      case 'employee':
+        return employeeMenuItems;
       case 'customer':
         return customerMenuItems;
       case 'supplier':
         return supplierMenuItems;
       case 'courier':
         return courierMenuItems;
-      case 'employee':
-        return employeeMenuItems;
-      case 'admin':
-        return adminMenuItems;
       default:
-        return adminMenuItems; // Default to admin access
+        // SECURITY: Unknown role gets no menu items
+        console.warn(`Unknown user role: ${userRole}`);
+        return [];
     }
   };
-
 
   // Logout function
   const handleLogout = async () => {
@@ -89,6 +121,7 @@ export default function DashboardLayout({
     setLocation("/");
   };
 
+  // Close mobile menu on navigation
   useEffect(() => {
     if (isMobile) {
       setIsMobileMenuOpen(false);
@@ -97,15 +130,41 @@ export default function DashboardLayout({
 
   // Show loading while checking auth
   if (loading) {
-    return <DashboardLayoutSkeleton />
+    return <DashboardLayoutSkeleton />;
   }
 
-  // Create a default guest user for unauthenticated access
-  const displayUser = user || {
-    name: 'אורח',
-    email: '',
-    role: 'admin' as const,
-  };
+  // SECURITY: If no authenticated user, don't render the dashboard
+  // This is a fallback - ProtectedRoute should handle this case
+  if (!isAuthenticated || !user) {
+    console.error('DashboardLayout: Attempted to render without authenticated user');
+    setLocation('/');
+    return null;
+  }
+
+  // Get menu items for the current user
+  const menuItems = getMenuItems(user.role);
+
+  // If no menu items available, user has no access
+  if (menuItems.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4" dir="rtl">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Shield className="w-8 h-8 text-red-600" />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+            אין גישה
+          </h1>
+          <p className="text-gray-600 mb-6">
+            לחשבון שלך אין הרשאות גישה למערכת. פנה למנהל המערכת.
+          </p>
+          <Button onClick={handleLogout} className="w-full">
+            התנתק
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background" dir="rtl">
@@ -134,7 +193,7 @@ export default function DashboardLayout({
           {/* Navigation */}
           <nav className="flex-1 py-4 px-2 overflow-y-auto">
             <ul className="space-y-1">
-              {getMenuItems(displayUser.role).map((item: typeof adminMenuItems[0]) => {
+              {menuItems.map((item) => {
                 const isActive = location === item.path;
                 return (
                   <li key={item.path}>
@@ -166,22 +225,33 @@ export default function DashboardLayout({
                 )}>
                   <Avatar className="h-9 w-9 border shrink-0">
                     <AvatarFallback className="text-xs font-medium">
-                      {displayUser.name?.charAt(0).toUpperCase() || '?'}
+                      {user.name?.charAt(0).toUpperCase() || '?'}
                     </AvatarFallback>
                   </Avatar>
                   {!isCollapsed && (
                     <div className="flex-1 min-w-0 text-right">
                       <p className="text-sm font-medium truncate leading-none">
-                        {displayUser.name || "-"}
+                        {user.name || "-"}
                       </p>
                       <p className="text-xs text-muted-foreground truncate mt-1">
-                        {displayUser.email || "-"}
+                        {user.email || "-"}
                       </p>
                     </div>
                   )}
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuContent align="end" className="w-56">
+                <div className="px-2 py-2">
+                  <p className="text-sm font-medium">{user.name}</p>
+                  <p className="text-xs text-muted-foreground">{user.email}</p>
+                  <Badge 
+                    variant="outline" 
+                    className={cn("mt-2 text-xs", roleBadgeColors[user.role] || 'bg-gray-100')}
+                  >
+                    {roleDisplayNames[user.role] || user.role}
+                  </Badge>
+                </div>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={handleLogout}
                   className="cursor-pointer text-destructive focus:text-destructive"
@@ -218,7 +288,7 @@ export default function DashboardLayout({
           <aside className="fixed top-14 right-0 bottom-0 w-64 bg-sidebar border-l border-border z-50 flex flex-col animate-in slide-in-from-right">
             <nav className="flex-1 py-4 px-2 overflow-y-auto">
               <ul className="space-y-1">
-                {getMenuItems(displayUser.role).map(item => {
+                {menuItems.map(item => {
                   const isActive = location === item.path;
                   return (
                     <li key={item.path}>
@@ -247,18 +317,24 @@ export default function DashboardLayout({
               <div className="flex items-center gap-3 px-2 py-2">
                 <Avatar className="h-9 w-9 border shrink-0">
                   <AvatarFallback className="text-xs font-medium">
-                    {displayUser.name?.charAt(0).toUpperCase() || '?'}
+                    {user.name?.charAt(0).toUpperCase() || '?'}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0 text-right">
                   <p className="text-sm font-medium truncate leading-none">
-                    {displayUser.name || "-"}
+                    {user.name || "-"}
                   </p>
                   <p className="text-xs text-muted-foreground truncate mt-1">
-                    {displayUser.email || "-"}
+                    {user.email || "-"}
                   </p>
                 </div>
               </div>
+              <Badge 
+                variant="outline" 
+                className={cn("mx-2 mb-2 text-xs", roleBadgeColors[user.role] || 'bg-gray-100')}
+              >
+                {roleDisplayNames[user.role] || user.role}
+              </Badge>
               <Button
                 variant="ghost"
                 onClick={handleLogout}
@@ -286,8 +362,6 @@ export default function DashboardLayout({
           {children}
         </div>
       </main>
-
-
     </div>
   );
 }

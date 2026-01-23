@@ -20,92 +20,127 @@ import CourierPortal from "./pages/CourierPortal";
 import CustomerSignup from "./pages/CustomerSignup";
 import AdminSetup from "./pages/AdminSetup";
 
+/**
+ * Router Component
+ * 
+ * SECURITY: כל נתיב מוגן מוגדר עם הרשאות ספציפיות:
+ * - requiredRole: תפקיד נדרש לגישה (יכול להיות מערך של תפקידים)
+ * - admin תמיד יכול לגשת לכל נתיב
+ * 
+ * תפקידים זמינים: admin, employee, customer, supplier, courier
+ */
 function Router() {
   return (
     <Switch>
-      {/* Public routes */}
+      {/* ========== Public routes - ללא צורך באימות ========== */}
       <Route path="/" component={LandingPage} />
       <Route path="/signup" component={CustomerSignup} />
       <Route path="/admin-setup" component={AdminSetup} />
       
-      {/* Protected dashboard routes */}
+      {/* ========== Admin & Employee routes - ניהול המערכת ========== */}
+      
+      {/* Dashboard - זמין לאדמין ועובדים */}
       <Route path="/dashboard">
-        <ProtectedRoute>
+        <ProtectedRoute requiredRole={['admin', 'employee']}>
           <DashboardLayout>
             <Home />
           </DashboardLayout>
         </ProtectedRoute>
       </Route>
+      
+      {/* Quotes - ניהול הצעות מחיר - זמין לאדמין ועובדים */}
       <Route path="/quotes">
-        <ProtectedRoute>
+        <ProtectedRoute requiredRole={['admin', 'employee']}>
           <DashboardLayout>
             <Quotes />
           </DashboardLayout>
         </ProtectedRoute>
       </Route>
+      
+      {/* Customers - ניהול לקוחות - זמין לאדמין ועובדים */}
       <Route path="/customers">
-        <ProtectedRoute>
+        <ProtectedRoute requiredRole={['admin', 'employee']}>
           <DashboardLayout>
             <Customers />
           </DashboardLayout>
         </ProtectedRoute>
       </Route>
+      
+      {/* Suppliers - ניהול ספקים - זמין לאדמין ועובדים */}
       <Route path="/suppliers">
-        <ProtectedRoute>
+        <ProtectedRoute requiredRole={['admin', 'employee']}>
           <DashboardLayout>
             <Suppliers />
           </DashboardLayout>
         </ProtectedRoute>
       </Route>
+      
+      {/* Products - ניהול מוצרים - זמין לאדמין ועובדים */}
       <Route path="/products">
-        <ProtectedRoute>
+        <ProtectedRoute requiredRole={['admin', 'employee']}>
           <DashboardLayout>
             <Products />
           </DashboardLayout>
         </ProtectedRoute>
       </Route>
+      
+      {/* Analytics - אנליטיקס - זמין לאדמין בלבד */}
       <Route path="/analytics">
-        <ProtectedRoute>
+        <ProtectedRoute requiredRole="admin">
           <DashboardLayout>
             <Analytics />
           </DashboardLayout>
         </ProtectedRoute>
       </Route>
+      
+      {/* Activity - יומן פעילות - זמין לאדמין ועובדים */}
       <Route path="/activity">
-        <ProtectedRoute>
+        <ProtectedRoute requiredRole={['admin', 'employee']}>
           <DashboardLayout>
             <Activity />
           </DashboardLayout>
         </ProtectedRoute>
       </Route>
+      
+      {/* Settings - הגדרות מערכת - זמין לאדמין בלבד */}
       <Route path="/settings">
-        <ProtectedRoute>
+        <ProtectedRoute requiredRole="admin">
           <DashboardLayout>
             <Settings />
           </DashboardLayout>
         </ProtectedRoute>
       </Route>
+      
+      {/* ========== Portal routes - פורטלים לסוגי משתמשים שונים ========== */}
+      
+      {/* Supplier Portal - זמין לספקים בלבד */}
       <Route path="/supplier-portal">
-        <ProtectedRoute>
+        <ProtectedRoute requiredRole="supplier">
           <DashboardLayout>
             <SupplierPortal />
           </DashboardLayout>
         </ProtectedRoute>
       </Route>
+      
+      {/* Customer Portal - זמין ללקוחות בלבד */}
       <Route path="/customer-portal">
-        <ProtectedRoute>
+        <ProtectedRoute requiredRole="customer">
           <DashboardLayout>
             <CustomerPortal />
           </DashboardLayout>
         </ProtectedRoute>
       </Route>
+      
+      {/* Courier Portal - זמין לשליחים בלבד */}
       <Route path="/courier-portal">
-        <ProtectedRoute>
+        <ProtectedRoute requiredRole="courier">
           <DashboardLayout>
             <CourierPortal />
           </DashboardLayout>
         </ProtectedRoute>
       </Route>
+      
+      {/* ========== Error routes ========== */}
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>
