@@ -140,9 +140,50 @@ export default function LandingPage() {
     });
   };
 
-  // Navigate directly to dashboard
+  // Login form state
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [showLoginForm, setShowLoginForm] = useState(false);
+
+  // Handle login
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginLoading(true);
+
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          email: loginEmail,
+          password: loginPassword,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        toast.error(data.error || "התחברות נכשלה");
+        return;
+      }
+
+      toast.success("התחברת בהצלחה!");
+      setTimeout(() => {
+        setLocation("/dashboard");
+      }, 500);
+    } catch (err) {
+      toast.error("שגיאה בהתחברות, נסה שוב");
+      console.error(err);
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
   const handleGoToDashboard = () => {
-    setLocation("/dashboard");
+    setShowLoginForm(true);
   };
 
   const handleCustomerSignup = async (e: React.FormEvent) => {
@@ -473,6 +514,77 @@ export default function LandingPage() {
 
       {/* Debug Panel */}
       <DebugPanel />
+
+      {/* Login Modal */}
+      {showLoginForm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" dir="rtl">
+          <Card className="w-full max-w-md shadow-2xl border-0 bg-white/95 backdrop-blur-sm">
+            <CardHeader className="text-center pb-2">
+              <CardTitle className="text-2xl">התחברות למערכת</CardTitle>
+              <CardDescription>הכנס את פרטיך כדי להתחבר</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="login-email">אימייל</Label>
+                  <div className="relative">
+                    <Mail className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="login-email"
+                      type="email"
+                      placeholder="your@email.com"
+                      value={loginEmail}
+                      onChange={(e) => setLoginEmail(e.target.value)}
+                      className="pr-10"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="login-password">סיסמה</Label>
+                  <div className="relative">
+                    <Input
+                      id="login-password"
+                      type="password"
+                      placeholder="••••••••"
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      className="pr-10"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-4">
+                  <Button
+                    type="submit"
+                    disabled={loginLoading}
+                    className="flex-1"
+                  >
+                    {loginLoading ? (
+                      <>
+                        <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                        מתחבר...
+                      </>
+                    ) : (
+                      "התחברות"
+                    )}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowLoginForm(false)}
+                    className="flex-1"
+                  >
+                    ביטול
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }
