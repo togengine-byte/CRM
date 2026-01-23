@@ -51,7 +51,7 @@ interface UploadedFile {
 export default function LandingPage() {
   const [, setLocation] = useLocation();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { isAuthenticated, loading: authLoading } = useAuthContext();
+  const { isAuthenticated, loading: authLoading, refresh } = useAuthContext();
   
   // Redirect to dashboard if already authenticated
   useEffect(() => {
@@ -171,9 +171,9 @@ export default function LandingPage() {
       }
 
       toast.success("התחברת בהצלחה!");
-      setTimeout(() => {
-        setLocation("/dashboard");
-      }, 500);
+      // Refresh auth context to update user state, then navigate
+      await refresh();
+      setLocation("/dashboard");
     } catch (err) {
       toast.error("שגיאה בהתחברות, נסה שוב");
       console.error(err);
