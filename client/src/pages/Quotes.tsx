@@ -430,8 +430,8 @@ export default function Quotes() {
       </div>
 
       {/* Filters */}
-      <Card>
-        <CardContent className="pt-6">
+      <Card className="border-0 shadow-sm">
+        <CardContent className="pt-4 pb-4">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
             <div className="relative flex-1">
               <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -468,17 +468,19 @@ export default function Quotes() {
       </Card>
 
       {/* Quotes List */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <FileText className="h-5 w-5" />
-            רשימת הצעות מחיר
-            {filteredQuotes && (
-              <Badge variant="secondary" className="mr-2">
-                {filteredQuotes.length} הצעות
+      <Card className="border-0 shadow-sm">
+        <CardHeader className="pb-4">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base font-medium flex items-center gap-2 text-foreground">
+              <FileText className="h-4 w-4 text-muted-foreground" />
+              רשימת הצעות מחיר
+            </CardTitle>
+            {filteredQuotes && filteredQuotes.length > 0 && (
+              <Badge variant="outline" className="text-[11px] font-normal">
+                {filteredQuotes.length}
               </Badge>
             )}
-          </CardTitle>
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -570,6 +572,40 @@ export default function Quotes() {
                                       </span>
                                     )}
                                   </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Attachments */}
+                          {quoteDetails.attachments && quoteDetails.attachments.length > 0 && (
+                            <div>
+                              <h4 className="font-medium mb-3 flex items-center gap-2">
+                                <FileText className="h-4 w-4" />
+                                קבצים מצורפים
+                              </h4>
+                              <div className="grid gap-2">
+                                {quoteDetails.attachments.map((attachment: { id: number; fileName: string; fileUrl: string; uploadedAt: string }) => (
+                                  <a
+                                    key={attachment.id}
+                                    href={attachment.fileUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center justify-between p-3 bg-background rounded-lg border hover:bg-accent/50 transition-colors cursor-pointer"
+                                  >
+                                    <div className="flex items-center gap-3">
+                                      <div className="h-8 w-8 rounded bg-blue-50 flex items-center justify-center">
+                                        <FileText className="h-4 w-4 text-blue-600" />
+                                      </div>
+                                      <div>
+                                        <p className="font-medium text-sm">{attachment.fileName}</p>
+                                        <p className="text-xs text-muted-foreground">
+                                          {new Date(attachment.uploadedAt).toLocaleDateString('he-IL')}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <Eye className="h-4 w-4 text-muted-foreground" />
+                                  </a>
                                 ))}
                               </div>
                             </div>

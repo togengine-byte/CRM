@@ -303,8 +303,8 @@ export default function Products() {
       </div>
 
       {/* Filters */}
-      <Card>
-        <CardContent className="pt-6">
+      <Card className="border-0 shadow-sm">
+        <CardContent className="pt-4 pb-4">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
             <div className="relative flex-1">
               <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -344,17 +344,19 @@ export default function Products() {
       </Card>
 
       {/* Products List */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Package className="h-5 w-5" />
-            קטלוג מוצרים
-            {filteredProducts && (
-              <Badge variant="secondary" className="mr-2">
-                {filteredProducts.length} מוצרים
+      <Card className="border-0 shadow-sm">
+        <CardHeader className="pb-4">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base font-medium flex items-center gap-2 text-foreground">
+              <Package className="h-4 w-4 text-muted-foreground" />
+              קטלוג מוצרים
+            </CardTitle>
+            {filteredProducts && filteredProducts.length > 0 && (
+              <Badge variant="outline" className="text-[11px] font-normal">
+                {filteredProducts.length}
               </Badge>
             )}
-          </CardTitle>
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (

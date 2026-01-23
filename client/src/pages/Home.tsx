@@ -545,16 +545,32 @@ function PendingSignupsCard({ signups, isLoading, onRefresh }: { signups: any[];
               {/* Files if any */}
               {selectedSignup.files && selectedSignup.files.length > 0 && (
                 <div className="space-y-2">
-                  <p className="text-sm font-medium">קבצים מצורפים ({selectedSignup.files.length})</p>
-                  <div className="space-y-1">
+                  <p className="text-sm font-medium flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    קבצים מצורפים ({selectedSignup.files.length})
+                  </p>
+                  <div className="space-y-2">
                     {selectedSignup.files.map((file: any, index: number) => (
-                      <div key={index} className="flex items-center gap-2 p-2 rounded bg-accent/30 text-sm">
-                        <FileText className="h-4 w-4 text-muted-foreground" />
-                        <span className="truncate">{file.originalName}</span>
-                        <span className="text-xs text-muted-foreground">
-                          ({(file.size / 1024 / 1024).toFixed(2)} MB)
-                        </span>
-                      </div>
+                      <a 
+                        key={index} 
+                        href={file.url || file.path}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-between p-3 rounded-lg bg-accent/30 hover:bg-accent/50 transition-colors cursor-pointer border"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 rounded bg-blue-50 flex items-center justify-center">
+                            <FileText className="h-4 w-4 text-blue-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium truncate max-w-[200px]">{file.originalName || file.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {file.size ? `${(file.size / 1024 / 1024).toFixed(2)} MB` : ''}
+                            </p>
+                          </div>
+                        </div>
+                        <Inbox className="h-4 w-4 text-muted-foreground" />
+                      </a>
                     ))}
                   </div>
                 </div>
@@ -994,10 +1010,9 @@ export default function Home() {
         <QuickActionsCard />
       </div>
 
-      {/* Secondary Grid - Now with 3 columns on large screens */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      {/* Secondary Grid */}
+      <div className="grid gap-6 md:grid-cols-2">
         <PendingSignupsCard signups={signups || []} isLoading={signupsLoading} onRefresh={handleSignupsRefresh} />
-        <PendingApprovalsCard customers={customers || []} isLoading={customersLoading} onRefresh={handleCustomerRefresh} />
         <ActivityFeedCard activities={activities || []} isLoading={activitiesLoading} />
       </div>
     </div>
