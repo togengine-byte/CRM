@@ -5,6 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -33,8 +41,6 @@ import {
   User,
   Building2,
   Calendar,
-  ChevronDown,
-  ChevronUp,
   AlertTriangle,
   FileWarning,
   Mail,
@@ -76,11 +82,11 @@ interface Job {
 export default function Jobs() {
   const [statusFilter, setStatusFilter] = useState<JobStatus>("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [expandedJobId, setExpandedJobId] = useState<number | null>(null);
+  const [selectedJobId, setSelectedJobId] = useState<number | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [newStatus, setNewStatus] = useState<string>("");
-  const [sendEmail, setSendEmail] = useState(false);
 
   // Fetch jobs from supplier_jobs table
   const { data: jobs, isLoading, refetch } = trpc.jobs.list.useQuery();
@@ -115,16 +121,6 @@ export default function Jobs() {
     );
   };
 
-  const handleRowClick = (jobId: number) => {
-    setExpandedJobId(expandedJobId === jobId ? null : jobId);
-  };
-
-  const handleUpdateStatus = (job: Job, status: string) => {
-    setSelectedJob(job);
-    setNewStatus(status);
-    setIsStatusDialogOpen(true);
-  };
-
   const confirmStatusUpdate = (withEmail: boolean = false) => {
     if (selectedJob && newStatus) {
       const shouldSendEmail = emailSetting === 'auto' ? true : 
@@ -135,7 +131,6 @@ export default function Jobs() {
         notifyCustomer: shouldSendEmail,
       });
       setIsStatusDialogOpen(false);
-      setSendEmail(false);
     }
   };
 
@@ -161,6 +156,15 @@ export default function Jobs() {
     return found?.label || status;
   };
 
+  // Get stats
+  const stats = {
+    total: jobs?.length || 0,
+    pending: jobs?.filter((j: Job) => j.status === "pending").length || 0,
+    inProgress: jobs?.filter((j: Job) => j.status === "in_progress").length || 0,
+    ready: jobs?.filter((j: Job) => j.status === "ready").length || 0,
+    delivered: jobs?.filter((j: Job) => j.status === "delivered").length || 0,
+  };
+
   // Filter jobs
   const filteredJobs = jobs?.filter((job: Job) => {
     // Status filter
@@ -179,25 +183,81 @@ export default function Jobs() {
     return true;
   });
 
+  // Get selected job details
+  const jobDetails = selectedJobId ? jobs?.find((j: Job) => j.id === selectedJobId) : null;
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-foreground">עבודות בביצוע</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            מעקב אחר עבודות בשלבי ייצור ומשלוח
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight">עבודות בביצוע</h1>
+          <p className="text-muted-foreground">מעקב אחר עבודות בשלבי ייצור ומשלוח</p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => refetch()} className="gap-2">
-          <RefreshCw className="h-4 w-4" />
-          רענן
-        </Button>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid gap-4 md:grid-cols-5">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">סה״כ עבודות</p>
+                <p className="text-2xl font-bold">{stats.total}</p>
+              </div>
+              <Briefcase className="h-8 w-8 text-muted-foreground/50" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">ממתינות</p>
+                <p className="text-2xl font-bold text-gray-600">{stats.pending}</p>
+              </div>
+              <Clock className="h-8 w-8 text-gray-500/50" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">בביצוע</p>
+                <p className="text-2xl font-bold text-orange-600">{stats.inProgress}</p>
+              </div>
+              <Factory className="h-8 w-8 text-orange-500/50" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">מוכנות לאיסוף</p>
+                <p className="text-2xl font-bold text-green-600">{stats.ready}</p>
+              </div>
+              <Package className="h-8 w-8 text-green-500/50" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">נמסרו</p>
+                <p className="text-2xl font-bold text-teal-600">{stats.delivered}</p>
+              </div>
+              <CheckCircle className="h-8 w-8 text-teal-500/50" />
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Filters */}
-      <Card className="border-0 shadow-sm">
-        <CardContent className="pt-4 pb-4">
+      <Card>
+        <CardContent className="pt-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
             <div className="relative flex-1">
               <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -214,7 +274,7 @@ export default function Jobs() {
             >
               <SelectTrigger className="w-[180px]">
                 <Filter className="ml-2 h-4 w-4" />
-                <SelectValue placeholder="סינון לפי סטטוס" />
+                <SelectValue placeholder="סטטוס" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">כל הסטטוסים</SelectItem>
@@ -223,176 +283,196 @@ export default function Jobs() {
                 ))}
               </SelectContent>
             </Select>
+            <Button variant="outline" size="icon" onClick={() => refetch()}>
+              <RefreshCw className="h-4 w-4" />
+            </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Jobs List */}
-      <Card className="border-0 shadow-sm">
-        <CardHeader className="pb-4">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base font-medium flex items-center gap-2 text-foreground">
-              <Briefcase className="h-4 w-4 text-muted-foreground" />
-              רשימת עבודות
-            </CardTitle>
-            {filteredJobs && filteredJobs.length > 0 && (
-              <Badge variant="outline" className="text-[11px] font-normal">
-                {filteredJobs.length}
+      {/* Jobs Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Briefcase className="h-5 w-5" />
+            רשימת עבודות
+            {filteredJobs && (
+              <Badge variant="secondary" className="mr-2">
+                {filteredJobs.length} עבודות
               </Badge>
             )}
-          </div>
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
               <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
-          ) : !filteredJobs || filteredJobs.length === 0 ? (
+          ) : filteredJobs?.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <Briefcase className="h-12 w-12 text-muted-foreground/50 mb-4" />
               <h3 className="text-lg font-medium">אין עבודות</h3>
-              <p className="text-muted-foreground mt-1">לא נמצאו עבודות בביצוע</p>
+              <p className="text-muted-foreground mt-1">לא נמצאו עבודות התואמות לחיפוש</p>
             </div>
           ) : (
-            <div className="space-y-2">
-              {filteredJobs.map((job: Job) => (
-                <div key={job.id}>
-                  <div
-                    onClick={() => handleRowClick(job.id)}
-                    className={cn(
-                      "flex items-center justify-between p-4 rounded-lg border cursor-pointer transition-colors",
-                      expandedJobId === job.id
-                        ? "bg-accent border-primary/30"
-                        : "hover:bg-muted/50"
-                    )}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-2">
-                        {expandedJobId === job.id ? (
-                          <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                        ) : (
-                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                        )}
-                        <span className="font-bold">#{job.id}</span>
-                      </div>
-                      <div>
-                        <p className="font-medium">{job.customerName || "לקוח לא מזוהה"}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {job.productName} • {job.supplierName}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      {getStatusBadge(job.status)}
-                      <span className="text-sm text-muted-foreground">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-right">מס׳</TableHead>
+                  <TableHead className="text-right">לקוח</TableHead>
+                  <TableHead className="text-right">מוצר</TableHead>
+                  <TableHead className="text-right">ספק</TableHead>
+                  <TableHead className="text-right">סטטוס</TableHead>
+                  <TableHead className="text-right">תאריך יצירה</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredJobs?.map((job: Job) => (
+                  <>
+                    <TableRow
+                      key={job.id}
+                      onClick={() => {
+                        setSelectedJobId(job.id);
+                        setIsDetailsOpen(selectedJobId === job.id ? !isDetailsOpen : true);
+                      }}
+                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                    >
+                      <TableCell className="font-bold">#{job.id}</TableCell>
+                      <TableCell className="font-medium">{job.customerName || "-"}</TableCell>
+                      <TableCell>{job.productName || "-"}</TableCell>
+                      <TableCell className="text-muted-foreground">{job.supplierName || "-"}</TableCell>
+                      <TableCell>{getStatusBadge(job.status)}</TableCell>
+                      <TableCell className="text-muted-foreground">
                         {new Date(job.createdAt).toLocaleDateString("he-IL")}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Expanded Details */}
-                  {expandedJobId === job.id && (
-                    <div className="mt-2 p-4 bg-muted/30 rounded-lg border border-t-0 rounded-t-none space-y-4">
-                      {/* Details Grid */}
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="flex items-center gap-2 p-3 rounded-lg bg-background">
-                          <User className="h-4 w-4 text-muted-foreground" />
-                          <div>
-                            <p className="text-xs text-muted-foreground">לקוח</p>
-                            <p className="text-sm font-medium">{job.customerName}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 p-3 rounded-lg bg-background">
-                          <Building2 className="h-4 w-4 text-muted-foreground" />
-                          <div>
-                            <p className="text-xs text-muted-foreground">ספק</p>
-                            <p className="text-sm font-medium">{job.supplierName}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 p-3 rounded-lg bg-background">
-                          <Package className="h-4 w-4 text-muted-foreground" />
-                          <div>
-                            <p className="text-xs text-muted-foreground">מוצר</p>
-                            <p className="text-sm font-medium">{job.productName}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 p-3 rounded-lg bg-background">
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                          <div>
-                            <p className="text-xs text-muted-foreground">תאריך יצירה</p>
-                            <p className="text-sm font-medium">
-                              {new Date(job.createdAt).toLocaleDateString("he-IL")}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* File Validation Warnings */}
-                      {job.fileValidationWarnings && job.fileValidationWarnings.length > 0 && (
-                        <div className="p-3 rounded-lg bg-amber-50 border border-amber-200">
-                          <div className="flex items-center gap-2 mb-2">
-                            <AlertTriangle className="h-4 w-4 text-amber-600" />
-                            <span className="font-medium text-amber-800">אזהרות לקבצים להדפסה</span>
-                          </div>
-                          <div className="space-y-2">
-                            {job.fileValidationWarnings.map((fileWarning, idx) => (
-                              <div key={idx} className="text-sm">
-                                <div className="flex items-center gap-1 text-amber-700 font-medium">
-                                  <FileWarning className="h-3 w-3" />
-                                  {fileWarning.fileName}
-                                </div>
-                                <ul className="mr-5 mt-1 space-y-0.5">
-                                  {fileWarning.warnings.map((warning, wIdx) => (
-                                    <li key={wIdx} className="text-amber-600 text-xs">• {warning}</li>
-                                  ))}
-                                </ul>
+                      </TableCell>
+                    </TableRow>
+                    {/* Expanded Details Row */}
+                    {isDetailsOpen && selectedJobId === job.id && jobDetails && (
+                      <TableRow className="bg-muted/30 hover:bg-muted/30">
+                        <TableCell colSpan={6}>
+                          <div className="p-6 space-y-6">
+                            {/* Details Grid */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                              <div>
+                                <p className="text-sm text-muted-foreground">לקוח</p>
+                                <p className="font-medium flex items-center gap-2">
+                                  <User className="h-4 w-4 text-muted-foreground" />
+                                  {jobDetails.customerName || "-"}
+                                </p>
                               </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                              <div>
+                                <p className="text-sm text-muted-foreground">ספק</p>
+                                <p className="font-medium flex items-center gap-2">
+                                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                                  {jobDetails.supplierName || "-"}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-sm text-muted-foreground">מוצר</p>
+                                <p className="font-medium flex items-center gap-2">
+                                  <Package className="h-4 w-4 text-muted-foreground" />
+                                  {jobDetails.productName || "-"}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-sm text-muted-foreground">תאריך יצירה</p>
+                                <p className="font-medium flex items-center gap-2">
+                                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                                  {new Date(jobDetails.createdAt).toLocaleDateString("he-IL")}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-sm text-muted-foreground">סטטוס נוכחי</p>
+                                <div className="mt-1">{getStatusBadge(jobDetails.status)}</div>
+                              </div>
+                              <div>
+                                <p className="text-sm text-muted-foreground">מס׳ הצעת מחיר</p>
+                                <p className="font-medium">#{jobDetails.quoteId}</p>
+                              </div>
+                              {jobDetails.readyAt && (
+                                <div>
+                                  <p className="text-sm text-muted-foreground">מוכן בתאריך</p>
+                                  <p className="font-medium">
+                                    {new Date(jobDetails.readyAt).toLocaleDateString("he-IL")}
+                                  </p>
+                                </div>
+                              )}
+                              {jobDetails.deliveredAt && (
+                                <div>
+                                  <p className="text-sm text-muted-foreground">נמסר בתאריך</p>
+                                  <p className="font-medium">
+                                    {new Date(jobDetails.deliveredAt).toLocaleDateString("he-IL")}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
 
-                      {/* Status Change Dropdown */}
-                      <div className="flex items-center gap-3 pt-2 border-t">
-                        <span className="text-sm text-muted-foreground">שנה סטטוס:</span>
-                        <Select
-                          value={job.status}
-                          onValueChange={(value) => {
-                            if (value !== job.status) {
-                              handleStatusChange(job, value);
-                            }
-                          }}
-                        >
-                          <SelectTrigger 
-                            className="w-[160px] h-9"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {allStatuses.map((s) => (
-                              <SelectItem key={s.value} value={s.value}>
-                                <span className={cn(
-                                  "flex items-center gap-2",
-                                  s.value === job.status && "font-medium"
-                                )}>
-                                  {s.value === "pending" && <Clock className="h-3 w-3" />}
-                                  {s.value === "in_progress" && <Factory className="h-3 w-3" />}
-                                  {s.value === "ready" && <Package className="h-3 w-3" />}
-                                  {s.value === "picked_up" && <Truck className="h-3 w-3" />}
-                                  {s.value === "delivered" && <CheckCircle className="h-3 w-3" />}
-                                  {s.label}
-                                </span>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+                            {/* File Validation Warnings */}
+                            {jobDetails.fileValidationWarnings && jobDetails.fileValidationWarnings.length > 0 && (
+                              <div className="p-4 rounded-lg bg-amber-50 border border-amber-200">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                                  <span className="font-medium text-amber-800">אזהרות לקבצים להדפסה</span>
+                                </div>
+                                <div className="space-y-2">
+                                  {jobDetails.fileValidationWarnings.map((fileWarning, idx) => (
+                                    <div key={idx} className="text-sm">
+                                      <div className="flex items-center gap-1 text-amber-700 font-medium">
+                                        <FileWarning className="h-3 w-3" />
+                                        {fileWarning.fileName}
+                                      </div>
+                                      <ul className="mr-5 mt-1 space-y-0.5">
+                                        {fileWarning.warnings.map((warning, wIdx) => (
+                                          <li key={wIdx} className="text-amber-600 text-xs">• {warning}</li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Status Change */}
+                            <div className="flex items-center gap-3 pt-4 border-t">
+                              <span className="text-sm text-muted-foreground">שנה סטטוס:</span>
+                              <Select
+                                value={jobDetails.status}
+                                onValueChange={(value) => {
+                                  if (value !== jobDetails.status) {
+                                    handleStatusChange(jobDetails, value);
+                                  }
+                                }}
+                              >
+                                <SelectTrigger className="w-[180px]">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {allStatuses.map((s) => (
+                                    <SelectItem key={s.value} value={s.value}>
+                                      <span className={cn(
+                                        "flex items-center gap-2",
+                                        s.value === jobDetails.status && "font-medium"
+                                      )}>
+                                        {s.value === "pending" && <Clock className="h-3 w-3" />}
+                                        {s.value === "in_progress" && <Factory className="h-3 w-3" />}
+                                        {s.value === "ready" && <Package className="h-3 w-3" />}
+                                        {s.value === "picked_up" && <Truck className="h-3 w-3" />}
+                                        {s.value === "delivered" && <CheckCircle className="h-3 w-3" />}
+                                        {s.label}
+                                      </span>
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>
