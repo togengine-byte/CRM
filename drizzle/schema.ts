@@ -18,6 +18,7 @@ export const users = pgTable("users", {
   phone: varchar("phone", { length: 20 }),
   companyName: text("companyName"),
   address: text("address"),
+  billingEmail: varchar("billingEmail", { length: 320 }),
   permissions: jsonb("permissions").default('{}'),
   customerNumber: integer("customerNumber"),
   supplierNumber: integer("supplierNumber"),

@@ -73,6 +73,7 @@ interface CustomerFormData {
   phone: string;
   companyName: string;
   address: string;
+  billingEmail: string;
 }
 
 export default function Customers() {
@@ -89,6 +90,7 @@ export default function Customers() {
     phone: "",
     companyName: "",
     address: "",
+    billingEmail: "",
   });
 
   const utils = trpc.useUtils();
@@ -196,6 +198,7 @@ export default function Customers() {
       phone: customer.phone || "",
       companyName: customer.companyName || "",
       address: customer.address || "",
+      billingEmail: (customer as any).billingEmail || "",
     });
     setIsEditDialogOpen(true);
   };
@@ -431,7 +434,14 @@ export default function Customers() {
                       <TableRow className="bg-muted/30 hover:bg-muted/30">
                         <TableCell colSpan={7}>
                           <div className="p-6 space-y-6">
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                            <div className="flex justify-between items-start mb-4">
+                              <h3 className="font-semibold">פרטי לקוח</h3>
+                              <Button variant="outline" size="sm" onClick={() => handleEditCustomer(customerDetails as any)}>
+                                <Pencil className="ml-2 h-4 w-4" />
+                                עריכה
+                              </Button>
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                               <div>
                                 <p className="text-sm text-muted-foreground">שם</p>
                                 <p className="font-medium">{customerDetails.name || "-"}</p>
@@ -439,6 +449,10 @@ export default function Customers() {
                               <div>
                                 <p className="text-sm text-muted-foreground">אימייל</p>
                                 <p className="font-medium">{customerDetails.email || "-"}</p>
+                              </div>
+                              <div>
+                                <p className="text-sm text-muted-foreground">אימייל לחשבונית</p>
+                                <p className="font-medium">{(customerDetails as any).billingEmail || "-"}</p>
                               </div>
                               <div>
                                 <p className="text-sm text-muted-foreground">טלפון</p>
@@ -455,10 +469,6 @@ export default function Customers() {
                               <div>
                                 <p className="text-sm text-muted-foreground">סטטוס</p>
                                 <div className="mt-1">{getStatusBadge(customerDetails.status)}</div>
-                              </div>
-                              <div>
-                                <p className="text-sm text-muted-foreground">תפקיד</p>
-                                <p className="font-medium">{customerDetails.role || "-"}</p>
                               </div>
                               <div>
                                 <p className="text-sm text-muted-foreground">תאריך הרשמה</p>
@@ -528,6 +538,16 @@ export default function Customers() {
                 value={editForm.address}
                 onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
                 rows={2}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="billingEmail">אימייל לחשבונית</Label>
+              <Input
+                id="billingEmail"
+                type="email"
+                value={editForm.billingEmail}
+                onChange={(e) => setEditForm({ ...editForm, billingEmail: e.target.value })}
+                placeholder="אופציונלי - אם ריק ישתמש באימייל הראשי"
               />
             </div>
           </div>

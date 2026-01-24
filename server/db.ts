@@ -1289,6 +1289,7 @@ export async function updateCustomer(input: {
   phone?: string;
   companyName?: string;
   address?: string;
+  billingEmail?: string;
   status?: 'pending_approval' | 'active' | 'rejected' | 'deactivated';
 }) {
   const db = await getDb();
@@ -1300,6 +1301,7 @@ export async function updateCustomer(input: {
   if (input.phone !== undefined) updateData.phone = input.phone;
   if (input.companyName !== undefined) updateData.companyName = input.companyName;
   if (input.address !== undefined) updateData.address = input.address;
+  if (input.billingEmail !== undefined) updateData.billingEmail = input.billingEmail;
   if (input.status !== undefined) updateData.status = input.status;
 
   if (Object.keys(updateData).length === 0) {
