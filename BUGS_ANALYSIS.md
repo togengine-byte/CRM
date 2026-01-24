@@ -19,7 +19,7 @@
 | 3 | `client/src/pages/Settings.tsx` | שימוש שגוי ב-`useState` במקום `useEffect` לעדכון מצב מקומי. | **קיים** |
 | 4 | `client/src/contexts/AuthContext.tsx` ו-`client/src/_core/hooks/useAuth.ts` | קיימים שני מנגנוני אימות שונים (AuthContext ו-useAuth) הגורמים לחוסר עקביות. | **קיים** |
 | 5 | `client/src/pages/Login.tsx` | קובץ `Login.tsx` קיים אך אינו בשימוש ואינו מנותב ב-`App.tsx`. | **קיים** |
-| 6 | `api/trpc/[trpc].ts` | שימוש ב-`Access-Control-Allow-Origin: *` יחד עם `credentials: true` הגורם לשגיאות CORS. | **תוקן חלקית** |
+| 6 | `api/trpc/[trpc].ts` | שימוש ב-`Access-Control-Allow-Origin: *` יחד עם `credentials: true` הגורם לשגיאות CORS. | **תוקן** (ראה תזכורת) |
 | 7 | `drizzle/schema.ts` | חוסר התאמה בשם השדה `uploadedAt` בטבלת `quoteAttachments` (בשימוש `createdAt`). | **קיים** |
 
 ---
@@ -41,6 +41,30 @@ if (input.secretKey !== adminSetupKey) {
   throw new Error('Invalid secret key');
 }
 ```
+
+---
+
+## תזכורות למעבר לדומיין אמיתי (Production)
+
+### CORS - הגדרת FRONTEND_URL
+
+כשעוברים לדומיין אמיתי, יש להגדיר משתנה סביבה בשרת:
+
+```
+FRONTEND_URL=https://your-domain.com
+```
+
+**למה זה חשוב?**
+הקובץ `api/trpc/[trpc].ts` משתמש ברשימת כתובות מורשות ל-CORS:
+```typescript
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5173',
+  process.env.FRONTEND_URL,  // <-- זה המשתנה שצריך להגדיר!
+];
+```
+
+**בלי הגדרה זו**, הדפדפן יחסום בקשות מהדומיין האמיתי לשרת.
 
 ---
 
