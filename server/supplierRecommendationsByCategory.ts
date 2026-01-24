@@ -372,7 +372,7 @@ export async function createSupplierJobsForCategory(
           ${item.sizeQuantityId},
           ${quantity},
           ${item.pricePerUnit},
-          'pending'
+          'in_progress'
         FROM quotes q
         WHERE q.id = ${quoteId}
         RETURNING id
