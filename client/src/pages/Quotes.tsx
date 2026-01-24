@@ -583,162 +583,101 @@ export default function Quotes() {
                     </div>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
-                    <div className="mt-2 p-6 bg-white rounded-lg border shadow-sm space-y-6">
+                    <div className="mt-2 p-4 bg-muted/30 rounded-lg border border-t-0 rounded-t-none">
                       {/* Quote Details */}
                       {quoteDetails && expandedQuoteId === quote.id && (
-                        <>
-                          {/* Header with Quote Info */}
-                          <div className="flex items-center justify-between pb-4 border-b">
+                        <div className="space-y-4">
+                          {/* Info Grid - Compact like Customers */}
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                             <div>
-                              <h3 className="text-xl font-bold text-slate-900">הצעת מחיר #{quote.id}</h3>
-                              <p className="text-sm text-slate-500 mt-1">
-                                לקוח: {quote.customerName || "לא מזוהה"} • {new Date(quote.createdAt).toLocaleDateString("he-IL")}
-                              </p>
+                              <p className="text-sm text-muted-foreground">לקוח</p>
+                              <p className="font-medium">{quote.customerName || "-"}</p>
                             </div>
-                            <div className="text-left">
-                              <p className="text-2xl font-bold text-slate-900">
-                                {quote.finalValue ? `₪${Number(quote.finalValue).toLocaleString()}` : "-"}
-                              </p>
-                              <p className="text-xs text-slate-500">סה"כ כולל</p>
+                            <div>
+                              <p className="text-sm text-muted-foreground">תאריך</p>
+                              <p className="font-medium">{new Date(quote.createdAt).toLocaleDateString("he-IL")}</p>
                             </div>
-                          </div>
-
-                          {/* Recommend Supplier Button - Prominent */}
-                          <div className="bg-gradient-to-r from-purple-50 to-indigo-50 p-4 rounded-xl border border-purple-200">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <h4 className="font-semibold text-purple-900">מצא ספק מתאים</h4>
-                                <p className="text-sm text-purple-600">קבל המלצות על ספקים לפי מחיר, איכות ואמינות</p>
-                              </div>
-                              <Button
-                                size="lg"
-                                className="bg-purple-600 hover:bg-purple-700 text-white shadow-md"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleFindSupplier(quote.id);
-                                }}
-                              >
-                                <Factory className="ml-2 h-5 w-5" />
-                                המלץ על ספק
-                              </Button>
+                            <div>
+                              <p className="text-sm text-muted-foreground">סטטוס</p>
+                              <div className="mt-1">{getStatusBadge(quote.status)}</div>
+                            </div>
+                            <div>
+                              <p className="text-sm text-muted-foreground">סה"כ</p>
+                              <p className="font-medium text-lg">{quote.finalValue ? `₪${Number(quote.finalValue).toLocaleString()}` : "-"}</p>
                             </div>
                           </div>
 
-                          {/* Items Section */}
+                          {/* Items - Compact */}
                           {quoteDetails.items && quoteDetails.items.length > 0 && (
                             <div>
-                              <h4 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                                <Package className="h-5 w-5 text-slate-600" />
-                                פריטים בהצעה ({quoteDetails.items.length})
-                              </h4>
-                              <div className="bg-slate-50 rounded-xl border overflow-hidden">
-                                <table className="w-full">
-                                  <thead className="bg-slate-100">
-                                    <tr>
-                                      <th className="text-right py-3 px-4 text-sm font-medium text-slate-600">מוצר</th>
-                                      <th className="text-center py-3 px-4 text-sm font-medium text-slate-600">גודל</th>
-                                      <th className="text-center py-3 px-4 text-sm font-medium text-slate-600">כמות</th>
-                                      <th className="text-left py-3 px-4 text-sm font-medium text-slate-600">מחיר</th>
-                                      <th className="text-center py-3 px-4 text-sm font-medium text-slate-600">פעולות</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="divide-y divide-slate-200">
-                                    {quoteDetails.items.map((item: any, index: number) => {
-                                      const fullName = item.productName || getSizeQuantityName(item.sizeQuantityId);
-                                      const parts = fullName.split(' - ');
-                                      const productName = parts[0] || fullName;
-                                      const sizeName = parts[1] || '-';
-                                      return (
-                                        <tr key={index} className="bg-white hover:bg-slate-50 transition-colors">
-                                          <td className="py-4 px-4">
-                                            <p className="font-medium text-slate-900">{productName}</p>
-                                            {item.notes && (
-                                              <p className="text-xs text-slate-500 mt-1">{item.notes}</p>
-                                            )}
-                                          </td>
-                                          <td className="py-4 px-4 text-center">
-                                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                              {sizeName}
-                                            </span>
-                                          </td>
-                                          <td className="py-4 px-4 text-center">
-                                            <span className="font-semibold text-slate-900">{item.quantity}</span>
-                                          </td>
-                                          <td className="py-4 px-4 text-left">
-                                            <span className="font-semibold text-slate-900">
-                                              {item.priceAtTimeOfQuote ? `₪${Number(item.priceAtTimeOfQuote).toLocaleString()}` : '-'}
-                                            </span>
-                                          </td>
-                                          <td className="py-4 px-4 text-center">
-                                            <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              className="text-slate-500 hover:text-slate-900"
-                                              onClick={(e) => e.stopPropagation()}
-                                            >
-                                              <Pencil className="h-4 w-4" />
-                                            </Button>
-                                          </td>
-                                        </tr>
-                                      );
-                                    })}
-                                  </tbody>
-                                </table>
+                              <p className="text-sm text-muted-foreground mb-2">פריטים ({quoteDetails.items.length})</p>
+                              <div className="space-y-2">
+                                {quoteDetails.items.map((item: any, index: number) => {
+                                  const fullName = item.productName || getSizeQuantityName(item.sizeQuantityId);
+                                  const parts = fullName.split(' - ');
+                                  const productName = parts[0] || fullName;
+                                  const sizeName = parts[1] || '';
+                                  return (
+                                    <div key={index} className="flex items-center justify-between p-3 bg-background rounded border">
+                                      <div className="flex items-center gap-3">
+                                        <span className="font-medium">{productName}</span>
+                                        {sizeName && <Badge variant="outline" className="text-xs">{sizeName}</Badge>}
+                                        <span className="text-muted-foreground">× {item.quantity}</span>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-medium">{item.priceAtTimeOfQuote ? `₪${Number(item.priceAtTimeOfQuote).toLocaleString()}` : '-'}</span>
+                                        <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()}>
+                                          <Pencil className="h-3 w-3" />
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                               </div>
                             </div>
                           )}
 
+                          {/* Recommended Suppliers - Inline */}
+                          <SupplierRecommendationsInline 
+                            quoteId={quote.id} 
+                            onSupplierSelected={() => refetch()}
+                          />
+
                           {/* Action Buttons */}
-                          <div className="flex flex-wrap gap-2 pt-4 border-t">
+                          <div className="flex flex-wrap gap-2 pt-3 border-t">
                             {getActionButtons(quote)}
                           </div>
 
-                          {/* Attachments */}
+                          {/* Attachments - Compact */}
                           {quoteDetails.attachments && quoteDetails.attachments.length > 0 && (
-                            <div className="pt-4 border-t">
-                              <h4 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                                <FileText className="h-5 w-5 text-slate-600" />
-                                קבצים מצורפים ({quoteDetails.attachments.length})
-                              </h4>
-                              <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <p className="text-sm text-muted-foreground mb-2">קבצים ({quoteDetails.attachments.length})</p>
+                              <div className="flex flex-wrap gap-2">
                                 {quoteDetails.attachments.map((attachment: any) => (
                                   <a
                                     key={attachment.id}
                                     href={attachment.fileUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border hover:bg-slate-100 transition-colors"
+                                    className="flex items-center gap-2 px-3 py-2 bg-background rounded border hover:bg-muted transition-colors"
                                   >
-                                    <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
-                                      <FileText className="h-5 w-5 text-blue-600" />
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                      <p className="font-medium text-sm text-slate-900 truncate">{attachment.fileName}</p>
-                                      <p className="text-xs text-slate-500">
-                                        {new Date(attachment.uploadedAt).toLocaleDateString('he-IL')}
-                                      </p>
-                                    </div>
+                                    <FileText className="h-4 w-4 text-muted-foreground" />
+                                    <span className="text-sm">{attachment.fileName}</span>
                                   </a>
                                 ))}
                               </div>
                             </div>
                           )}
 
-                          {/* Rejection Reason */}
+                          {/* Rejection Reason - Compact */}
                           {quoteDetails.rejectionReason && (
-                            <div className="p-4 bg-red-50 rounded-xl border border-red-200">
-                              <div className="flex items-start gap-3">
-                                <XCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
-                                <div>
-                                  <p className="font-medium text-red-800">סיבת דחייה</p>
-                                  <p className="text-sm text-red-600 mt-1">{quoteDetails.rejectionReason}</p>
-                                </div>
-                              </div>
+                            <div className="p-3 bg-red-50 rounded border border-red-200">
+                              <p className="text-sm"><span className="font-medium text-red-700">סיבת דחייה:</span> <span className="text-red-600">{quoteDetails.rejectionReason}</span></p>
                             </div>
                           )}
 
-                          {/* History Toggle */}
-                          <div className="pt-4 border-t">
+                          {/* History Toggle - Compact */}
+                          <div className="pt-3 border-t">
                             <Button
                               variant="ghost"
                               size="sm"
@@ -746,35 +685,35 @@ export default function Quotes() {
                                 e.stopPropagation();
                                 setShowHistory(!showHistory);
                               }}
-                              className="text-slate-500 hover:text-slate-900"
+                              className="text-muted-foreground h-8 px-2"
                             >
-                              <History className="ml-2 h-4 w-4" />
-                              {showHistory ? "הסתר היסטוריה" : "הצג היסטוריית גרסאות"}
+                              <History className="ml-1 h-3 w-3" />
+                              {showHistory ? "הסתר היסטוריה" : "היסטוריה"}
                             </Button>
 
                             {showHistory && quoteHistory && (
-                              <div className="mt-3 space-y-2">
+                              <div className="mt-2 space-y-1">
                                 {quoteHistory.map((version) => (
                                   <div
                                     key={version.id}
                                     className={cn(
-                                      "flex items-center justify-between p-3 rounded-lg border",
+                                      "flex items-center justify-between p-2 rounded border text-sm",
                                       version.id === quote.id
                                         ? "border-primary bg-primary/5"
-                                        : "bg-slate-50"
+                                        : "bg-background"
                                     )}
                                   >
-                                    <div className="flex items-center gap-3">
-                                      <Badge variant="outline">v{version.version}</Badge>
+                                    <div className="flex items-center gap-2">
+                                      <Badge variant="outline" className="text-xs">v{version.version}</Badge>
                                       {version.id === quote.id && (
-                                        <Badge variant="default" className="text-xs">נוכחי</Badge>
+                                        <Badge variant="default" className="text-[10px] px-1">נוכחי</Badge>
                                       )}
                                       {getStatusBadge(version.status)}
                                     </div>
-                                    <div className="text-sm text-slate-500">
+                                    <div className="text-muted-foreground">
                                       {new Date(version.createdAt).toLocaleDateString("he-IL")}
                                       {version.finalValue && (
-                                        <span className="mr-2 font-medium text-slate-900">
+                                        <span className="mr-2 font-medium text-foreground">
                                           ₪{Number(version.finalValue).toLocaleString()}
                                         </span>
                                       )}
@@ -784,7 +723,7 @@ export default function Quotes() {
                               </div>
                             )}
                           </div>
-                        </>
+                        </div>
                       )}
                     </div>
                   </CollapsibleContent>
@@ -1126,5 +1065,154 @@ function SupplierSelectionModal({
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+
+// ==================== SUPPLIER RECOMMENDATIONS INLINE ====================
+
+function SupplierRecommendationsInline({ 
+  quoteId, 
+  onSupplierSelected 
+}: { 
+  quoteId: number;
+  onSupplierSelected: () => void;
+}) {
+  const [confirmSupplier, setConfirmSupplier] = useState<SupplierRecommendation | null>(null);
+
+  const { data: recommendations, isLoading } = trpc.suppliers.enhancedRecommendations.useQuery(
+    { productId: undefined, limit: 3 },
+    { enabled: !!quoteId }
+  );
+
+  const assignSupplierMutation = trpc.quotes.assignSupplier.useMutation({
+    onSuccess: () => {
+      toast.success("העבודה הועברה לספק בהצלחה!");
+      setConfirmSupplier(null);
+      onSupplierSelected();
+    },
+    onError: (error) => {
+      toast.error(`שגיאה בהעברה לספק: ${error.message}`);
+    },
+  });
+
+  const handleConfirmSupplier = () => {
+    if (confirmSupplier) {
+      assignSupplierMutation.mutate({
+        quoteId,
+        supplierId: confirmSupplier.supplierId,
+      });
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="p-3 bg-background rounded border">
+        <p className="text-sm text-muted-foreground mb-2">ספקים מומלצים</p>
+        <div className="flex gap-2">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-10 flex-1 bg-muted animate-pulse rounded" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (!recommendations || recommendations.length === 0) {
+    return (
+      <div className="p-3 bg-background rounded border">
+        <p className="text-sm text-muted-foreground">לא נמצאו ספקים מומלצים</p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="p-3 bg-background rounded border">
+        <p className="text-sm text-muted-foreground mb-2">ספקים מומלצים</p>
+        <div className="flex gap-2">
+          {recommendations.slice(0, 3).map((supplier: SupplierRecommendation, index: number) => {
+            const score = supplier.totalScore || supplier.score || 0;
+            const rating = supplier.rating || supplier.avgRating || 0;
+            return (
+              <button
+                key={supplier.supplierId}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setConfirmSupplier(supplier);
+                }}
+                className={cn(
+                  "flex-1 p-2 rounded border text-right transition-all hover:shadow-sm",
+                  index === 0 
+                    ? "bg-green-50 border-green-200 hover:border-green-300" 
+                    : "bg-muted/50 hover:bg-muted"
+                )}
+              >
+                <p className="font-medium text-sm truncate">{supplier.supplierName}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-xs text-muted-foreground">⭐ {rating.toFixed(1)}</span>
+                  {index === 0 && (
+                    <Badge variant="outline" className="text-[10px] px-1 py-0 bg-green-100 text-green-700 border-green-200">
+                      מומלץ
+                    </Badge>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Confirm Dialog */}
+      <Dialog open={!!confirmSupplier} onOpenChange={() => setConfirmSupplier(null)}>
+        <DialogContent className="sm:max-w-[400px]" dir="rtl">
+          <DialogHeader>
+            <DialogTitle>העברת עבודה לספק</DialogTitle>
+            <DialogDescription>
+              האם להעביר את העבודה לספק <strong>{confirmSupplier?.supplierName}</strong>?
+            </DialogDescription>
+          </DialogHeader>
+          
+          {confirmSupplier && (
+            <div className="p-4 bg-muted rounded-lg space-y-2">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">שם הספק:</span>
+                <span className="font-medium">{confirmSupplier.supplierName}</span>
+              </div>
+              {confirmSupplier.companyName && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">חברה:</span>
+                  <span className="font-medium">{confirmSupplier.companyName}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">דירוג:</span>
+                <span className="font-medium">⭐ {(confirmSupplier.rating || confirmSupplier.avgRating || 0).toFixed(1)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">מחיר:</span>
+                <span className="font-medium">₪{confirmSupplier.pricePerUnit || confirmSupplier.price || 0}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">זמן אספקה:</span>
+                <span className="font-medium">{confirmSupplier.deliveryDays || confirmSupplier.avgDeliveryDays || 0} ימים</span>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setConfirmSupplier(null)}>
+              ביטול
+            </Button>
+            <Button 
+              onClick={handleConfirmSupplier}
+              disabled={assignSupplierMutation.isPending}
+            >
+              {assignSupplierMutation.isPending ? "מעביר..." : "אשר והעבר לספק"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
