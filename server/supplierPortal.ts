@@ -15,18 +15,19 @@ export const supplierPortalRouter = router({
   dashboard: protectedProcedure
     .query(async ({ ctx }) => {
       if (!ctx.user) throw new Error("Not authenticated");
-      if (ctx.user.role !== "supplier") {
+      // Admin and employees can also view supplier portal for testing/development
+      if (ctx.user.role !== "supplier" && ctx.user.role !== "admin" && ctx.user.role !== "employee") {
         throw new Error("Only suppliers can access supplier portal");
       }
 
       const db = await getDb();
       if (!db) throw new Error("Database not available");
 
-      // Get supplier's price listings
-      const prices = await db
-        .select()
-        .from(supplierPrices)
-        .where(eq(supplierPrices.supplierId, ctx.user.id));
+      // Get supplier's price listings (or all prices for admin/employee)
+      const isAdminOrEmployee = ctx.user.role === "admin" || ctx.user.role === "employee";
+      const prices = isAdminOrEmployee
+        ? await db.select().from(supplierPrices)
+        : await db.select().from(supplierPrices).where(eq(supplierPrices.supplierId, ctx.user.id));
 
       if (prices.length === 0) {
         return {
@@ -61,7 +62,7 @@ export const supplierPortalRouter = router({
     )
     .query(async ({ ctx, input }) => {
       if (!ctx.user) throw new Error("Not authenticated");
-      if (ctx.user.role !== "supplier") {
+      if (ctx.user.role !== "supplier" && ctx.user.role !== "admin" && ctx.user.role !== "employee") {
         throw new Error("Only suppliers can access supplier portal");
       }
 
@@ -69,9 +70,10 @@ export const supplierPortalRouter = router({
       if (!db) throw new Error("Database not available");
 
       const offset = (input.page - 1) * input.limit;
+      const isAdminOrEmployee = ctx.user.role === "admin" || ctx.user.role === "employee";
 
-      // Get all prices with size+quantity info
-      const allPrices = await db
+      // Get all prices with size+quantity info (all prices for admin/employee)
+      const baseQuery = db
         .select({
           id: supplierPrices.id,
           price: supplierPrices.pricePerUnit,
@@ -96,9 +98,11 @@ export const supplierPortalRouter = router({
         .innerJoin(
           baseProducts,
           eq(productSizes.productId, baseProducts.id)
-        )
-        .where(eq(supplierPrices.supplierId, ctx.user.id))
-        .orderBy(desc(supplierPrices.updatedAt));
+        );
+
+      const allPrices = isAdminOrEmployee
+        ? await baseQuery.orderBy(desc(supplierPrices.updatedAt))
+        : await baseQuery.where(eq(supplierPrices.supplierId, ctx.user.id)).orderBy(desc(supplierPrices.updatedAt));
 
       // Filter by search if provided
       let filteredPrices = allPrices;
@@ -132,7 +136,7 @@ export const supplierPortalRouter = router({
     )
     .query(async ({ ctx, input }) => {
       if (!ctx.user) throw new Error("Not authenticated");
-      if (ctx.user.role !== "supplier") {
+      if (ctx.user.role !== "supplier" && ctx.user.role !== "admin" && ctx.user.role !== "employee") {
         throw new Error("Only suppliers can access supplier portal");
       }
 
@@ -172,11 +176,11 @@ export const supplierPortalRouter = router({
         );
       }
 
-      // Get supplier's existing prices
-      const existingPrices = await db
-        .select({ sizeQuantityId: supplierPrices.sizeQuantityId })
-        .from(supplierPrices)
-        .where(eq(supplierPrices.supplierId, ctx.user.id));
+      // Get supplier's existing prices (or all prices for admin/employee)
+      const isAdminOrEmployee = ctx.user.role === "admin" || ctx.user.role === "employee";
+      const existingPrices = isAdminOrEmployee
+        ? await db.select({ sizeQuantityId: supplierPrices.sizeQuantityId }).from(supplierPrices)
+        : await db.select({ sizeQuantityId: supplierPrices.sizeQuantityId }).from(supplierPrices).where(eq(supplierPrices.supplierId, ctx.user.id));
 
       const existingSizeQuantityIds = new Set(
         existingPrices.map((p) => p.sizeQuantityId)

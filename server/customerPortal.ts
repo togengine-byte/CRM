@@ -15,18 +15,19 @@ export const customerPortalRouter = router({
   stats: protectedProcedure
     .query(async ({ ctx }) => {
       if (!ctx.user) throw new Error("Not authenticated");
-      if (ctx.user.role !== "customer") {
+      // Admin and employees can also view customer portal for testing/development
+      if (ctx.user.role !== "customer" && ctx.user.role !== "admin" && ctx.user.role !== "employee") {
         throw new Error("Only customers can access customer portal");
       }
 
       const db = await getDb();
       if (!db) throw new Error("Database not available");
 
-      // Get all quotes for this customer
-      const allQuotes = await db
-        .select({ status: quotes.status })
-        .from(quotes)
-        .where(eq(quotes.customerId, ctx.user.id));
+      // Get all quotes for this customer (or all quotes for admin/employee)
+      const isAdminOrEmployee = ctx.user.role === "admin" || ctx.user.role === "employee";
+      const allQuotes = isAdminOrEmployee
+        ? await db.select({ status: quotes.status }).from(quotes)
+        : await db.select({ status: quotes.status }).from(quotes).where(eq(quotes.customerId, ctx.user.id));
 
       const total = allQuotes.length;
       const pending = allQuotes.filter(q => q.status === "sent").length;
@@ -57,26 +58,40 @@ export const customerPortalRouter = router({
     )
     .query(async ({ ctx, input }) => {
       if (!ctx.user) throw new Error("Not authenticated");
-      if (ctx.user.role !== "customer") {
+      if (ctx.user.role !== "customer" && ctx.user.role !== "admin" && ctx.user.role !== "employee") {
         throw new Error("Only customers can access customer portal");
       }
 
       const db = await getDb();
       if (!db) throw new Error("Database not available");
 
-      // Get quotes for this customer only (excluding superseded versions by default)
-      let allQuotes = await db
-        .select({
-          id: quotes.id,
-          status: quotes.status,
-          version: quotes.version,
-          finalValue: quotes.finalValue,
-          createdAt: quotes.createdAt,
-          parentQuoteId: quotes.parentQuoteId,
-        })
-        .from(quotes)
-        .where(eq(quotes.customerId, ctx.user.id))
-        .orderBy(desc(quotes.createdAt));
+      const isAdminOrEmployee = ctx.user.role === "admin" || ctx.user.role === "employee";
+
+      // Get quotes for this customer only (or all quotes for admin/employee)
+      let allQuotes = isAdminOrEmployee
+        ? await db
+            .select({
+              id: quotes.id,
+              status: quotes.status,
+              version: quotes.version,
+              finalValue: quotes.finalValue,
+              createdAt: quotes.createdAt,
+              parentQuoteId: quotes.parentQuoteId,
+            })
+            .from(quotes)
+            .orderBy(desc(quotes.createdAt))
+        : await db
+            .select({
+              id: quotes.id,
+              status: quotes.status,
+              version: quotes.version,
+              finalValue: quotes.finalValue,
+              createdAt: quotes.createdAt,
+              parentQuoteId: quotes.parentQuoteId,
+            })
+            .from(quotes)
+            .where(eq(quotes.customerId, ctx.user.id))
+            .orderBy(desc(quotes.createdAt));
 
       // Filter by status if provided
       if (input?.status) {
@@ -102,23 +117,19 @@ export const customerPortalRouter = router({
     .input(z.object({ quoteId: z.number() }))
     .query(async ({ ctx, input }) => {
       if (!ctx.user) throw new Error("Not authenticated");
-      if (ctx.user.role !== "customer") {
+      if (ctx.user.role !== "customer" && ctx.user.role !== "admin" && ctx.user.role !== "employee") {
         throw new Error("Only customers can access customer portal");
       }
 
       const db = await getDb();
       if (!db) throw new Error("Database not available");
 
-      // Get quote - verify it belongs to this customer
-      const quoteResult = await db
-        .select()
-        .from(quotes)
-        .where(
-          and(
-            eq(quotes.id, input.quoteId),
-            eq(quotes.customerId, ctx.user.id)
-          )
-        );
+      const isAdminOrEmployee = ctx.user.role === "admin" || ctx.user.role === "employee";
+
+      // Get quote - verify it belongs to this customer (or any quote for admin/employee)
+      const quoteResult = isAdminOrEmployee
+        ? await db.select().from(quotes).where(eq(quotes.id, input.quoteId))
+        : await db.select().from(quotes).where(and(eq(quotes.id, input.quoteId), eq(quotes.customerId, ctx.user.id)));
 
       if (quoteResult.length === 0) {
         throw new Error("Quote not found");
