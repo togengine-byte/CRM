@@ -28,18 +28,19 @@
 
 ### 1. **Secret Key קשיח בקוד**
 
-**קובץ**: `server/routers.ts` (שורה 164)
+**קובץ**: `server/routers.ts`
 
-**בעיה**: מפתח סודי (`SETUP_ADMIN_2024`) מוטמע בקוד.
+**בעיה מקורית**: מפתח סודי (`SETUP_ADMIN_2024`) היה מוטמע בקוד.
+
+**סטטוס**: **תוקן**
+
+**פתרון שיושם**: הקוד עודכן לשימוש במשתנה סביבה `ADMIN_SETUP_KEY`:
 ```typescript
-if (input.secretKey !== 'SETUP_ADMIN_2024') {
+const adminSetupKey = process.env.ADMIN_SETUP_KEY || 'CHANGE_THIS_DEFAULT_KEY';
+if (input.secretKey !== adminSetupKey) {
   throw new Error('Invalid secret key');
 }
 ```
-
-**סטטוס**: **קיים (קריטי לתיקון)**
-
-**פתרון**: להעביר ל-environment variable.
 
 ---
 
