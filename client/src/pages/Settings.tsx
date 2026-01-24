@@ -62,10 +62,13 @@ import {
   Building2,
   UserPlus,
   Key,
+  ExternalLink,
+  ShoppingBag,
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { Loader2 } from "lucide-react";
+import { useLocation } from "wouter";
 
 // ==================== DEVELOPER LOGS SETTINGS ====================
 function DeveloperLogsSettings() {
@@ -1183,7 +1186,7 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="staff" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6 lg:w-[750px]">
+        <TabsList className="grid w-full grid-cols-7 lg:w-[875px]">
           <TabsTrigger value="staff" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             עובדים
@@ -1207,6 +1210,10 @@ export default function Settings() {
           <TabsTrigger value="developers" className="flex items-center gap-2">
             <Key className="h-4 w-4" />
             מפתחים
+          </TabsTrigger>
+          <TabsTrigger value="portals" className="flex items-center gap-2">
+            <ExternalLink className="h-4 w-4" />
+            פורטלים
           </TabsTrigger>
         </TabsList>
 
@@ -1535,6 +1542,115 @@ export default function Settings() {
 
         <TabsContent value="developers">
           <DeveloperLogsSettings />
+        </TabsContent>
+
+        <TabsContent value="portals">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ExternalLink className="h-5 w-5 text-blue-600" />
+                גישה מהירה לפורטלים
+              </CardTitle>
+              <CardDescription>
+                צפה בפורטלים של ספקים, שליחים ולקוחות לצורך בדיקה ופיתוח
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-3">
+                {/* פורטל ספקים */}
+                <Card className="border-2 hover:border-purple-300 transition-colors">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-purple-100 rounded-lg">
+                        <Package className="h-6 w-6 text-purple-600" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg">פורטל ספקים</CardTitle>
+                        <CardDescription>ניהול מחירים ועבודות</CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      ספקים יכולים לנהל מחירים, לראות עבודות שהוקצו להם ולסמן מוכנות.
+                    </p>
+                    <Button 
+                      className="w-full" 
+                      variant="outline"
+                      onClick={() => window.open('/supplier-portal', '_blank')}
+                    >
+                      <ExternalLink className="ml-2 h-4 w-4" />
+                      פתח פורטל ספקים
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                {/* פורטל שליחים */}
+                <Card className="border-2 hover:border-orange-300 transition-colors">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-orange-100 rounded-lg">
+                        <Truck className="h-6 w-6 text-orange-600" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg">פורטל שליחים</CardTitle>
+                        <CardDescription>איסוף ומשלוחים</CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      שליחים יכולים לראות עבודות מוכנות לאיסוף, לסמן איסוף ומסירה.
+                    </p>
+                    <Button 
+                      className="w-full" 
+                      variant="outline"
+                      onClick={() => window.open('/courier-portal', '_blank')}
+                    >
+                      <ExternalLink className="ml-2 h-4 w-4" />
+                      פתח פורטל שליחים
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                {/* פורטל לקוחות */}
+                <Card className="border-2 hover:border-green-300 transition-colors">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-green-100 rounded-lg">
+                        <ShoppingBag className="h-6 w-6 text-green-600" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg">פורטל לקוחות</CardTitle>
+                        <CardDescription>הצעות מחיר ואישורים</CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      לקוחות יכולים לצפות בהצעות מחיר, לאשר או לדחות ולעקוב אחרי הזמנות.
+                    </p>
+                    <Button 
+                      className="w-full" 
+                      variant="outline"
+                      onClick={() => window.open('/customer-portal', '_blank')}
+                    >
+                      <ExternalLink className="ml-2 h-4 w-4" />
+                      פתח פורטל לקוחות
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <h4 className="font-semibold text-blue-900 mb-2">הערה</h4>
+                <p className="text-sm text-blue-800">
+                  הפורטלים ייפתחו בחלון חדש. כמנהל מערכת, אתה יכול לצפות בכל הפורטלים לצורך בדיקה ופיתוח.
+                  משתמשים רגילים (ספקים, שליחים, לקוחות) יראו רק את הפורטל הרלוונטי לתפקידם.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>
