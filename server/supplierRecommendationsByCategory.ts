@@ -223,7 +223,7 @@ export async function getRecommendationsByCategory(
           pricePerUnit: sp.pricePerUnit,
           deliveryDays: sp.deliveryDays,
         });
-        coverage.totalPrice += sp.pricePerUnit * item.quantity;
+        coverage.totalPrice += sp.pricePerUnit; // המחיר כבר כולל את הכמות (מחיר לכמות, לא ליחידה)
         coverage.maxDeliveryDays = Math.max(coverage.maxDeliveryDays, sp.deliveryDays);
       }
     }
