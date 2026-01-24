@@ -13,7 +13,8 @@ import { eq, and, desc } from "drizzle-orm";
 export const supplierPortalRouter = router({
   // ==================== DASHBOARD ====================
   dashboard: protectedProcedure
-    .query(async ({ ctx }) => {
+    .input(z.object({ supplierId: z.number().optional() }).optional())
+    .query(async ({ ctx, input }) => {
       if (!ctx.user) throw new Error("Not authenticated");
       // Admin and employees can also view supplier portal for testing/development
       if (ctx.user.role !== "supplier" && ctx.user.role !== "admin" && ctx.user.role !== "employee") {
@@ -23,11 +24,10 @@ export const supplierPortalRouter = router({
       const db = await getDb();
       if (!db) throw new Error("Database not available");
 
-      // Get supplier's price listings (or all prices for admin/employee)
+      // Get supplier's price listings
       const isAdminOrEmployee = ctx.user.role === "admin" || ctx.user.role === "employee";
-      const prices = isAdminOrEmployee
-        ? await db.select().from(supplierPrices)
-        : await db.select().from(supplierPrices).where(eq(supplierPrices.supplierId, ctx.user.id));
+      const targetSupplierId = isAdminOrEmployee && input?.supplierId ? input.supplierId : ctx.user.id;
+      const prices = await db.select().from(supplierPrices).where(eq(supplierPrices.supplierId, targetSupplierId));
 
       if (prices.length === 0) {
         return {
@@ -58,6 +58,7 @@ export const supplierPortalRouter = router({
         page: z.number().int().positive().default(1),
         limit: z.number().int().positive().max(100).default(20),
         search: z.string().optional(),
+        supplierId: z.number().optional(),
       })
     )
     .query(async ({ ctx, input }) => {
@@ -71,9 +72,10 @@ export const supplierPortalRouter = router({
 
       const offset = (input.page - 1) * input.limit;
       const isAdminOrEmployee = ctx.user.role === "admin" || ctx.user.role === "employee";
+      const targetSupplierId = isAdminOrEmployee && input.supplierId ? input.supplierId : ctx.user.id;
 
-      // Get all prices with size+quantity info (all prices for admin/employee)
-      const baseQuery = db
+      // Get all prices with size+quantity info for target supplier
+      const allPrices = await db
         .select({
           id: supplierPrices.id,
           price: supplierPrices.pricePerUnit,
@@ -98,11 +100,9 @@ export const supplierPortalRouter = router({
         .innerJoin(
           baseProducts,
           eq(productSizes.productId, baseProducts.id)
-        );
-
-      const allPrices = isAdminOrEmployee
-        ? await baseQuery.orderBy(desc(supplierPrices.updatedAt))
-        : await baseQuery.where(eq(supplierPrices.supplierId, ctx.user.id)).orderBy(desc(supplierPrices.updatedAt));
+        )
+        .where(eq(supplierPrices.supplierId, targetSupplierId))
+        .orderBy(desc(supplierPrices.updatedAt));
 
       // Filter by search if provided
       let filteredPrices = allPrices;
@@ -132,6 +132,7 @@ export const supplierPortalRouter = router({
     .input(
       z.object({
         search: z.string().optional(),
+        supplierId: z.number().optional(),
       })
     )
     .query(async ({ ctx, input }) => {
@@ -142,6 +143,9 @@ export const supplierPortalRouter = router({
 
       const db = await getDb();
       if (!db) throw new Error("Database not available");
+
+      const isAdminOrEmployee = ctx.user.role === "admin" || ctx.user.role === "employee";
+      const targetSupplierId = isAdminOrEmployee && input.supplierId ? input.supplierId : ctx.user.id;
 
       // Get all size quantities with product info
       const allSizeQuantities = await db
@@ -176,11 +180,8 @@ export const supplierPortalRouter = router({
         );
       }
 
-      // Get supplier's existing prices (or all prices for admin/employee)
-      const isAdminOrEmployee = ctx.user.role === "admin" || ctx.user.role === "employee";
-      const existingPrices = isAdminOrEmployee
-        ? await db.select({ sizeQuantityId: supplierPrices.sizeQuantityId }).from(supplierPrices)
-        : await db.select({ sizeQuantityId: supplierPrices.sizeQuantityId }).from(supplierPrices).where(eq(supplierPrices.supplierId, ctx.user.id));
+      // Get target supplier's existing prices
+      const existingPrices = await db.select({ sizeQuantityId: supplierPrices.sizeQuantityId }).from(supplierPrices).where(eq(supplierPrices.supplierId, targetSupplierId));
 
       const existingSizeQuantityIds = new Set(
         existingPrices.map((p) => p.sizeQuantityId)
@@ -202,16 +203,20 @@ export const supplierPortalRouter = router({
         sizeQuantityId: z.number(),
         price: z.number().positive("Price must be positive"),
         deliveryDays: z.number().int().positive("Delivery days must be positive"),
+        supplierId: z.number().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       if (!ctx.user) throw new Error("Not authenticated");
-      if (ctx.user.role !== "supplier") {
+      if (ctx.user.role !== "supplier" && ctx.user.role !== "admin" && ctx.user.role !== "employee") {
         throw new Error("Only suppliers can access supplier portal");
       }
 
       const db = await getDb();
       if (!db) throw new Error("Database not available");
+
+      const isAdminOrEmployee = ctx.user.role === "admin" || ctx.user.role === "employee";
+      const targetSupplierId = isAdminOrEmployee && input.supplierId ? input.supplierId : ctx.user.id;
 
       // Check if price already exists
       const existing = await db
@@ -219,7 +224,7 @@ export const supplierPortalRouter = router({
         .from(supplierPrices)
         .where(
           and(
-            eq(supplierPrices.supplierId, ctx.user.id),
+            eq(supplierPrices.supplierId, targetSupplierId),
             eq(supplierPrices.sizeQuantityId, input.sizeQuantityId)
           )
         );
@@ -230,7 +235,7 @@ export const supplierPortalRouter = router({
 
       // Insert new price
       await db.insert(supplierPrices).values({
-        supplierId: ctx.user.id,
+        supplierId: targetSupplierId,
         sizeQuantityId: input.sizeQuantityId,
         pricePerUnit: input.price.toString(),
         deliveryDays: input.deliveryDays,
@@ -252,14 +257,16 @@ export const supplierPortalRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       if (!ctx.user) throw new Error("Not authenticated");
-      if (ctx.user.role !== "supplier") {
+      if (ctx.user.role !== "supplier" && ctx.user.role !== "admin" && ctx.user.role !== "employee") {
         throw new Error("Only suppliers can access supplier portal");
       }
 
       const db = await getDb();
       if (!db) throw new Error("Database not available");
 
-      // Verify ownership
+      const isAdminOrEmployee = ctx.user.role === "admin" || ctx.user.role === "employee";
+
+      // Verify ownership (admin can update any price)
       const price = await db
         .select()
         .from(supplierPrices)
@@ -269,7 +276,7 @@ export const supplierPortalRouter = router({
         throw new Error("Price not found");
       }
 
-      if (price[0].supplierId !== ctx.user.id) {
+      if (!isAdminOrEmployee && price[0].supplierId !== ctx.user.id) {
         throw new Error("You can only update your own prices");
       }
 
@@ -291,14 +298,16 @@ export const supplierPortalRouter = router({
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       if (!ctx.user) throw new Error("Not authenticated");
-      if (ctx.user.role !== "supplier") {
+      if (ctx.user.role !== "supplier" && ctx.user.role !== "admin" && ctx.user.role !== "employee") {
         throw new Error("Only suppliers can access supplier portal");
       }
 
       const db = await getDb();
       if (!db) throw new Error("Database not available");
 
-      // Verify ownership
+      const isAdminOrEmployee = ctx.user.role === "admin" || ctx.user.role === "employee";
+
+      // Verify ownership (admin can delete any price)
       const price = await db
         .select()
         .from(supplierPrices)
@@ -308,7 +317,7 @@ export const supplierPortalRouter = router({
         throw new Error("Price not found");
       }
 
-      if (price[0].supplierId !== ctx.user.id) {
+      if (!isAdminOrEmployee && price[0].supplierId !== ctx.user.id) {
         throw new Error("You can only delete your own prices");
       }
 
