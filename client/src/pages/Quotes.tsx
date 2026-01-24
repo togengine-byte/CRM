@@ -583,71 +583,141 @@ export default function Quotes() {
                     </div>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
-                    <div className="mt-2 p-4 bg-muted/30 rounded-lg border border-t-0 rounded-t-none space-y-4">
-                      {/* Action Buttons */}
-                      <div className="flex flex-wrap gap-2 pb-4 border-b">
-                        {getActionButtons(quote)}
-                      </div>
-
+                    <div className="mt-2 p-6 bg-white rounded-lg border shadow-sm space-y-6">
                       {/* Quote Details */}
                       {quoteDetails && expandedQuoteId === quote.id && (
                         <>
-                          {/* Items */}
+                          {/* Header with Quote Info */}
+                          <div className="flex items-center justify-between pb-4 border-b">
+                            <div>
+                              <h3 className="text-xl font-bold text-slate-900">הצעת מחיר #{quote.id}</h3>
+                              <p className="text-sm text-slate-500 mt-1">
+                                לקוח: {quote.customerName || "לא מזוהה"} • {new Date(quote.createdAt).toLocaleDateString("he-IL")}
+                              </p>
+                            </div>
+                            <div className="text-left">
+                              <p className="text-2xl font-bold text-slate-900">
+                                {quote.finalValue ? `₪${Number(quote.finalValue).toLocaleString()}` : "-"}
+                              </p>
+                              <p className="text-xs text-slate-500">סה"כ כולל</p>
+                            </div>
+                          </div>
+
+                          {/* Recommend Supplier Button - Prominent */}
+                          <div className="bg-gradient-to-r from-purple-50 to-indigo-50 p-4 rounded-xl border border-purple-200">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <h4 className="font-semibold text-purple-900">מצא ספק מתאים</h4>
+                                <p className="text-sm text-purple-600">קבל המלצות על ספקים לפי מחיר, איכות ואמינות</p>
+                              </div>
+                              <Button
+                                size="lg"
+                                className="bg-purple-600 hover:bg-purple-700 text-white shadow-md"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleFindSupplier(quote.id);
+                                }}
+                              >
+                                <Factory className="ml-2 h-5 w-5" />
+                                המלץ על ספק
+                              </Button>
+                            </div>
+                          </div>
+
+                          {/* Items Section */}
                           {quoteDetails.items && quoteDetails.items.length > 0 && (
                             <div>
-                              <h4 className="font-medium mb-3 flex items-center gap-2">
-                                <Eye className="h-4 w-4" />
-                                פריטים בהצעה
+                              <h4 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                                <Package className="h-5 w-5 text-slate-600" />
+                                פריטים בהצעה ({quoteDetails.items.length})
                               </h4>
-                              <div className="grid gap-2">
-                                {quoteDetails.items.map((item: any, index: number) => (
-                                  <div
-                                    key={index}
-                                    className="flex justify-between items-center p-3 bg-background rounded-lg border"
-                                  >
-                                    <div>
-                                      <p className="font-medium">{item.productName || getSizeQuantityName(item.sizeQuantityId)}</p>
-                                      <p className="text-sm text-muted-foreground">כמות: {item.quantity}</p>
-                                    </div>
-                                    {item.priceAtTimeOfQuote && (
-                                      <span className="font-medium">
-                                        ₪{Number(item.priceAtTimeOfQuote).toLocaleString()}
-                                      </span>
-                                    )}
-                                  </div>
-                                ))}
+                              <div className="bg-slate-50 rounded-xl border overflow-hidden">
+                                <table className="w-full">
+                                  <thead className="bg-slate-100">
+                                    <tr>
+                                      <th className="text-right py-3 px-4 text-sm font-medium text-slate-600">מוצר</th>
+                                      <th className="text-center py-3 px-4 text-sm font-medium text-slate-600">גודל</th>
+                                      <th className="text-center py-3 px-4 text-sm font-medium text-slate-600">כמות</th>
+                                      <th className="text-left py-3 px-4 text-sm font-medium text-slate-600">מחיר</th>
+                                      <th className="text-center py-3 px-4 text-sm font-medium text-slate-600">פעולות</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-200">
+                                    {quoteDetails.items.map((item: any, index: number) => {
+                                      const fullName = item.productName || getSizeQuantityName(item.sizeQuantityId);
+                                      const parts = fullName.split(' - ');
+                                      const productName = parts[0] || fullName;
+                                      const sizeName = parts[1] || '-';
+                                      return (
+                                        <tr key={index} className="bg-white hover:bg-slate-50 transition-colors">
+                                          <td className="py-4 px-4">
+                                            <p className="font-medium text-slate-900">{productName}</p>
+                                            {item.notes && (
+                                              <p className="text-xs text-slate-500 mt-1">{item.notes}</p>
+                                            )}
+                                          </td>
+                                          <td className="py-4 px-4 text-center">
+                                            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                              {sizeName}
+                                            </span>
+                                          </td>
+                                          <td className="py-4 px-4 text-center">
+                                            <span className="font-semibold text-slate-900">{item.quantity}</span>
+                                          </td>
+                                          <td className="py-4 px-4 text-left">
+                                            <span className="font-semibold text-slate-900">
+                                              {item.priceAtTimeOfQuote ? `₪${Number(item.priceAtTimeOfQuote).toLocaleString()}` : '-'}
+                                            </span>
+                                          </td>
+                                          <td className="py-4 px-4 text-center">
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              className="text-slate-500 hover:text-slate-900"
+                                              onClick={(e) => e.stopPropagation()}
+                                            >
+                                              <Pencil className="h-4 w-4" />
+                                            </Button>
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
                               </div>
                             </div>
                           )}
 
+                          {/* Action Buttons */}
+                          <div className="flex flex-wrap gap-2 pt-4 border-t">
+                            {getActionButtons(quote)}
+                          </div>
+
                           {/* Attachments */}
                           {quoteDetails.attachments && quoteDetails.attachments.length > 0 && (
-                            <div>
-                              <h4 className="font-medium mb-3 flex items-center gap-2">
-                                <FileText className="h-4 w-4" />
-                                קבצים מצורפים
+                            <div className="pt-4 border-t">
+                              <h4 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                                <FileText className="h-5 w-5 text-slate-600" />
+                                קבצים מצורפים ({quoteDetails.attachments.length})
                               </h4>
-                              <div className="grid gap-2">
+                              <div className="grid grid-cols-2 gap-3">
                                 {quoteDetails.attachments.map((attachment: any) => (
                                   <a
                                     key={attachment.id}
                                     href={attachment.fileUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="flex items-center justify-between p-3 bg-background rounded-lg border hover:bg-accent/50 transition-colors cursor-pointer"
+                                    className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border hover:bg-slate-100 transition-colors"
                                   >
-                                    <div className="flex items-center gap-3">
-                                      <div className="h-8 w-8 rounded bg-blue-50 flex items-center justify-center">
-                                        <FileText className="h-4 w-4 text-blue-600" />
-                                      </div>
-                                      <div>
-                                        <p className="font-medium text-sm">{attachment.fileName}</p>
-                                        <p className="text-xs text-muted-foreground">
-                                          {new Date(attachment.uploadedAt).toLocaleDateString('he-IL')}
-                                        </p>
-                                      </div>
+                                    <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                                      <FileText className="h-5 w-5 text-blue-600" />
                                     </div>
-                                    <Eye className="h-4 w-4 text-muted-foreground" />
+                                    <div className="min-w-0 flex-1">
+                                      <p className="font-medium text-sm text-slate-900 truncate">{attachment.fileName}</p>
+                                      <p className="text-xs text-slate-500">
+                                        {new Date(attachment.uploadedAt).toLocaleDateString('he-IL')}
+                                      </p>
+                                    </div>
                                   </a>
                                 ))}
                               </div>
@@ -656,28 +726,19 @@ export default function Quotes() {
 
                           {/* Rejection Reason */}
                           {quoteDetails.rejectionReason && (
-                            <div className="p-3 bg-red-50 rounded-lg border border-red-200">
-                              <p className="text-sm font-medium text-red-700 mb-1">סיבת דחייה:</p>
-                              <p className="text-sm text-red-600">{quoteDetails.rejectionReason}</p>
+                            <div className="p-4 bg-red-50 rounded-xl border border-red-200">
+                              <div className="flex items-start gap-3">
+                                <XCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+                                <div>
+                                  <p className="font-medium text-red-800">סיבת דחייה</p>
+                                  <p className="text-sm text-red-600 mt-1">{quoteDetails.rejectionReason}</p>
+                                </div>
+                              </div>
                             </div>
                           )}
 
-                          {/* Recommend Supplier Button */}
-                          <div className="pt-4 border-t">
-                            <Button
-                              className="w-full bg-purple-600 hover:bg-purple-700 text-white"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleFindSupplier(quote.id);
-                              }}
-                            >
-                              <Search className="ml-2 h-4 w-4" />
-                              המלץ על ספק
-                            </Button>
-                          </div>
-
                           {/* History Toggle */}
-                          <div className="pt-2 border-t">
+                          <div className="pt-4 border-t">
                             <Button
                               variant="ghost"
                               size="sm"
@@ -685,9 +746,9 @@ export default function Quotes() {
                                 e.stopPropagation();
                                 setShowHistory(!showHistory);
                               }}
-                              className="text-muted-foreground"
+                              className="text-slate-500 hover:text-slate-900"
                             >
-                              <History className="ml-1 h-4 w-4" />
+                              <History className="ml-2 h-4 w-4" />
                               {showHistory ? "הסתר היסטוריה" : "הצג היסטוריית גרסאות"}
                             </Button>
 
@@ -700,7 +761,7 @@ export default function Quotes() {
                                       "flex items-center justify-between p-3 rounded-lg border",
                                       version.id === quote.id
                                         ? "border-primary bg-primary/5"
-                                        : "bg-background"
+                                        : "bg-slate-50"
                                     )}
                                   >
                                     <div className="flex items-center gap-3">
@@ -710,10 +771,10 @@ export default function Quotes() {
                                       )}
                                       {getStatusBadge(version.status)}
                                     </div>
-                                    <div className="text-sm text-muted-foreground">
+                                    <div className="text-sm text-slate-500">
                                       {new Date(version.createdAt).toLocaleDateString("he-IL")}
                                       {version.finalValue && (
-                                        <span className="mr-2 font-medium text-foreground">
+                                        <span className="mr-2 font-medium text-slate-900">
                                           ₪{Number(version.finalValue).toLocaleString()}
                                         </span>
                                       )}
