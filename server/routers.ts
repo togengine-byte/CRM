@@ -9,6 +9,7 @@ import { customerPortalRouter } from "./customerPortal";
 import { createCustomerWithQuote } from "./createCustomerWithQuote";
 import { publicProcedure, protectedProcedure, adminProcedure, router } from "./_core/trpc";
 import { getTopSupplierRecommendations, getEnhancedSupplierRecommendations } from './supplierRecommendations';
+import { getRecommendationsByCategory, createSupplierJobsForCategory } from './supplierRecommendationsByCategory';
 import {
   getUserByEmail,
   getDashboardKPIs,
@@ -1220,6 +1221,48 @@ export const appRouter = router({
           input.supplierId,
           input.supplierCost,
           input.deliveryDays
+        );
+      }),
+
+    // Get supplier recommendations grouped by category for a quote
+    recommendationsByCategory: protectedProcedure
+      .input(z.object({
+        quoteItems: z.array(z.object({
+          quoteItemId: z.number(),
+          sizeQuantityId: z.number(),
+          quantity: z.number(),
+          productName: z.string().optional(),
+        })),
+      }))
+      .query(async ({ ctx, input }) => {
+        if (!ctx.user) throw new Error("Not authenticated");
+        if (ctx.user.role !== 'admin' && ctx.user.role !== 'employee') {
+          throw new Error("Only employees can view supplier recommendations");
+        }
+        return await getRecommendationsByCategory(input.quoteItems);
+      }),
+
+    // Assign supplier to category items and create jobs
+    assignToCategory: protectedProcedure
+      .input(z.object({
+        quoteId: z.number(),
+        supplierId: z.number(),
+        items: z.array(z.object({
+          quoteItemId: z.number(),
+          sizeQuantityId: z.number(),
+          pricePerUnit: z.number(),
+          deliveryDays: z.number(),
+        })),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new Error("Not authenticated");
+        if (ctx.user.role !== 'admin' && ctx.user.role !== 'employee') {
+          throw new Error("Only employees can assign suppliers");
+        }
+        return await createSupplierJobsForCategory(
+          input.quoteId,
+          input.supplierId,
+          input.items
         );
       }),
   }),

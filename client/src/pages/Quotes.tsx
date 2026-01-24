@@ -637,9 +637,15 @@ export default function Quotes() {
                             </div>
                           )}
 
-                          {/* Recommended Suppliers - Inline */}
-                          <SupplierRecommendationsInline 
-                            quoteId={quote.id} 
+                          {/* Recommended Suppliers by Category */}
+                          <SupplierRecommendationsByCategory 
+                            quoteId={quote.id}
+                            quoteItems={quoteDetails.items?.map((item: any) => ({
+                              quoteItemId: item.id,
+                              sizeQuantityId: item.sizeQuantityId,
+                              quantity: item.quantity,
+                              productName: item.productName || getSizeQuantityName(item.sizeQuantityId),
+                            })) || []}
                             onSupplierSelected={() => refetch()}
                           />
 
@@ -1069,26 +1075,63 @@ function SupplierSelectionModal({
 }
 
 
-// ==================== SUPPLIER RECOMMENDATIONS INLINE ====================
+// ==================== SUPPLIER RECOMMENDATIONS BY CATEGORY ====================
 
-function SupplierRecommendationsInline({ 
-  quoteId, 
+interface CategoryRecommendation {
+  categoryId: number;
+  categoryName: string;
+  items: {
+    quoteItemId: number;
+    sizeQuantityId: number;
+    productName: string;
+    quantity: number;
+  }[];
+  suppliers: {
+    supplierId: number;
+    supplierName: string;
+    supplierCompany: string | null;
+    avgRating: number;
+    totalPrice: number;
+    avgDeliveryDays: number;
+    reliabilityPct: number;
+    totalScore: number;
+    rank: number;
+    canFulfill: {
+      quoteItemId: number;
+      sizeQuantityId: number;
+      pricePerUnit: number;
+      deliveryDays: number;
+    }[];
+  }[];
+}
+
+interface ConfirmSupplierData {
+  categoryId: number;
+  categoryName: string;
+  supplier: CategoryRecommendation['suppliers'][0];
+  items: CategoryRecommendation['items'];
+}
+
+function SupplierRecommendationsByCategory({ 
+  quoteId,
+  quoteItems,
   onSupplierSelected 
 }: { 
   quoteId: number;
+  quoteItems: { quoteItemId: number; sizeQuantityId: number; quantity: number; productName: string }[];
   onSupplierSelected: () => void;
 }) {
-  const [confirmSupplier, setConfirmSupplier] = useState<SupplierRecommendation | null>(null);
+  const [confirmData, setConfirmData] = useState<ConfirmSupplierData | null>(null);
 
-  const { data: recommendations, isLoading } = trpc.suppliers.enhancedRecommendations.useQuery(
-    { productId: undefined, limit: 3 },
-    { enabled: !!quoteId }
+  const { data: recommendations, isLoading } = trpc.suppliers.recommendationsByCategory.useQuery(
+    { quoteItems },
+    { enabled: quoteItems.length > 0 }
   );
 
-  const assignSupplierMutation = trpc.quotes.assignSupplier.useMutation({
+  const assignMutation = trpc.suppliers.assignToCategory.useMutation({
     onSuccess: () => {
-      toast.success("העבודה הועברה לספק בהצלחה!");
-      setConfirmSupplier(null);
+      toast.success(`העבודה הועברה לספק בהצלחה!`);
+      setConfirmData(null);
       onSupplierSelected();
     },
     onError: (error) => {
@@ -1097,10 +1140,11 @@ function SupplierRecommendationsInline({
   });
 
   const handleConfirmSupplier = () => {
-    if (confirmSupplier) {
-      assignSupplierMutation.mutate({
+    if (confirmData) {
+      assignMutation.mutate({
         quoteId,
-        supplierId: confirmSupplier.supplierId,
+        supplierId: confirmData.supplier.supplierId,
+        items: confirmData.supplier.canFulfill,
       });
     }
   };
@@ -1108,11 +1152,9 @@ function SupplierRecommendationsInline({
   if (isLoading) {
     return (
       <div className="p-3 bg-background rounded border">
-        <p className="text-sm text-muted-foreground mb-2">ספקים מומלצים</p>
-        <div className="flex gap-2">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-10 flex-1 bg-muted animate-pulse rounded" />
-          ))}
+        <p className="text-sm text-muted-foreground mb-2">טוען ספקים מומלצים...</p>
+        <div className="space-y-2">
+          <div className="h-16 bg-muted animate-pulse rounded" />
         </div>
       </div>
     );
@@ -1121,94 +1163,140 @@ function SupplierRecommendationsInline({
   if (!recommendations || recommendations.length === 0) {
     return (
       <div className="p-3 bg-background rounded border">
-        <p className="text-sm text-muted-foreground">לא נמצאו ספקים מומלצים</p>
+        <p className="text-sm text-muted-foreground">לא נמצאו ספקים מומלצים למוצרים בהצעה</p>
       </div>
     );
   }
 
   return (
     <>
-      <div className="p-3 bg-background rounded border">
-        <p className="text-sm text-muted-foreground mb-2">ספקים מומלצים</p>
-        <div className="flex gap-2">
-          {recommendations.slice(0, 3).map((supplier: SupplierRecommendation, index: number) => {
-            const score = supplier.totalScore || supplier.score || 0;
-            const rating = supplier.rating || supplier.avgRating || 0;
-            return (
-              <button
-                key={supplier.supplierId}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setConfirmSupplier(supplier);
-                }}
-                className={cn(
-                  "flex-1 p-2 rounded border text-right transition-all hover:shadow-sm",
-                  index === 0 
-                    ? "bg-green-50 border-green-200 hover:border-green-300" 
-                    : "bg-muted/50 hover:bg-muted"
-                )}
-              >
-                <p className="font-medium text-sm truncate">{supplier.supplierName}</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="text-xs text-muted-foreground">⭐ {rating.toFixed(1)}</span>
-                  {index === 0 && (
-                    <Badge variant="outline" className="text-[10px] px-1 py-0 bg-green-100 text-green-700 border-green-200">
-                      מומלץ
-                    </Badge>
-                  )}
-                </div>
-              </button>
-            );
-          })}
-        </div>
+      <div className="space-y-3">
+        {(recommendations as CategoryRecommendation[]).map((category) => (
+          <div key={category.categoryId} className="p-3 bg-background rounded border">
+            {/* Category Header */}
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <p className="font-medium text-sm">{category.categoryName}</p>
+                <p className="text-xs text-muted-foreground">
+                  {category.items.map(i => i.productName).join(', ')}
+                </p>
+              </div>
+              <Badge variant="outline" className="text-xs">
+                {category.items.length} פריטים
+              </Badge>
+            </div>
+
+            {/* Suppliers for this category */}
+            {category.suppliers.length === 0 ? (
+              <p className="text-xs text-muted-foreground">אין ספקים זמינים לתחום זה</p>
+            ) : (
+              <div className="flex gap-2">
+                {category.suppliers.map((supplier, index) => (
+                  <button
+                    key={supplier.supplierId}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setConfirmData({
+                        categoryId: category.categoryId,
+                        categoryName: category.categoryName,
+                        supplier,
+                        items: category.items,
+                      });
+                    }}
+                    className={cn(
+                      "flex-1 p-2 rounded border text-right transition-all hover:shadow-sm",
+                      index === 0 
+                        ? "bg-green-50 border-green-200 hover:border-green-300" 
+                        : "bg-muted/50 hover:bg-muted"
+                    )}
+                  >
+                    <p className="font-medium text-sm truncate">{supplier.supplierName}</p>
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="text-xs text-muted-foreground">⭐ {supplier.avgRating.toFixed(1)}</span>
+                      <span className="text-xs font-medium">₪{supplier.totalPrice.toLocaleString()}</span>
+                    </div>
+                    {index === 0 && (
+                      <Badge variant="outline" className="text-[10px] px-1 py-0 mt-1 bg-green-100 text-green-700 border-green-200">
+                        מומלץ
+                      </Badge>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
       </div>
 
       {/* Confirm Dialog */}
-      <Dialog open={!!confirmSupplier} onOpenChange={() => setConfirmSupplier(null)}>
-        <DialogContent className="sm:max-w-[400px]" dir="rtl">
+      <Dialog open={!!confirmData} onOpenChange={() => setConfirmData(null)}>
+        <DialogContent className="sm:max-w-[450px]" dir="rtl">
           <DialogHeader>
             <DialogTitle>העברת עבודה לספק</DialogTitle>
             <DialogDescription>
-              האם להעביר את העבודה לספק <strong>{confirmSupplier?.supplierName}</strong>?
+              האם להעביר את העבודה לספק <strong>{confirmData?.supplier.supplierName}</strong>?
             </DialogDescription>
           </DialogHeader>
           
-          {confirmSupplier && (
-            <div className="p-4 bg-muted rounded-lg space-y-2">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">שם הספק:</span>
-                <span className="font-medium">{confirmSupplier.supplierName}</span>
-              </div>
-              {confirmSupplier.companyName && (
+          {confirmData && (
+            <div className="space-y-3">
+              {/* Supplier Info */}
+              <div className="p-3 bg-muted rounded-lg space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">חברה:</span>
-                  <span className="font-medium">{confirmSupplier.companyName}</span>
+                  <span className="text-muted-foreground">ספק:</span>
+                  <span className="font-medium">{confirmData.supplier.supplierName}</span>
                 </div>
-              )}
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">דירוג:</span>
-                <span className="font-medium">⭐ {(confirmSupplier.rating || confirmSupplier.avgRating || 0).toFixed(1)}</span>
+                {confirmData.supplier.supplierCompany && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">חברה:</span>
+                    <span className="font-medium">{confirmData.supplier.supplierCompany}</span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">דירוג:</span>
+                  <span className="font-medium">⭐ {confirmData.supplier.avgRating.toFixed(1)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">זמן אספקה:</span>
+                  <span className="font-medium">{confirmData.supplier.avgDeliveryDays} ימים</span>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">מחיר:</span>
-                <span className="font-medium">₪{confirmSupplier.pricePerUnit || confirmSupplier.price || 0}</span>
+
+              {/* Items to transfer */}
+              <div>
+                <p className="text-sm font-medium mb-2">פריטים להעברה:</p>
+                <div className="space-y-1">
+                  {confirmData.items.map((item) => {
+                    const fulfillInfo = confirmData.supplier.canFulfill.find(
+                      f => f.quoteItemId === item.quoteItemId
+                    );
+                    return (
+                      <div key={item.quoteItemId} className="flex justify-between text-sm p-2 bg-background rounded border">
+                        <span>{item.productName} × {item.quantity}</span>
+                        <span className="font-medium">₪{fulfillInfo?.pricePerUnit || 0}</span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">זמן אספקה:</span>
-                <span className="font-medium">{confirmSupplier.deliveryDays || confirmSupplier.avgDeliveryDays || 0} ימים</span>
+
+              {/* Total */}
+              <div className="flex justify-between p-3 bg-green-50 rounded-lg border border-green-200">
+                <span className="font-medium">סה"כ לתחום:</span>
+                <span className="font-bold text-lg">₪{confirmData.supplier.totalPrice.toLocaleString()}</span>
               </div>
             </div>
           )}
 
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setConfirmSupplier(null)}>
+            <Button variant="outline" onClick={() => setConfirmData(null)}>
               ביטול
             </Button>
             <Button 
               onClick={handleConfirmSupplier}
-              disabled={assignSupplierMutation.isPending}
+              disabled={assignMutation.isPending}
             >
-              {assignSupplierMutation.isPending ? "מעביר..." : "אשר והעבר לספק"}
+              {assignMutation.isPending ? "מעביר..." : "אשר והעבר לספק"}
             </Button>
           </DialogFooter>
         </DialogContent>
