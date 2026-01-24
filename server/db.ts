@@ -1865,88 +1865,93 @@ export async function getCourierReadyJobs() {
   const db = await getDb();
   if (!db) return [];
 
-  // Get quote items that are ready for pickup (quote status = 'ready')
-  const results = await db.select({
-    id: quoteItems.id,
-    quoteId: quoteItems.quoteId,
-    productName: baseProducts.name,
-    sizeName: productSizes.name,
-    dimensions: productSizes.dimensions,
-    quantity: quoteItems.quantity,
-    supplierId: quoteItems.supplierId,
-    supplierName: users.name,
-    supplierCompany: users.companyName,
-    supplierAddress: users.address,
-    supplierPhone: users.phone,
-    customerId: quotes.customerId,
-    pickedUp: quoteItems.pickedUp,
-    pickedUpAt: quoteItems.pickedUpAt,
-    delivered: quoteItems.delivered,
-    deliveredAt: quoteItems.deliveredAt,
-    readyAt: quotes.updatedAt,
-  })
-    .from(quoteItems)
-    .innerJoin(quotes, eq(quoteItems.quoteId, quotes.id))
-    .innerJoin(sizeQuantities, eq(quoteItems.sizeQuantityId, sizeQuantities.id))
-    .innerJoin(productSizes, eq(sizeQuantities.sizeId, productSizes.id))
-    .innerJoin(baseProducts, eq(productSizes.productId, baseProducts.id))
-    .leftJoin(users, eq(quoteItems.supplierId, users.id))
-    .where(and(
-      eq(quotes.status, 'ready'),
-      sql`${quoteItems.supplierId} IS NOT NULL`
-    ))
-    .orderBy(desc(quotes.updatedAt));
+  // Get jobs from supplier_jobs that are ready for pickup, picked up, or delivered
+  const result = await db.execute(sql`
+    SELECT 
+      sj.id,
+      sj."quoteId",
+      sj."supplierId",
+      sj."customerId",
+      sj."sizeQuantityId",
+      sj.quantity,
+      sj.status,
+      sj."createdAt",
+      supplier.name as "supplierName",
+      supplier."companyName" as "supplierCompany",
+      supplier.address as "supplierAddress",
+      supplier.phone as "supplierPhone",
+      customer.name as "customerName",
+      customer."companyName" as "customerCompany",
+      customer.address as "customerAddress",
+      customer.phone as "customerPhone",
+      ps.name as "sizeName",
+      ps.dimensions as "dimensions",
+      bp.name as "productName"
+    FROM supplier_jobs sj
+    LEFT JOIN users supplier ON sj."supplierId" = supplier.id
+    LEFT JOIN users customer ON sj."customerId" = customer.id
+    LEFT JOIN size_quantities sq ON sj."sizeQuantityId" = sq.id
+    LEFT JOIN product_sizes ps ON sq.size_id = ps.id
+    LEFT JOIN base_products bp ON ps.product_id = bp.id
+    WHERE sj.status IN ('ready', 'picked_up', 'delivered')
+    ORDER BY 
+      CASE sj.status 
+        WHEN 'ready' THEN 1
+        WHEN 'picked_up' THEN 2
+        WHEN 'delivered' THEN 3
+      END,
+      sj."createdAt" DESC
+  `);
 
-  // Get customer details for each job
-  const jobsWithCustomers = await Promise.all(results.map(async (job) => {
-    const customerResult = await db.select({
-      name: users.name,
-      address: users.address,
-      phone: users.phone,
-    }).from(users).where(eq(users.id, job.customerId));
-    
-    const customer = customerResult[0];
-    return {
-      ...job,
-      customerName: customer?.name || null,
-      customerAddress: customer?.address || null,
-      customerPhone: customer?.phone || null,
-    };
+  // Map results to expected format
+  return (result.rows || []).map((job: any) => ({
+    id: job.id,
+    quoteId: job.quoteId,
+    productName: job.productName || 'מוצר',
+    sizeName: job.sizeName || '',
+    dimensions: job.dimensions,
+    quantity: job.quantity,
+    supplierName: job.supplierName || job.supplierCompany || '-',
+    supplierAddress: job.supplierAddress || '-',
+    supplierPhone: job.supplierPhone || '-',
+    customerName: job.customerName || job.customerCompany || '-',
+    customerAddress: job.customerAddress || '-',
+    customerPhone: job.customerPhone || '-',
+    pickedUp: job.status === 'picked_up' || job.status === 'delivered',
+    pickedUpAt: null,
+    delivered: job.status === 'delivered',
+    deliveredAt: null,
   }));
-
-  return jobsWithCustomers;
 }
 
-export async function markJobPickedUp(quoteItemId: number, courierId: number) {
+export async function markJobPickedUp(jobId: number, courierId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  await db.update(quoteItems)
-    .set({
-      pickedUp: true,
-      pickedUpAt: new Date(),
-      pickedUpBy: courierId,
-    })
-    .where(eq(quoteItems.id, quoteItemId));
+  // Update supplier_jobs status to picked_up
+  await db.execute(sql`
+    UPDATE supplier_jobs 
+    SET status = 'picked_up'
+    WHERE id = ${jobId}
+  `);
 
-  await logActivity(courierId, "job_picked_up", { quoteItemId });
+  await logActivity(courierId, "job_picked_up", { jobId });
 
   return { success: true };
 }
 
-export async function markJobDelivered(quoteItemId: number, courierId: number) {
+export async function markJobDelivered(jobId: number, courierId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  await db.update(quoteItems)
-    .set({
-      delivered: true,
-      deliveredAt: new Date(),
-      deliveredBy: courierId,
-    })
-    .where(eq(quoteItems.id, quoteItemId));
+  // Update supplier_jobs status to delivered
+  await db.execute(sql`
+    UPDATE supplier_jobs 
+    SET status = 'delivered'
+    WHERE id = ${jobId}
+  `);
 
-  await logActivity(courierId, "job_delivered", { quoteItemId });
+  await logActivity(courierId, "job_delivered", { jobId });
 
   return { success: true };
 }
@@ -1955,28 +1960,23 @@ export async function getCourierStats(courierId?: number) {
   const db = await getDb();
   if (!db) return { pending: 0, pickedUp: 0, delivered: 0 };
 
-  const baseQuery = db.select({
-    pickedUp: quoteItems.pickedUp,
-    delivered: quoteItems.delivered,
-    count: sql<number>`count(*)`,
-  })
-    .from(quoteItems)
-    .innerJoin(quotes, eq(quoteItems.quoteId, quotes.id))
-    .where(and(
-      eq(quotes.status, 'ready'),
-      sql`${quoteItems.supplierId} IS NOT NULL`
-    ))
-    .groupBy(quoteItems.pickedUp, quoteItems.delivered);
-
-  const result = await baseQuery;
+  // Get stats from supplier_jobs
+  const result = await db.execute(sql`
+    SELECT 
+      status,
+      COUNT(*) as count
+    FROM supplier_jobs
+    WHERE status IN ('ready', 'picked_up', 'delivered')
+    GROUP BY status
+  `);
 
   const stats = { pending: 0, pickedUp: 0, delivered: 0 };
   
-  for (const row of result) {
+  for (const row of (result.rows || []) as any[]) {
     const count = Number(row.count);
-    if (!row.pickedUp && !row.delivered) stats.pending += count;
-    else if (row.pickedUp && !row.delivered) stats.pickedUp += count;
-    else if (row.delivered) stats.delivered += count;
+    if (row.status === 'ready') stats.pending = count;
+    else if (row.status === 'picked_up') stats.pickedUp = count;
+    else if (row.status === 'delivered') stats.delivered = count;
   }
 
   return stats;

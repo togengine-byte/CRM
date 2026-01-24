@@ -1286,6 +1286,7 @@ export const appRouter = router({
         if (ctx.user.role !== 'admin' && ctx.user.role !== 'employee' && ctx.user.role !== 'courier') {
           throw new Error("Only couriers can mark jobs as picked up");
         }
+        // quoteItemId is now actually the supplier_jobs id
         return await markJobPickedUp(input.quoteItemId, ctx.user.id);
       }),
 
@@ -1296,6 +1297,7 @@ export const appRouter = router({
         if (ctx.user.role !== 'admin' && ctx.user.role !== 'employee' && ctx.user.role !== 'courier') {
           throw new Error("Only couriers can mark jobs as delivered");
         }
+        // quoteItemId is now actually the supplier_jobs id
         return await markJobDelivered(input.quoteItemId, ctx.user.id);
       }),
 

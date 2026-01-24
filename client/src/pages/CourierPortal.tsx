@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -19,13 +19,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import {
@@ -34,16 +27,20 @@ import {
   Package,
   MapPin,
   Phone,
-  Clock,
   CheckCircle,
-  AlertCircle,
   RefreshCw,
-  Navigation,
   Building2,
   User,
-  Calendar,
+  Filter,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface ReadyJob {
   id: number;
@@ -66,9 +63,10 @@ interface ReadyJob {
 
 export default function CourierPortal() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedJob, setSelectedJob] = useState<ReadyJob | null>(null);
+  const [selectedJobId, setSelectedJobId] = useState<number | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
+  const [selectedJob, setSelectedJob] = useState<ReadyJob | null>(null);
   const [confirmAction, setConfirmAction] = useState<"pickup" | "deliver" | null>(null);
   const [activeTab, setActiveTab] = useState("pending");
 
@@ -129,11 +127,6 @@ export default function CourierPortal() {
     }
   };
 
-  const openDetails = (job: ReadyJob) => {
-    setSelectedJob(job);
-    setIsDetailsOpen(true);
-  };
-
   // Filter jobs based on tab and search
   const filteredJobs = (jobs as any[]).filter((job: any) => {
     const matchesSearch = !searchQuery || 
@@ -161,25 +154,24 @@ export default function CourierPortal() {
     }
   };
 
+  // Get job details for expanded row
+  const jobDetails = selectedJobId ? (jobs as any[]).find((j: any) => j.id === selectedJobId) : null;
+
   return (
-    <div className="space-y-6 p-6" dir="rtl">
+    <div className="space-y-6" dir="rtl">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
+          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
             <Truck className="h-6 w-6" />
             פורטל שליחים
           </h1>
           <p className="text-muted-foreground">ניהול משלוחים ואיסופים</p>
         </div>
-        <Button variant="outline" onClick={() => refetch()}>
-          <RefreshCw className="ml-2 h-4 w-4" />
-          רענן
-        </Button>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -206,7 +198,7 @@ export default function CourierPortal() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">נמסרו היום</p>
+                <p className="text-sm text-muted-foreground">נמסרו</p>
                 <p className="text-2xl font-bold text-green-600">{stats?.delivered || 0}</p>
               </div>
               <CheckCircle className="h-8 w-8 text-green-500/50" />
@@ -215,330 +207,284 @@ export default function CourierPortal() {
         </Card>
       </div>
 
-      {/* Search */}
+      {/* Filters */}
       <Card>
         <CardContent className="pt-6">
-          <div className="relative">
-            <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="חיפוש לפי מוצר, ספק או לקוח..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pr-10"
-            />
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+            <div className="relative flex-1">
+              <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="חיפוש לפי מוצר, ספק או לקוח..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pr-10"
+              />
+            </div>
+            <Select value={activeTab} onValueChange={setActiveTab}>
+              <SelectTrigger className="w-[180px]">
+                <Filter className="ml-2 h-4 w-4" />
+                <SelectValue placeholder="סטטוס" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pending">ממתינים לאיסוף</SelectItem>
+                <SelectItem value="in_transit">בדרך</SelectItem>
+                <SelectItem value="delivered">נמסרו</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="icon" onClick={() => refetch()}>
+              <RefreshCw className="h-4 w-4" />
+            </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Jobs Tabs */}
+      {/* Jobs Table */}
       <Card>
         <CardHeader>
-          <CardTitle>עבודות משלוח</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Package className="h-5 w-5" />
+            עבודות משלוח
+            {filteredJobs && (
+              <Badge variant="secondary" className="mr-2">
+                {filteredJobs.length} עבודות
+              </Badge>
+            )}
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-3 mb-4">
-              <TabsTrigger value="pending">
-                ממתינים ({(jobs as any[]).filter((j: any) => !j.pickedUp).length})
-              </TabsTrigger>
-              <TabsTrigger value="in_transit">
-                בדרך ({(jobs as any[]).filter((j: any) => j.pickedUp && !j.delivered).length})
-              </TabsTrigger>
-              <TabsTrigger value="delivered">
-                נמסרו ({(jobs as any[]).filter((j: any) => j.delivered).length})
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value={activeTab}>
-              {isLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
-                </div>
-              ) : filteredJobs.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-center">
-                  <Package className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                  <h3 className="text-lg font-medium">אין עבודות</h3>
-                  <p className="text-muted-foreground mt-1">
-                    {activeTab === "pending" && "אין עבודות הממתינות לאיסוף"}
-                    {activeTab === "in_transit" && "אין עבודות בדרך"}
-                    {activeTab === "delivered" && "אין עבודות שנמסרו"}
-                  </p>
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-right">מוצר</TableHead>
-                      <TableHead className="text-right">כמות</TableHead>
-                      <TableHead className="text-right">ספק (איסוף)</TableHead>
-                      <TableHead className="text-right">לקוח (מסירה)</TableHead>
-                      <TableHead className="text-right">סטטוס</TableHead>
-                      <TableHead className="text-right">פעולות</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredJobs.map((job: any) => (
-                      <TableRow key={job.id}>
-                        <TableCell>
-                          <div>
-                            <div className="font-medium">{job.productName || "מוצר"}</div>
-                            <div className="text-sm text-muted-foreground">{job.sizeName} {job.dimensions ? `(${job.dimensions})` : ''}</div>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : filteredJobs.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <Package className="h-12 w-12 text-muted-foreground/50 mb-4" />
+              <h3 className="text-lg font-medium">אין עבודות</h3>
+              <p className="text-muted-foreground mt-1">
+                {activeTab === "pending" && "אין עבודות הממתינות לאיסוף"}
+                {activeTab === "in_transit" && "אין עבודות בדרך"}
+                {activeTab === "delivered" && "אין עבודות שנמסרו"}
+              </p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-right">מס׳</TableHead>
+                  <TableHead className="text-right">מוצר</TableHead>
+                  <TableHead className="text-right">כמות</TableHead>
+                  <TableHead className="text-right">ספק</TableHead>
+                  <TableHead className="text-right">לקוח</TableHead>
+                  <TableHead className="text-right">סטטוס</TableHead>
+                  <TableHead className="text-right">פעולות</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredJobs.map((job: any) => (
+                  <>
+                    <TableRow
+                      key={job.id}
+                      onClick={() => {
+                        setSelectedJobId(job.id);
+                        setIsDetailsOpen(selectedJobId === job.id ? !isDetailsOpen : true);
+                      }}
+                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                    >
+                      <TableCell className="font-bold">#{job.id}</TableCell>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">{job.productName || "מוצר"}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {job.sizeName} {job.dimensions ? `(${job.dimensions})` : ''}
                           </div>
-                        </TableCell>
-                        <TableCell>{job.quantity}</TableCell>
-                        <TableCell>
-                          <div className="text-sm">
-                            <div className="font-medium">{job.supplierName || "-"}</div>
-                            <div className="text-muted-foreground truncate max-w-[150px]">
-                              {job.supplierAddress || "-"}
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-sm">
-                            <div className="font-medium">{job.customerName || "-"}</div>
-                            <div className="text-muted-foreground truncate max-w-[150px]">
-                              {job.customerAddress || "-"}
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>{getJobStatus(job)}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
+                        </div>
+                      </TableCell>
+                      <TableCell>{job.quantity}</TableCell>
+                      <TableCell className="font-medium">{job.supplierName || "-"}</TableCell>
+                      <TableCell className="font-medium">{job.customerName || "-"}</TableCell>
+                      <TableCell>{getJobStatus(job)}</TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-2">
+                          {!job.pickedUp && (
                             <Button
-                              variant="ghost"
                               size="sm"
-                              onClick={() => openDetails(job)}
+                              className="bg-blue-600 hover:bg-blue-700"
+                              onClick={() => openConfirmDialog(job, "pickup")}
                             >
-                              פרטים
+                              אסוף
                             </Button>
-                            {!job.pickedUp && (
-                              <Button
-                                size="sm"
-                                className="bg-blue-600 hover:bg-blue-700"
-                                onClick={() => openConfirmDialog(job, "pickup")}
-                              >
-                                אסוף
-                              </Button>
-                            )}
-                            {job.pickedUp && !job.delivered && (
-                              <Button
-                                size="sm"
-                                className="bg-green-600 hover:bg-green-700"
-                                onClick={() => openConfirmDialog(job, "deliver")}
-                              >
-                                מסור
-                              </Button>
-                            )}
+                          )}
+                          {job.pickedUp && !job.delivered && (
+                            <Button
+                              size="sm"
+                              className="bg-green-600 hover:bg-green-700"
+                              onClick={() => openConfirmDialog(job, "deliver")}
+                            >
+                              מסור
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                    {/* Expanded Details Row */}
+                    {isDetailsOpen && selectedJobId === job.id && jobDetails && (
+                      <TableRow className="bg-muted/30 hover:bg-muted/30">
+                        <TableCell colSpan={7}>
+                          <div className="p-6 space-y-6">
+                            {/* Details Grid */}
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                              <div>
+                                <p className="text-sm text-muted-foreground">מוצר</p>
+                                <p className="font-medium flex items-center gap-2">
+                                  <Package className="h-4 w-4 text-muted-foreground" />
+                                  {jobDetails.productName || "-"}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-sm text-muted-foreground">גודל</p>
+                                <p className="font-medium">
+                                  {jobDetails.sizeName} {jobDetails.dimensions ? `(${jobDetails.dimensions})` : ''}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-sm text-muted-foreground">כמות</p>
+                                <p className="font-medium">{jobDetails.quantity}</p>
+                              </div>
+                            </div>
+
+                            {/* Pickup Info */}
+                            <div className="p-4 rounded-lg bg-blue-50 border border-blue-200">
+                              <h4 className="font-medium text-blue-800 mb-3 flex items-center gap-2">
+                                <Building2 className="h-4 w-4" />
+                                פרטי איסוף (ספק)
+                              </h4>
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                                <div>
+                                  <p className="text-blue-600">שם</p>
+                                  <p className="font-medium text-blue-900">{jobDetails.supplierName || "-"}</p>
+                                </div>
+                                <div>
+                                  <p className="text-blue-600">כתובת</p>
+                                  <p className="font-medium text-blue-900 flex items-center gap-1">
+                                    <MapPin className="h-3 w-3" />
+                                    {jobDetails.supplierAddress || "-"}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-blue-600">טלפון</p>
+                                  <p className="font-medium text-blue-900 flex items-center gap-1">
+                                    <Phone className="h-3 w-3" />
+                                    {jobDetails.supplierPhone || "-"}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Delivery Info */}
+                            <div className="p-4 rounded-lg bg-green-50 border border-green-200">
+                              <h4 className="font-medium text-green-800 mb-3 flex items-center gap-2">
+                                <User className="h-4 w-4" />
+                                פרטי מסירה (לקוח)
+                              </h4>
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                                <div>
+                                  <p className="text-green-600">שם</p>
+                                  <p className="font-medium text-green-900">{jobDetails.customerName || "-"}</p>
+                                </div>
+                                <div>
+                                  <p className="text-green-600">כתובת</p>
+                                  <p className="font-medium text-green-900 flex items-center gap-1">
+                                    <MapPin className="h-3 w-3" />
+                                    {jobDetails.customerAddress || "-"}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-green-600">טלפון</p>
+                                  <p className="font-medium text-green-900 flex items-center gap-1">
+                                    <Phone className="h-3 w-3" />
+                                    {jobDetails.customerPhone || "-"}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex items-center gap-3 pt-4 border-t">
+                              {!jobDetails.pickedUp && (
+                                <Button
+                                  className="bg-blue-600 hover:bg-blue-700"
+                                  onClick={() => openConfirmDialog(jobDetails, "pickup")}
+                                >
+                                  <Package className="ml-2 h-4 w-4" />
+                                  סמן כנאסף
+                                </Button>
+                              )}
+                              {jobDetails.pickedUp && !jobDetails.delivered && (
+                                <Button
+                                  className="bg-green-600 hover:bg-green-700"
+                                  onClick={() => openConfirmDialog(jobDetails, "deliver")}
+                                >
+                                  <CheckCircle className="ml-2 h-4 w-4" />
+                                  סמן כנמסר
+                                </Button>
+                              )}
+                              {jobDetails.delivered && (
+                                <Badge className="bg-green-100 text-green-800 border-green-200 text-base py-2 px-4">
+                                  <CheckCircle className="ml-2 h-4 w-4" />
+                                  העבודה הושלמה
+                                </Badge>
+                              )}
+                            </div>
                           </div>
                         </TableCell>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </TabsContent>
-          </Tabs>
+                    )}
+                  </>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
 
-      {/* Job Details Sheet */}
-      <Sheet open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto" dir="rtl">
-          <SheetHeader>
-            <SheetTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              פרטי משלוח
-            </SheetTitle>
-            <SheetDescription>
-              הזמנה #{selectedJob?.quoteId}
-            </SheetDescription>
-          </SheetHeader>
-
-          {selectedJob && (
-            <div className="mt-6 space-y-6">
-              {/* Status */}
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">סטטוס:</span>
-                {getJobStatus(selectedJob)}
-              </div>
-
-              {/* Product Info */}
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Package className="h-4 w-4" />
-                    פרטי מוצר
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">מוצר:</span>
-                    <span className="font-medium">{selectedJob.productName}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">גודל:</span>
-                    <span>{selectedJob.sizeName} {selectedJob.dimensions ? `(${selectedJob.dimensions})` : ''}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">כמות:</span>
-                    <span>{selectedJob.quantity}</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Pickup Location */}
-              <Card className="border-blue-200 bg-blue-50/50">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base flex items-center gap-2 text-blue-700">
-                    <Building2 className="h-4 w-4" />
-                    נקודת איסוף (ספק)
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <User className="h-4 w-4 text-muted-foreground" />
-                    <span>{selectedJob.supplierName || "-"}</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
-                    <span>{selectedJob.supplierAddress || "-"}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-4 w-4 text-muted-foreground" />
-                    <a href={`tel:${selectedJob.supplierPhone}`} className="text-blue-600 hover:underline">
-                      {selectedJob.supplierPhone || "-"}
-                    </a>
-                  </div>
-                  {selectedJob.supplierAddress && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full mt-2"
-                      onClick={() => window.open(`https://waze.com/ul?q=${encodeURIComponent(selectedJob.supplierAddress)}`, '_blank')}
-                    >
-                      <Navigation className="h-4 w-4 ml-2" />
-                      נווט ב-Waze
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Delivery Location */}
-              <Card className="border-green-200 bg-green-50/50">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base flex items-center gap-2 text-green-700">
-                    <MapPin className="h-4 w-4" />
-                    נקודת מסירה (לקוח)
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <User className="h-4 w-4 text-muted-foreground" />
-                    <span>{selectedJob.customerName || "-"}</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
-                    <span>{selectedJob.customerAddress || "-"}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-4 w-4 text-muted-foreground" />
-                    <a href={`tel:${selectedJob.customerPhone}`} className="text-green-600 hover:underline">
-                      {selectedJob.customerPhone || "-"}
-                    </a>
-                  </div>
-                  {selectedJob.customerAddress && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full mt-2"
-                      onClick={() => window.open(`https://waze.com/ul?q=${encodeURIComponent(selectedJob.customerAddress)}`, '_blank')}
-                    >
-                      <Navigation className="h-4 w-4 ml-2" />
-                      נווט ב-Waze
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Timeline */}
-              {(selectedJob.pickedUpAt || selectedJob.deliveredAt) && (
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Clock className="h-4 w-4" />
-                      ציר זמן
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    {selectedJob.pickedUpAt && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <CheckCircle className="h-4 w-4 text-blue-600" />
-                        <span>נאסף: {new Date(selectedJob.pickedUpAt).toLocaleString("he-IL")}</span>
-                      </div>
-                    )}
-                    {selectedJob.deliveredAt && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <CheckCircle className="h-4 w-4 text-green-600" />
-                        <span>נמסר: {new Date(selectedJob.deliveredAt).toLocaleString("he-IL")}</span>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Actions */}
-              <div className="flex gap-3 pt-4">
-                {!selectedJob.pickedUp && (
-                  <Button
-                    className="flex-1 bg-blue-600 hover:bg-blue-700"
-                    onClick={() => openConfirmDialog(selectedJob, "pickup")}
-                    disabled={pickupMutation.isPending}
-                  >
-                    <Package className="h-4 w-4 ml-2" />
-                    סמן כנאסף
-                  </Button>
-                )}
-                {selectedJob.pickedUp && !selectedJob.delivered && (
-                  <Button
-                    className="flex-1 bg-green-600 hover:bg-green-700"
-                    onClick={() => openConfirmDialog(selectedJob, "deliver")}
-                    disabled={deliverMutation.isPending}
-                  >
-                    <CheckCircle className="h-4 w-4 ml-2" />
-                    סמן כנמסר
-                  </Button>
-                )}
-              </div>
-            </div>
-          )}
-        </SheetContent>
-      </Sheet>
-
       {/* Confirm Dialog */}
       <Dialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>
-        <DialogContent dir="rtl">
+        <DialogContent className="sm:max-w-md" dir="rtl">
           <DialogHeader>
             <DialogTitle>
               {confirmAction === "pickup" ? "אישור איסוף" : "אישור מסירה"}
             </DialogTitle>
             <DialogDescription>
               {confirmAction === "pickup" 
-                ? `האם אספת את המשלוח מ-${selectedJob?.supplierName}?`
-                : `האם מסרת את המשלוח ל-${selectedJob?.customerName}?`
+                ? `האם לסמן את העבודה #${selectedJob?.id} כנאספה מהספק?`
+                : `האם לסמן את העבודה #${selectedJob?.id} כנמסרה ללקוח?`
               }
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="flex gap-2 sm:gap-0">
+          
+          {selectedJob && (
+            <div className="py-4 space-y-2 text-sm">
+              <p><strong>מוצר:</strong> {selectedJob.productName}</p>
+              <p><strong>כמות:</strong> {selectedJob.quantity}</p>
+              {confirmAction === "pickup" && (
+                <p><strong>ספק:</strong> {selectedJob.supplierName}</p>
+              )}
+              {confirmAction === "deliver" && (
+                <p><strong>לקוח:</strong> {selectedJob.customerName}</p>
+              )}
+            </div>
+          )}
+
+          <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setIsConfirmDialogOpen(false)}>
               ביטול
             </Button>
-            <Button
-              className={confirmAction === "pickup" ? "bg-blue-600 hover:bg-blue-700" : "bg-green-600 hover:bg-green-700"}
+            <Button 
               onClick={handleConfirm}
+              className={confirmAction === "pickup" ? "bg-blue-600 hover:bg-blue-700" : "bg-green-600 hover:bg-green-700"}
               disabled={pickupMutation.isPending || deliverMutation.isPending}
             >
-              {(pickupMutation.isPending || deliverMutation.isPending) ? "מעדכן..." : "אשר"}
+              {(pickupMutation.isPending || deliverMutation.isPending) ? "מעדכן..." : "אישור"}
             </Button>
           </DialogFooter>
         </DialogContent>
