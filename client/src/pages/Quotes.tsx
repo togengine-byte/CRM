@@ -22,10 +22,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { toast } from "sonner";
 import {
   FileText,
@@ -43,8 +46,6 @@ import {
   Package,
   History,
   Trash2,
-  ChevronDown,
-  ChevronUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -541,52 +542,43 @@ export default function Quotes() {
               </Button>
             </div>
           ) : (
-            <div className="space-y-2">
-              {filteredQuotes?.map((quote) => (
-                <Collapsible
-                  key={quote.id}
-                  open={expandedQuoteId === quote.id}
-                  onOpenChange={() => handleRowClick(quote.id)}
-                >
-                  <CollapsibleTrigger asChild>
-                    <div
-                      className={cn(
-                        "flex items-center justify-between p-4 rounded-lg border cursor-pointer transition-colors",
-                        expandedQuoteId === quote.id
-                          ? "bg-accent border-primary/30"
-                          : "hover:bg-muted/50"
-                      )}
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-right">מס׳</TableHead>
+                  <TableHead className="text-right">לקוח</TableHead>
+                  <TableHead className="text-right">תאריך</TableHead>
+                  <TableHead className="text-right">סטטוס</TableHead>
+                  <TableHead className="text-right">גרסה</TableHead>
+                  <TableHead className="text-right">סה״כ</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredQuotes?.map((quote) => (
+                  <>
+                    <TableRow
+                      key={quote.id}
+                      onClick={() => handleRowClick(quote.id)}
+                      className="cursor-pointer hover:bg-muted/50 transition-colors"
                     >
-                      <div className="flex items-center gap-6">
-                        <div className="flex items-center gap-2">
-                          {expandedQuoteId === quote.id ? (
-                            <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                          ) : (
-                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                          )}
-                          <span className="font-bold text-lg">#{quote.id}</span>
-                        </div>
-                        <div>
-                          <p className="font-medium">{quote.customerName || "לקוח לא מזוהה"}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {new Date(quote.createdAt).toLocaleDateString("he-IL")}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        {getStatusBadge(quote.status)}
+                      <TableCell className="font-bold">#{quote.id}</TableCell>
+                      <TableCell className="font-medium">{quote.customerName || "לקוח לא מזוהה"}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {new Date(quote.createdAt).toLocaleDateString("he-IL")}
+                      </TableCell>
+                      <TableCell>{getStatusBadge(quote.status)}</TableCell>
+                      <TableCell>
                         <Badge variant="outline">v{quote.version}</Badge>
-                        <span className="font-bold text-lg min-w-[80px] text-left">
-                          {quote.finalValue ? `₪${Number(quote.finalValue).toLocaleString()}` : "-"}
-                        </span>
-                      </div>
-                    </div>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <div className="mt-2 p-4 bg-muted/30 rounded-lg border border-t-0 rounded-t-none">
-                      {/* Quote Details */}
-                      {quoteDetails && expandedQuoteId === quote.id && (
-                        <div className="space-y-4">
+                      </TableCell>
+                      <TableCell className="font-bold">
+                        {quote.finalValue ? `₪${Number(quote.finalValue).toLocaleString()}` : "-"}
+                      </TableCell>
+                    </TableRow>
+                    {/* Expanded Details Row */}
+                    {expandedQuoteId === quote.id && quoteDetails && (
+                      <TableRow className="bg-muted/30 hover:bg-muted/30">
+                        <TableCell colSpan={6}>
+                          <div className="p-6 space-y-6">
                           {/* Info Grid - Compact like Customers */}
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                             <div>
@@ -729,13 +721,14 @@ export default function Quotes() {
                               </div>
                             )}
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  </CollapsibleContent>
-                </Collapsible>
-              ))}
-            </div>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>
