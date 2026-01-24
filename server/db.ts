@@ -1489,10 +1489,65 @@ export async function getSupplierById(id: number) {
     .from(quoteItems)
     .where(eq(quoteItems.supplierId, id));
 
+  // Get supplier ratings from supplier_jobs
+  const ratingsResult = await db.execute(sql`
+    SELECT 
+      AVG("supplierRating") as avg_rating,
+      COUNT("supplierRating") as total_ratings,
+      COUNT(CASE WHEN "supplierMarkedReady" = true AND "courierConfirmedReady" = true THEN 1 END) as reliable_jobs,
+      COUNT(CASE WHEN "supplierMarkedReady" = true THEN 1 END) as total_ready_jobs,
+      AVG(EXTRACT(EPOCH FROM ("supplierReadyAt" - "createdAt")) / 86400) as avg_delivery_days
+    FROM supplier_jobs
+    WHERE "supplierId" = ${id}
+  `);
+
+  // Get average price score compared to other suppliers
+  const priceScoreResult = await db.execute(sql`
+    WITH supplier_avg AS (
+      SELECT AVG(CAST("pricePerUnit" AS DECIMAL)) as avg_price
+      FROM supplier_prices
+      WHERE "supplierId" = ${id}
+    ),
+    all_avg AS (
+      SELECT AVG(CAST("pricePerUnit" AS DECIMAL)) as avg_price
+      FROM supplier_prices
+    )
+    SELECT 
+      supplier_avg.avg_price as supplier_price,
+      all_avg.avg_price as market_price
+    FROM supplier_avg, all_avg
+  `);
+
+  const ratingsRow = ratingsResult.rows?.[0] as any || {};
+  const priceRow = priceScoreResult.rows?.[0] as any || {};
+
+  // Calculate scores (0-100)
+  const avgRating = parseFloat(ratingsRow.avg_rating) || 3;
+  const totalRatings = parseInt(ratingsRow.total_ratings) || 0;
+  const reliableJobs = parseInt(ratingsRow.reliable_jobs) || 0;
+  const totalReadyJobs = parseInt(ratingsRow.total_ready_jobs) || 0;
+  const avgDeliveryDays = parseFloat(ratingsRow.avg_delivery_days) || 3;
+  const supplierPrice = parseFloat(priceRow.supplier_price) || 0;
+  const marketPrice = parseFloat(priceRow.market_price) || 0;
+
+  // Calculate percentage scores
+  const qualityScore = Math.round((avgRating / 5) * 100);
+  const reliabilityScore = totalReadyJobs > 0 ? Math.round((reliableJobs / totalReadyJobs) * 100) : 50;
+  const speedScore = Math.round(Math.max(0, Math.min(100, 100 - (avgDeliveryDays - 1) * 20))); // 1 day = 100%, 6+ days = 0%
+  const priceScore = marketPrice > 0 && supplierPrice > 0 
+    ? Math.round(Math.max(0, Math.min(100, 100 - ((supplierPrice - marketPrice) / marketPrice) * 100)))
+    : 50;
+
   return {
     ...supplier[0],
     prices,
     openJobsCount: Number(openJobsResult[0]?.count || 0),
+    ratings: {
+      quality: { score: qualityScore, avgRating, totalRatings },
+      reliability: { score: reliabilityScore, reliableJobs, totalReadyJobs },
+      speed: { score: speedScore, avgDeliveryDays: Math.round(avgDeliveryDays * 10) / 10 },
+      price: { score: priceScore, supplierAvg: Math.round(supplierPrice), marketAvg: Math.round(marketPrice) },
+    },
   };
 }
 

@@ -51,6 +51,10 @@ import {
   Eye,
   Edit,
   Briefcase,
+  Star,
+  Zap,
+  Shield,
+  DollarSign,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -318,54 +322,62 @@ export default function Suppliers() {
                 </TableRow>
               ) : (
                 suppliers.map((supplier) => (
-                  <TableRow key={supplier.id}>
-                    <TableCell className="font-medium">{supplier.name || "-"}</TableCell>
-                    <TableCell>{supplier.companyName || "-"}</TableCell>
-                    <TableCell>{supplier.email || "-"}</TableCell>
-                    <TableCell>{supplier.phone || "-"}</TableCell>
-                    <TableCell>{getStatusBadge(supplier.status)}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {new Date(supplier.createdAt).toLocaleDateString("he-IL")}
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => {
-                              setSelectedSupplier(supplier.id);
-                              setIsDetailsOpen(true);
-                            }}
-                          >
-                            <Eye className="ml-2 h-4 w-4" />
-                            צפה בפרטים
-                          </DropdownMenuItem>
-                          {supplier.status === "active" ? (
+                  <>
+                    <TableRow
+                      key={supplier.id}
+                      onClick={() => {
+                        setSelectedSupplier(supplier.id);
+                        setIsDetailsOpen(selectedSupplier === supplier.id ? !isDetailsOpen : true);
+                      }}
+                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                    >
+                      <TableCell className="font-medium">{supplier.name || "-"}</TableCell>
+                      <TableCell>{supplier.companyName || "-"}</TableCell>
+                      <TableCell>{supplier.email || "-"}</TableCell>
+                      <TableCell>{supplier.phone || "-"}</TableCell>
+                      <TableCell>{getStatusBadge(supplier.status)}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {new Date(supplier.createdAt).toLocaleDateString("he-IL")}
+                      </TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
                             <DropdownMenuItem
-                              onClick={() => handleStatusChange(supplier.id, "deactivated")}
-                              className="text-red-600"
+                              onClick={() => {
+                                setSelectedSupplier(supplier.id);
+                                setIsDetailsOpen(true);
+                              }}
                             >
-                              <Edit className="ml-2 h-4 w-4" />
-                              השבת ספק
+                              <Eye className="ml-2 h-4 w-4" />
+                              צפה בפרטים
                             </DropdownMenuItem>
-                          ) : (
-                            <DropdownMenuItem
-                              onClick={() => handleStatusChange(supplier.id, "active")}
-                              className="text-green-600"
-                            >
-                              <Edit className="ml-2 h-4 w-4" />
-                              הפעל ספק
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))
+                            {supplier.status === "active" ? (
+                              <DropdownMenuItem
+                                onClick={() => handleStatusChange(supplier.id, "deactivated")}
+                                className="text-red-600"
+                              >
+                                <Edit className="ml-2 h-4 w-4" />
+                                השבת ספק
+                              </DropdownMenuItem>
+                            ) : (
+                              <DropdownMenuItem
+                                onClick={() => handleStatusChange(supplier.id, "active")}
+                                className="text-green-600"
+                              >
+                                <Edit className="ml-2 h-4 w-4" />
+                                הפעל ספק
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  </>))
               )}
             </TableBody>
           </Table>
@@ -394,8 +406,12 @@ export default function Suppliers() {
               </TabsList>
 
               <TabsContent value="info" className="space-y-4 mt-4">
+                {/* פרטי קשר */}
                 <Card>
-                  <CardContent className="pt-6 space-y-4">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg">פרטי קשר</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
                     <div className="flex items-center gap-3">
                       <Mail className="h-4 w-4 text-muted-foreground" />
                       <span>{supplierDetails.email || "-"}</span>
@@ -415,6 +431,99 @@ export default function Suppliers() {
                     <div className="pt-2">
                       {getStatusBadge(supplierDetails.status)}
                     </div>
+                  </CardContent>
+                </Card>
+
+                {/* דירוגים */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg">דירוגים</CardTitle>
+                    <CardDescription>ביצועים מבוססים על היסטוריית עבודות</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {supplierDetails.ratings ? (
+                      <>
+                        {/* איכות */}
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Star className="h-4 w-4 text-yellow-500" />
+                              <span className="font-medium">איכות</span>
+                            </div>
+                            <span className="text-sm text-muted-foreground">
+                              {supplierDetails.ratings.quality.score}% ({supplierDetails.ratings.quality.avgRating.toFixed(1)}/5 מ-{supplierDetails.ratings.quality.totalRatings} דירוגים)
+                            </span>
+                          </div>
+                          <div className="h-2 bg-muted rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-yellow-500 transition-all" 
+                              style={{ width: `${supplierDetails.ratings.quality.score}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* אמינות */}
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Shield className="h-4 w-4 text-green-500" />
+                              <span className="font-medium">אמינות</span>
+                            </div>
+                            <span className="text-sm text-muted-foreground">
+                              {supplierDetails.ratings.reliability.score}% ({supplierDetails.ratings.reliability.reliableJobs}/{supplierDetails.ratings.reliability.totalReadyJobs} עבודות)
+                            </span>
+                          </div>
+                          <div className="h-2 bg-muted rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-green-500 transition-all" 
+                              style={{ width: `${supplierDetails.ratings.reliability.score}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* מהירות */}
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Zap className="h-4 w-4 text-blue-500" />
+                              <span className="font-medium">מהירות</span>
+                            </div>
+                            <span className="text-sm text-muted-foreground">
+                              {supplierDetails.ratings.speed.score}% (ממוצע {supplierDetails.ratings.speed.avgDeliveryDays} ימים)
+                            </span>
+                          </div>
+                          <div className="h-2 bg-muted rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-blue-500 transition-all" 
+                              style={{ width: `${supplierDetails.ratings.speed.score}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* מחיר */}
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <DollarSign className="h-4 w-4 text-purple-500" />
+                              <span className="font-medium">מחיר</span>
+                            </div>
+                            <span className="text-sm text-muted-foreground">
+                              {supplierDetails.ratings.price.score}% (ספק: ₪{supplierDetails.ratings.price.supplierAvg} / שוק: ₪{supplierDetails.ratings.price.marketAvg})
+                            </span>
+                          </div>
+                          <div className="h-2 bg-muted rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-purple-500 transition-all" 
+                              style={{ width: `${supplierDetails.ratings.price.score}%` }}
+                            />
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <p className="text-center text-muted-foreground py-4">
+                        אין נתוני דירוג לספק זה
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
