@@ -58,6 +58,8 @@ async function getSuppliersForSizeQuantities(sizeQuantityIds: number[]): Promise
   const result = new Map<number, { supplierId: number; pricePerUnit: number; deliveryDays: number }[]>();
 
   try {
+    // Build the IN clause dynamically to avoid ANY() issues with Drizzle
+    const sqIdList = sizeQuantityIds.join(',');
     const pricesResult = await db.execute(sql`
       SELECT 
         sp."supplierId",
@@ -66,7 +68,7 @@ async function getSuppliersForSizeQuantities(sizeQuantityIds: number[]): Promise
         sp."deliveryDays"
       FROM supplier_prices sp
       JOIN users u ON sp."supplierId" = u.id
-      WHERE sp."sizeQuantityId" = ANY(${sizeQuantityIds})
+      WHERE sp."sizeQuantityId" IN (${sql.raw(sqIdList)})
         AND u.status = 'active'
         AND u.role = 'supplier'
     `);
