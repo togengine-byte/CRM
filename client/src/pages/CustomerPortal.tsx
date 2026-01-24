@@ -277,7 +277,7 @@ export default function CustomerPortal() {
               <TableBody>
                 {quotes.map((quote: Quote) => (
                   <TableRow key={quote.id}>
-                    <TableCell className="font-medium">#{quote.id}</TableCell>
+                    <TableCell>{quote.id}</TableCell>
                     <TableCell>v{quote.version}</TableCell>
                     <TableCell>
                       {quote.finalValue ? `₪${parseFloat(quote.finalValue).toLocaleString()}` : "-"}
@@ -338,7 +338,7 @@ export default function CustomerPortal() {
       <Sheet open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
         <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto" dir="rtl">
           <SheetHeader>
-            <SheetTitle>פרטי הצעת מחיר #{selectedQuoteId}</SheetTitle>
+            <SheetTitle>פרטי הצעת מחיר {selectedQuoteId}</SheetTitle>
             <SheetDescription>
               צפה בפרטי ההצעה ובצע פעולות
             </SheetDescription>

@@ -290,7 +290,7 @@ export default function CourierPortal() {
                       }}
                       className="cursor-pointer hover:bg-muted/50 transition-colors"
                     >
-                      <TableCell className="font-bold">#{job.id}</TableCell>
+                      <TableCell>{job.id}</TableCell>
                       <TableCell>
                         <div>
                           <div className="font-medium">{job.productName || "מוצר"}</div>

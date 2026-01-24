@@ -561,7 +561,7 @@ export default function Quotes() {
                       onClick={() => handleRowClick(quote.id)}
                       className="cursor-pointer hover:bg-muted/50 transition-colors"
                     >
-                      <TableCell className="font-bold">#{quote.id}</TableCell>
+                      <TableCell>{quote.id}</TableCell>
                       <TableCell className="font-medium">{quote.customerName || "לקוח לא מזוהה"}</TableCell>
                       <TableCell className="text-muted-foreground">
                         {new Date(quote.createdAt).toLocaleDateString("he-IL")}
@@ -972,7 +972,7 @@ function SupplierSelectionModal({
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
             <Factory className="h-5 w-5 text-purple-600" />
-            בחירת ספק להצעה #{quoteId}
+            בחירת ספק להצעה {quoteId}
           </DialogTitle>
           <DialogDescription className="text-slate-500">
             הספקים המתאימים ביותר על פי מחיר, איכות ואמינות
@@ -1011,7 +1011,7 @@ function SupplierSelectionModal({
                       <div className={`h-10 w-10 rounded-lg flex items-center justify-center font-semibold ${
                         index === 0 ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'
                       }`}>
-                        #{index + 1}
+                        {index + 1}
                       </div>
                       <div>
                         <p className="font-medium text-slate-900">{supplier.supplierName}</p>

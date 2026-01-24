@@ -594,7 +594,7 @@ export default function Suppliers() {
                         <TableBody>
                           {openJobs.map((job: any) => (
                             <TableRow key={job.quoteItemId}>
-                              <TableCell>#{job.quoteId}</TableCell>
+                              <TableCell>{job.quoteId}</TableCell>
                               <TableCell>{job.productName} - {job.sizeName} {job.dimensions ? `(${job.dimensions})` : ''}</TableCell>
                               <TableCell>{job.quantity}</TableCell>
                               <TableCell>

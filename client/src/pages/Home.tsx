@@ -499,7 +499,7 @@ function PendingSignupsCard({
                     <Package className="h-4 w-4 text-blue-600" />
                     <div>
                       <p className="text-xs text-blue-600">מוצר מבוקש</p>
-                      <p className="text-sm font-medium text-blue-700">מוצר #{String(selectedSignup.productId || '')}</p>
+                      <p className="text-sm font-medium text-blue-700">מוצר {String(selectedSignup.productId || '')}</p>
                     </div>
                   </div>
                 )}
@@ -796,7 +796,7 @@ function SupplierRecommendationsModal({
                       <div className={`h-10 w-10 rounded-lg flex items-center justify-center font-semibold ${
                         index === 0 ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'
                       }`}>
-                        #{index + 1}
+                        {index + 1}
                       </div>
                       <div>
                         <p className="font-medium text-slate-900">{supplier.supplierName}</p>

@@ -337,7 +337,7 @@ export default function Jobs() {
                       }}
                       className="cursor-pointer hover:bg-muted/50 transition-colors"
                     >
-                      <TableCell className="font-bold">#{job.id}</TableCell>
+                      <TableCell>{job.id}</TableCell>
                       <TableCell className="font-medium">{job.customerName || "-"}</TableCell>
                       <TableCell>{job.productName || "-"}</TableCell>
                       <TableCell className="text-muted-foreground">{job.supplierName || "-"}</TableCell>
@@ -387,7 +387,7 @@ export default function Jobs() {
                               </div>
                               <div>
                                 <p className="text-sm text-muted-foreground">מס׳ הצעת מחיר</p>
-                                <p className="font-medium">#{jobDetails.quoteId}</p>
+                                <p className="font-medium">{jobDetails.quoteId}</p>
                               </div>
                               {jobDetails.readyAt && (
                                 <div>
@@ -483,7 +483,7 @@ export default function Jobs() {
           <DialogHeader>
             <DialogTitle>עדכון סטטוס עבודה</DialogTitle>
             <DialogDescription>
-              עדכון סטטוס עבודה #{selectedJob?.id} ל{getStatusLabel(newStatus)}
+              עדכון סטטוס עבודה {selectedJob?.id} ל{getStatusLabel(newStatus)}
             </DialogDescription>
           </DialogHeader>
           
