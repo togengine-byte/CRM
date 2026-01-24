@@ -274,7 +274,7 @@ export async function getPendingApprovals(limit: number = 5) {
   const pending = await db.select()
     .from(users)
     .where(eq(users.status, "pending_approval"))
-    .orderBy(desc(users.createdAt))
+    .orderBy(desc(users.id))
     .limit(limit);
 
   return pending;
@@ -290,7 +290,7 @@ export async function getPendingCustomers(limit: number = 5) {
   const pending = await db.select()
     .from(users)
     .where(eq(users.status, "pending_approval"))
-    .orderBy(desc(users.createdAt))
+    .orderBy(desc(users.id))
     .limit(limit);
 
   return pending;
@@ -420,7 +420,7 @@ export async function getQuotes(filters?: {
   })
   .from(quotes)
   .leftJoin(users, eq(quotes.customerId, users.id))
-  .orderBy(desc(quotes.createdAt))
+  .orderBy(desc(quotes.id))
   .limit(filters?.limit || 50);
   
   let filtered = results;
@@ -1199,7 +1199,7 @@ export async function getCustomers(filters: CustomerFilters = {}) {
   const result = await db.select()
     .from(users)
     .where(and(...conditions))
-    .orderBy(desc(users.createdAt));
+    .orderBy(desc(users.id));
 
   // Filter by search if provided
   if (filters.search) {
@@ -1435,7 +1435,7 @@ export async function getSuppliers(filters?: {
   })
     .from(users)
     .where(and(...conditions))
-    .orderBy(desc(users.createdAt));
+    .orderBy(desc(users.id));
 
   const results = await query;
 
@@ -2891,7 +2891,7 @@ export async function getPendingUsers(role?: string) {
   return await db.select()
     .from(users)
     .where(and(...conditions))
-    .orderBy(desc(users.createdAt));
+    .orderBy(desc(users.id));
 }
 
 export async function getSuppliersList() {
@@ -2901,7 +2901,7 @@ export async function getSuppliersList() {
   return await db.select()
     .from(users)
     .where(eq(users.role, 'supplier'))
-    .orderBy(users.name);
+    .orderBy(desc(users.id));
 }
 
 export async function getCouriersList() {
@@ -2911,7 +2911,7 @@ export async function getCouriersList() {
   return await db.select()
     .from(users)
     .where(eq(users.role, 'courier'))
-    .orderBy(users.name);
+    .orderBy(desc(users.id));
 }
 
 export async function approveUser(userId: number, adminId: number) {
