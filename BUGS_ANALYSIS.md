@@ -16,7 +16,7 @@
 |---|---|---|---|
 | 1 | `api/auth/login.ts` | שימוש בקוד בדיקה ישן במקום אימות אימייל וסיסמה. | **תוקן** |
 | 2 | `server/customerPortal.ts` | השדות `entityType` ו-`entityId` כבר קיימים בסכמה. | **לא רלוונטי** |
-| 3 | `client/src/pages/Settings.tsx` | שימוש שגוי ב-`useState` במקום `useEffect` לעדכון מצב מקומי. | **קיים** |
+| 3 | `client/src/pages/Settings.tsx` | הקוד כבר משתמש ב-`useEffect` כנדרש. | **תוקן** |
 | 4 | `client/src/_core/hooks/useAuth.ts` | היה קוד מת - מנגנון Auth כפול שלא היה בשימוש. | **תוקן** (נמחק) |
 | 5 | `client/src/pages/Login.tsx` | קובץ `Login.tsx` קיים אך אינו בשימוש ואינו מנותב ב-`App.tsx`. | **קיים** |
 | 6 | `api/trpc/[trpc].ts` | שימוש ב-`Access-Control-Allow-Origin: *` יחד עם `credentials: true` הגורם לשגיאות CORS. | **תוקן** (ראה תזכורת) |
