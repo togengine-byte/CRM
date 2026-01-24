@@ -17,7 +17,7 @@
 | 1 | `api/auth/login.ts` | שימוש בקוד בדיקה ישן במקום אימות אימייל וסיסמה. | **תוקן** |
 | 2 | `server/customerPortal.ts` | הוספת `entityType` ו-`entityId` ל-`activityLog` למרות שהשדות לא קיימים בסכמה. | **קיים** |
 | 3 | `client/src/pages/Settings.tsx` | שימוש שגוי ב-`useState` במקום `useEffect` לעדכון מצב מקומי. | **קיים** |
-| 4 | `client/src/contexts/AuthContext.tsx` ו-`client/src/_core/hooks/useAuth.ts` | קיימים שני מנגנוני אימות שונים (AuthContext ו-useAuth) הגורמים לחוסר עקביות. | **קיים** |
+| 4 | `client/src/_core/hooks/useAuth.ts` | היה קוד מת - מנגנון Auth כפול שלא היה בשימוש. | **תוקן** (נמחק) |
 | 5 | `client/src/pages/Login.tsx` | קובץ `Login.tsx` קיים אך אינו בשימוש ואינו מנותב ב-`App.tsx`. | **קיים** |
 | 6 | `api/trpc/[trpc].ts` | שימוש ב-`Access-Control-Allow-Origin: *` יחד עם `credentials: true` הגורם לשגיאות CORS. | **תוקן** (ראה תזכורת) |
 | 7 | `drizzle/schema.ts` | חוסר התאמה בשם השדה `uploadedAt` בטבלת `quoteAttachments` (בשימוש `createdAt`). | **קיים** |
@@ -70,7 +70,7 @@ const allowedOrigins = [
 
 ## המלצות לשיפור
 
-1.  **לאחד את מנגנוני ה-Auth** - להשתמש רק ב-AuthContext או רק ב-useAuth.
+1.  ~~**לאחד את מנגנוני ה-Auth**~~ - **בוצע!** נמחק `useAuth.ts` המיותר, נשאר רק `AuthContext`.
 2.  **להוסיף validation** - לוודא שכל הקלטים מאומתים.
 3.  **להסיר קוד מת** - `Login.tsx` לא בשימוש.
 4.  **לתקן את CORS** - לוודא שהגדרות ה-CORS נכונות לסביבת הייצור.
