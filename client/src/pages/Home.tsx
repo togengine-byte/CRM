@@ -102,30 +102,30 @@ function KPICard({
   isLoading?: boolean;
 }) {
   return (
-    <Card className="border-0 shadow-sm bg-white">
-      <CardContent className="p-5">
+    <Card className="border border-slate-200 shadow-none bg-white">
+      <CardContent className="p-3">
         {isLoading ? (
-          <div className="space-y-3">
-            <Skeleton className="h-4 w-20" />
-            <Skeleton className="h-8 w-24" />
+          <div className="space-y-2">
+            <Skeleton className="h-3 w-16" />
+            <Skeleton className="h-6 w-20" />
           </div>
         ) : (
-          <div className="flex items-start justify-between">
-            <div className="space-y-1">
-              <p className="text-sm text-slate-500 font-medium">{title}</p>
-              <p className="text-2xl font-semibold text-slate-900 tracking-tight">{value}</p>
-              <div className={`flex items-center gap-1 text-xs font-medium ${
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-slate-500 font-medium">{title}</p>
+              <p className="text-xl font-semibold text-slate-900 tracking-tight">{value}</p>
+              <div className={`flex items-center gap-1 text-[10px] font-medium ${
                 trend === 'up' ? 'text-emerald-600' : 
                 trend === 'down' ? 'text-red-500' : 
-                'text-slate-500'
+                'text-slate-400'
               }`}>
-                {trend === 'up' && <ArrowUpRight className="h-3 w-3" />}
-                {trend === 'down' && <ArrowDownRight className="h-3 w-3" />}
+                {trend === 'up' && <ArrowUpRight className="h-2.5 w-2.5" />}
+                {trend === 'down' && <ArrowDownRight className="h-2.5 w-2.5" />}
                 <span>{trendValue}</span>
               </div>
             </div>
-            <div className="h-10 w-10 rounded-lg bg-slate-100 flex items-center justify-center">
-              <Icon className="h-5 w-5 text-slate-600" />
+            <div className="h-8 w-8 rounded bg-slate-50 flex items-center justify-center">
+              <Icon className="h-4 w-4 text-slate-400" />
             </div>
           </div>
         )}
@@ -141,70 +141,60 @@ function JobsInProductionCard({ isLoading: parentLoading }: { isLoading: boolean
   const [, navigate] = useLocation();
   const loading = parentLoading || isLoading;
   
-  const inProductionJobs = jobs?.filter((job: any) => ['pending', 'in_progress', 'in_production'].includes(job.status)).slice(0, 4) || [];
+  const inProductionJobs = jobs?.filter((job: any) => ['pending', 'in_progress', 'in_production'].includes(job.status)).slice(0, 5) || [];
 
   return (
-    <Card className="border-0 shadow-sm bg-white">
-      <CardHeader className="pb-2 pt-5 px-5">
+    <Card className="border border-slate-200 shadow-none bg-white">
+      <CardHeader className="pb-2 pt-3 px-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-blue-50 flex items-center justify-center">
-              <Factory className="h-4 w-4 text-blue-600" />
-            </div>
-            <div>
-              <CardTitle className="text-sm font-semibold text-slate-900">בייצור אצל ספקים</CardTitle>
-              <p className="text-xs text-slate-500">עבודות בתהליך ייצור</p>
-            </div>
+            <Factory className="h-4 w-4 text-blue-600" />
+            <CardTitle className="text-sm font-medium text-slate-900">בייצור</CardTitle>
           </div>
           {inProductionJobs.length > 0 && (
-            <Badge className="bg-blue-50 text-blue-700 hover:bg-blue-50 border-0 font-medium">
+            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-5">
               {inProductionJobs.length}
             </Badge>
           )}
         </div>
       </CardHeader>
-      <CardContent className="px-5 pb-5">
+      <CardContent className="px-4 pb-3">
         {loading ? (
-          <div className="space-y-3 pt-2">
+          <div className="space-y-2">
             {[...Array(3)].map((_, i) => (
-              <Skeleton key={i} className="h-16 w-full rounded-lg" />
+              <Skeleton key={i} className="h-10 w-full" />
             ))}
           </div>
         ) : inProductionJobs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center mb-3">
-              <CheckCircle2 className="h-6 w-6 text-slate-400" />
-            </div>
-            <p className="text-sm text-slate-500">אין עבודות בייצור</p>
+          <div className="flex items-center justify-center py-4 text-center">
+            <p className="text-xs text-slate-400">אין עבודות בייצור</p>
           </div>
         ) : (
-          <div className="space-y-2 pt-2">
+          <div className="space-y-1">
             {inProductionJobs.map((job: any) => (
               <div 
                 key={job.id}
-                className="flex items-center justify-between p-3 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer group"
+                className="flex items-center justify-between py-2 px-2 rounded hover:bg-slate-50 transition-colors cursor-pointer group"
                 onClick={() => navigate('/jobs')}
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="h-9 w-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center shrink-0">
-                    <Package className="h-4 w-4 text-slate-600" />
-                  </div>
+                <div className="flex items-center gap-2 min-w-0">
+                  <Package className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-slate-900 truncate">{job.productName}</p>
-                    <p className="text-xs text-slate-500 truncate">{job.supplierName} · {formatNumber(job.quantity)} יח'</p>
+                    <p className="text-xs font-medium text-slate-700 truncate">{job.productName}</p>
+                    <p className="text-[10px] text-slate-400 truncate">{job.supplierName}</p>
                   </div>
                 </div>
-                <ChevronRight className="h-4 w-4 text-slate-400 group-hover:text-slate-600 transition-colors shrink-0" />
+                <span className="text-[10px] text-slate-400 shrink-0">{formatNumber(job.quantity)}</span>
               </div>
             ))}
-            {jobs && jobs.filter((j: any) => ['pending', 'in_progress', 'in_production'].includes(j.status)).length > 4 && (
+            {jobs && jobs.filter((j: any) => ['pending', 'in_progress', 'in_production'].includes(j.status)).length > 5 && (
               <Button 
                 variant="ghost" 
-                className="w-full text-sm text-slate-600 hover:text-slate-900 mt-1"
+                size="sm"
+                className="w-full text-xs text-slate-500 h-7 mt-1"
                 onClick={() => navigate('/jobs')}
               >
-                צפה בכל העבודות
-                <ChevronRight className="h-4 w-4 mr-1" />
+                הצג הכל
               </Button>
             )}
           </div>
@@ -221,62 +211,46 @@ function ReadyForPickupCard({ isLoading: parentLoading }: { isLoading: boolean }
   const loading = parentLoading || isLoading;
 
   return (
-    <Card className="border-0 shadow-sm bg-white">
-      <CardHeader className="pb-2 pt-5 px-5">
+    <Card className="border border-slate-200 shadow-none bg-white">
+      <CardHeader className="pb-2 pt-3 px-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-emerald-50 flex items-center justify-center">
-              <Truck className="h-4 w-4 text-emerald-600" />
-            </div>
-            <div>
-              <CardTitle className="text-sm font-semibold text-slate-900">מוכן לאיסוף</CardTitle>
-              <p className="text-xs text-slate-500">ממתין לשליח</p>
-            </div>
+            <Truck className="h-4 w-4 text-emerald-600" />
+            <CardTitle className="text-sm font-medium text-slate-900">מוכן לאיסוף</CardTitle>
           </div>
           {pickups && pickups.length > 0 && (
-            <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50 border-0 font-medium">
+            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-5">
               {pickups.length}
             </Badge>
           )}
         </div>
       </CardHeader>
-      <CardContent className="px-5 pb-5">
+      <CardContent className="px-4 pb-3">
         {loading ? (
-          <div className="space-y-3 pt-2">
+          <div className="space-y-2">
             {[...Array(2)].map((_, i) => (
-              <Skeleton key={i} className="h-16 w-full rounded-lg" />
+              <Skeleton key={i} className="h-10 w-full" />
             ))}
           </div>
         ) : !pickups || pickups.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center mb-3">
-              <CheckCircle2 className="h-6 w-6 text-slate-400" />
-            </div>
-            <p className="text-sm text-slate-500">אין עבודות ממתינות</p>
+          <div className="flex items-center justify-center py-4 text-center">
+            <p className="text-xs text-slate-400">אין עבודות ממתינות</p>
           </div>
         ) : (
-          <div className="space-y-2 pt-2">
+          <div className="space-y-1">
             {pickups.slice(0, 4).map((pickup: any) => (
               <div 
                 key={pickup.id}
-                className="p-3 rounded-lg bg-emerald-50 border border-emerald-100"
+                className="py-2 px-2 rounded hover:bg-slate-50 transition-colors"
               >
-                <div className="flex items-start justify-between mb-2">
+                <div className="flex items-center justify-between">
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-slate-900 truncate">{pickup.productName}</p>
-                    <p className="text-xs text-slate-600">{pickup.quantity} יח'</p>
+                    <p className="text-xs font-medium text-slate-700 truncate">{pickup.productName}</p>
+                    <p className="text-[10px] text-slate-400">{pickup.supplierName} → {pickup.customerName}</p>
                   </div>
-                  <Badge variant="outline" className="bg-white text-emerald-700 border-emerald-200 text-[10px] shrink-0">
+                  <span className="text-[10px] text-emerald-600 font-medium shrink-0">
                     {formatTime(pickup.supplierReadyAt)}
-                  </Badge>
-                </div>
-                <div className="flex items-center gap-4 text-xs text-slate-500">
-                  <span className="flex items-center gap-1">
-                    <MapPin className="h-3 w-3" />
-                    {pickup.supplierName}
                   </span>
-                  <span>→</span>
-                  <span>{pickup.customerName}</span>
                 </div>
               </div>
             ))}
@@ -421,59 +395,51 @@ function PendingSignupsCard({
 
   return (
     <>
-      <Card className="border-0 shadow-sm bg-white">
-        <CardHeader className="pb-2 pt-5 px-5">
+      <Card className="border border-slate-200 shadow-none bg-white">
+        <CardHeader className="pb-2 pt-3 px-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-amber-50 flex items-center justify-center">
-                <Inbox className="h-4 w-4 text-amber-600" />
-              </div>
-              <div>
-                <CardTitle className="text-sm font-semibold text-slate-900">בקשות חדשות</CardTitle>
-                <p className="text-xs text-slate-500">הצעות מחיר ממתינות</p>
-              </div>
+              <Inbox className="h-4 w-4 text-amber-600" />
+              <CardTitle className="text-sm font-medium text-slate-900">בקשות חדשות</CardTitle>
             </div>
             {signups.length > 0 && (
-              <Badge className="bg-amber-50 text-amber-700 hover:bg-amber-50 border-0 font-medium">
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-5">
                 {signups.length}
               </Badge>
             )}
           </div>
         </CardHeader>
-        <CardContent className="px-5 pb-5">
+        <CardContent className="px-4 pb-3">
           {isLoading ? (
-            <div className="space-y-3 pt-2">
+            <div className="space-y-2">
               {[...Array(3)].map((_, i) => (
-                <Skeleton key={i} className="h-14 w-full rounded-lg" />
+                <Skeleton key={i} className="h-10 w-full" />
               ))}
             </div>
           ) : signups.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center mb-3">
-                <CheckCircle2 className="h-6 w-6 text-slate-400" />
-              </div>
-              <p className="text-sm text-slate-500">אין בקשות ממתינות</p>
+            <div className="flex items-center justify-center py-4 text-center">
+              <p className="text-xs text-slate-400">אין בקשות ממתינות</p>
             </div>
           ) : (
-            <div className="space-y-2 pt-2">
-              {signups.slice(0, 4).map((signup) => (
+            <div className="space-y-1">
+              {signups.slice(0, 5).map((signup) => (
                 <div 
                   key={signup.id}
-                  className="flex items-center justify-between p-3 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer group"
+                  className="flex items-center justify-between py-2 px-2 rounded hover:bg-slate-50 transition-colors cursor-pointer group"
                   onClick={() => setSelectedSignup(signup)}
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="h-9 w-9 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
-                      <span className="text-sm font-medium text-amber-700">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="h-6 w-6 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+                      <span className="text-[10px] font-medium text-amber-700">
                         {signup.name?.charAt(0) || '?'}
                       </span>
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-slate-900 truncate">{signup.name || 'לקוח חדש'}</p>
-                      <p className="text-xs text-slate-500 truncate">{signup.companyName || signup.email}</p>
+                      <p className="text-xs font-medium text-slate-700 truncate">{signup.name || 'לקוח חדש'}</p>
+                      <p className="text-[10px] text-slate-400 truncate">{signup.companyName || signup.email}</p>
                     </div>
                   </div>
-                  <ChevronRight className="h-4 w-4 text-slate-400 group-hover:text-slate-600 transition-colors shrink-0" />
+                  <ChevronRight className="h-3.5 w-3.5 text-slate-400 group-hover:text-slate-600 transition-colors shrink-0" />
                 </div>
               ))}
             </div>
@@ -904,45 +870,37 @@ function ActivityFeedCard({ activities, isLoading }: { activities: any[]; isLoad
   };
 
   return (
-    <Card className="border-0 shadow-sm bg-white">
-      <CardHeader className="pb-2 pt-5 px-5">
+    <Card className="border border-slate-200 shadow-none bg-white">
+      <CardHeader className="pb-2 pt-3 px-4">
         <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-lg bg-slate-100 flex items-center justify-center">
-            <Activity className="h-4 w-4 text-slate-600" />
-          </div>
-          <div>
-            <CardTitle className="text-sm font-semibold text-slate-900">פעילות אחרונה</CardTitle>
-            <p className="text-xs text-slate-500">עדכונים מהמערכת</p>
-          </div>
+          <Activity className="h-4 w-4 text-slate-600" />
+          <CardTitle className="text-sm font-medium text-slate-900">פעילות אחרונה</CardTitle>
         </div>
       </CardHeader>
-      <CardContent className="px-5 pb-5">
+      <CardContent className="px-4 pb-3">
         {isLoading ? (
-          <div className="space-y-3 pt-2">
+          <div className="space-y-2">
             {[...Array(4)].map((_, i) => (
-              <Skeleton key={i} className="h-10 w-full rounded-lg" />
+              <Skeleton key={i} className="h-8 w-full" />
             ))}
           </div>
         ) : activities.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center mb-3">
-              <Activity className="h-6 w-6 text-slate-400" />
-            </div>
-            <p className="text-sm text-slate-500">אין פעילות אחרונה</p>
+          <div className="flex items-center justify-center py-4 text-center">
+            <p className="text-xs text-slate-400">אין פעילות אחרונה</p>
           </div>
         ) : (
-          <div className="space-y-1 pt-2">
+          <div className="space-y-0.5">
             {activities.slice(0, 6).map((activity, index) => (
-              <div key={activity.id || index} className="flex items-center gap-3 py-2">
-                <div className="h-7 w-7 rounded-full bg-slate-100 flex items-center justify-center shrink-0 text-slate-500">
+              <div key={activity.id || index} className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-slate-50">
+                <div className="h-5 w-5 rounded-full bg-slate-100 flex items-center justify-center shrink-0 text-slate-400">
                   {getActivityIcon(activity.actionType)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-slate-700 truncate">
+                  <p className="text-xs text-slate-600 truncate">
                     {actionTypeLabels[activity.actionType] || activity.actionType}
                   </p>
                 </div>
-                <span className="text-xs text-slate-400 shrink-0">
+                <span className="text-[10px] text-slate-400 shrink-0">
                   {activity.createdAt ? new Date(activity.createdAt).toLocaleTimeString('he-IL', {
                     hour: '2-digit',
                     minute: '2-digit'
@@ -970,66 +928,55 @@ export default function Home() {
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-4 max-w-7xl mx-auto">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900">לוח בקרה</h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            סקירה כללית של הפעילות העסקית
-          </p>
-        </div>
+      <div className="flex items-center justify-between">
+        <h1 className="text-lg font-semibold text-slate-900">לוח בקרה</h1>
+        <p className="text-xs text-slate-400">
+          {new Date().toLocaleDateString('he-IL', { weekday: 'long', day: 'numeric', month: 'long' })}
+        </p>
       </div>
 
       {/* KPIs Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KPICard 
           title="הצעות מחיר" 
           value={kpisLoading ? '—' : formatNumber(kpis?.totalQuotes || 0)}
-          trend="up"
-          trendValue="+12% מהחודש שעבר"
+          trend={(kpis?.totalQuotes || 0) > 0 ? "up" : "neutral"}
+          trendValue={(kpis?.totalQuotes || 0) > 0 ? `${kpis?.quotesThisMonth || 0} החודש` : "אין נתונים"}
           icon={FileText}
           isLoading={kpisLoading}
         />
         <KPICard 
           title="לקוחות פעילים" 
           value={kpisLoading ? '—' : formatNumber(kpis?.activeCustomers || 0)}
-          trend="up"
-          trendValue="+5 החודש"
+          trend={(kpis?.activeCustomers || 0) > 0 ? "up" : "neutral"}
+          trendValue={(kpis?.pendingApprovals || 0) > 0 ? `${kpis?.pendingApprovals} ממתינים` : "מעודכן"}
           icon={Users}
           isLoading={kpisLoading}
         />
         <KPICard 
-          title="הכנסות החודש" 
+          title="הכנסות" 
           value={kpisLoading ? '—' : formatCurrency(kpis?.totalRevenue || 0)}
-          trend="up"
-          trendValue="+18%"
+          trend={(kpis?.totalRevenue || 0) > 0 ? "up" : "neutral"}
+          trendValue={(kpis?.avgDealValue || 0) > 0 ? `ממוצע ${formatCurrency(kpis?.avgDealValue || 0)}` : "אין נתונים"}
           icon={TrendingUp}
           isLoading={kpisLoading}
         />
         <KPICard 
           title="שיעור המרה" 
           value={kpisLoading ? '—' : `${kpis?.conversionRate || 0}%`}
-          trend="neutral"
-          trendValue="יציב"
+          trend={(kpis?.conversionRate || 0) >= 50 ? "up" : (kpis?.conversionRate || 0) > 0 ? "neutral" : "down"}
+          trendValue={(kpis?.conversionRate || 0) >= 50 ? "טוב" : (kpis?.conversionRate || 0) > 0 ? "סביר" : "אין נתונים"}
           icon={Activity}
           isLoading={kpisLoading}
         />
       </div>
 
-      {/* Main Content Grid */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Jobs in Production - Takes 2 columns */}
-        <div className="lg:col-span-2">
-          <JobsInProductionCard isLoading={kpisLoading} />
-        </div>
-        
-        {/* Ready for Pickup */}
+      {/* Main Content Grid - 4 columns for compact view */}
+      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+        <JobsInProductionCard isLoading={kpisLoading} />
         <ReadyForPickupCard isLoading={kpisLoading} />
-      </div>
-
-      {/* Secondary Grid */}
-      <div className="grid gap-6 md:grid-cols-2">
         <PendingSignupsCard 
           signups={signups || []} 
           isLoading={signupsLoading} 
