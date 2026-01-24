@@ -3205,15 +3205,7 @@ export async function getActiveJobs() {
     LEFT JOIN size_quantities sq ON sj."sizeQuantityId" = sq.id
     LEFT JOIN product_sizes ps ON sq.size_id = ps.id
     LEFT JOIN base_products bp ON ps.product_id = bp.id
-    ORDER BY 
-      CASE sj.status 
-        WHEN 'ready' THEN 1
-        WHEN 'in_production' THEN 2
-        WHEN 'picked_up' THEN 3
-        WHEN 'delivered' THEN 4
-        ELSE 5
-      END,
-      sj."createdAt" DESC
+    ORDER BY sj.id DESC
   `);
 
   return result.rows.map((row: any) => ({
