@@ -229,9 +229,26 @@ export const supplierJobs = pgTable("supplier_jobs", {
   sizeQuantityId: integer("sizeQuantityId"),
   quantity: integer("quantity").notNull(),
   pricePerUnit: decimal("pricePerUnit", { precision: 10, scale: 2 }).notNull(),
+  // Status flow: pending -> accepted -> ready -> picked_up -> delivered
+  // pending = הזמנה חדשה (ממתין לאישור ספק)
+  // accepted = ספק אישר (עבודה בביצוע)
+  // ready = ספק סימן כמוכן (מוכן לאיסוף)
+  // cancelled = עבודה בוטלה (לפני שספק אישר)
   status: varchar("status", { length: 50 }).default("pending").notNull(),
+  
+  // Supplier acceptance
+  supplierAccepted: boolean("supplierAccepted").default(false),
+  supplierAcceptedAt: timestamp("supplierAcceptedAt"),
+  
+  // Supplier marked ready
   supplierMarkedReady: boolean("supplierMarkedReady").default(false),
   supplierReadyAt: timestamp("supplierReadyAt"),
+  
+  // Cancellation
+  isCancelled: boolean("isCancelled").default(false),
+  cancelledAt: timestamp("cancelledAt"),
+  cancelledReason: text("cancelledReason"),
+  
   courierConfirmedReady: boolean("courierConfirmedReady").default(false),
   supplierRating: decimal("supplierRating", { precision: 3, scale: 1 }),
   promisedDeliveryDays: integer("promisedDeliveryDays").default(3),

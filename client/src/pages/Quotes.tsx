@@ -48,6 +48,8 @@ import {
   Trash2,
   DollarSign,
   Calculator,
+  Clock,
+  UserX,
   Loader2,
   Save,
   RotateCcw,
@@ -206,6 +208,18 @@ export default function Quotes() {
     },
     onError: (error) => {
       toast.error(`שגיאה בשליחת ההצעה: ${error.message}`);
+    },
+  });
+
+  // Cancel supplier mutation
+  const cancelSupplierMutation = trpc.suppliers.cancelJobsByQuote.useMutation({
+    onSuccess: () => {
+      toast.success("הספק בוטל בהצלחה - ההצעה חזרה לממתין לספק");
+      refetch();
+      utils.quotes.getById.refetch();
+    },
+    onError: (error) => {
+      toast.error(`שגיאה בביטול הספק: ${error.message}`);
     },
   });
 
@@ -370,51 +384,51 @@ export default function Quotes() {
     switch (status) {
       case "draft":
         return (
-          <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
-            <Pencil className="ml-1 h-3 w-3" />
-            טיוטה
+          <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+            <Clock className="ml-1 h-3 w-3" />
+            ממתין לשליחה
           </Badge>
         );
       case "sent":
         return (
           <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
             <Send className="ml-1 h-3 w-3" />
-            נשלחה
+            נשלח ללקוח
           </Badge>
         );
       case "approved":
         return (
           <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
             <CheckCircle className="ml-1 h-3 w-3" />
-            אושרה
+            אושר - ממתין לספק
           </Badge>
         );
       case "rejected":
         return (
           <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
             <XCircle className="ml-1 h-3 w-3" />
-            נדחתה
+            נדחה
           </Badge>
         );
       case "superseded":
         return (
           <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
             <Copy className="ml-1 h-3 w-3" />
-            הוחלפה
+            הוחלף
           </Badge>
         );
       case "in_production":
         return (
           <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
             <Factory className="ml-1 h-3 w-3" />
-            בייצור
+            עבר ליצור
           </Badge>
         );
       case "ready":
         return (
           <Badge variant="outline" className="bg-teal-50 text-teal-700 border-teal-200">
             <Package className="ml-1 h-3 w-3" />
-            מוכנה
+            מוכן
           </Badge>
         );
       default:
@@ -512,6 +526,7 @@ export default function Quotes() {
     }
 
     if (quote.status === "approved") {
+      // אחרי אישור לקוח - ממתין לספק
       buttons.push(
         <Button
           key="find-supplier"
@@ -524,40 +539,32 @@ export default function Quotes() {
           }}
         >
           <Search className="ml-1 h-3 w-3" />
-          בחר ספק
-        </Button>,
+          בחר ספק ושלח
+        </Button>
+      );
+      // אפשרות לבטל ספק אם הוא עדיין לא אישר (לא עבר ליצור)
+      buttons.push(
         <Button
-          key="production"
+          key="cancel-supplier"
           size="sm"
           variant="outline"
-          className="text-orange-600 border-orange-200 hover:bg-orange-50"
+          className="text-red-600 border-red-200 hover:bg-red-50"
           onClick={(e) => {
             e.stopPropagation();
-            handleOpenStatusDialog(quote.id, "in_production");
+            if (confirm("האם אתה בטוח שברצונך לבטל את הספק? ההצעה תחזור לממתין לשליחה.")) {
+              cancelSupplierMutation.mutate({ quoteId: quote.id, reason: "ביטול על ידי המשתמש" });
+            }
           }}
         >
-          <Factory className="ml-1 h-3 w-3" />
-          העבר לייצור
+          <UserX className="ml-1 h-3 w-3" />
+          בטל ספק
         </Button>
       );
     }
 
     if (quote.status === "in_production") {
-      buttons.push(
-        <Button
-          key="ready"
-          size="sm"
-          variant="outline"
-          className="text-teal-600 border-teal-200 hover:bg-teal-50"
-          onClick={(e) => {
-            e.stopPropagation();
-            handleOpenStatusDialog(quote.id, "ready");
-          }}
-        >
-          <Package className="ml-1 h-3 w-3" />
-          סמן כמוכן
-        </Button>
-      );
+      // עבר ליצור - הספק כבר אישר, אי אפשר לבטל
+      // הספק יסמן כמוכן בפורטל שלו
     }
 
     buttons.push(

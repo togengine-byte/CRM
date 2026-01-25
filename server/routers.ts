@@ -1322,6 +1322,176 @@ export const appRouter = router({
         }
         return await getSupplierScoreDetails(input.supplierId);
       }),
+
+    // Cancel all supplier jobs for a quote (before suppliers accept)
+    cancelJobsByQuote: protectedProcedure
+      .input(z.object({
+        quoteId: z.number(),
+        reason: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new Error("Not authenticated");
+        if (ctx.user.role !== 'admin' && ctx.user.role !== 'employee') {
+          throw new Error("רק עובדים יכולים לבטל ספק");
+        }
+
+        const db = await getDb();
+        if (!db) throw new Error("Database not available");
+
+        // Get all active jobs for this quote
+        const jobsResult = await db.execute(sql`
+          SELECT id, "isAccepted", "isCancelled"
+          FROM supplier_jobs 
+          WHERE "quoteId" = ${input.quoteId} AND "isCancelled" = false
+        `);
+
+        if (!jobsResult.rows || jobsResult.rows.length === 0) {
+          throw new Error("לא נמצאו עבודות פעילות להצעה זו");
+        }
+
+        // Check if any supplier has accepted
+        const acceptedJobs = (jobsResult.rows as any[]).filter(j => j.isAccepted);
+        if (acceptedJobs.length > 0) {
+          throw new Error("לא ניתן לבטל ספק לאחר שהוא אישר את העבודה");
+        }
+
+        // Cancel all jobs
+        await db.execute(sql`
+          UPDATE supplier_jobs
+          SET "isCancelled" = true,
+              "cancelledAt" = NOW(),
+              "cancelledReason" = ${input.reason || 'בוטל על ידי המשרד'},
+              status = 'cancelled',
+              "updatedAt" = NOW()
+          WHERE "quoteId" = ${input.quoteId} AND "isCancelled" = false
+        `);
+
+        // Remove suppliers from quote items
+        await db.execute(sql`
+          UPDATE quote_items
+          SET "supplierId" = NULL,
+              "supplierCost" = NULL,
+              "deliveryDays" = NULL
+          WHERE "quoteId" = ${input.quoteId}
+        `);
+
+        // Revert quote to approved status
+        await db.execute(sql`
+          UPDATE quotes
+          SET status = 'approved',
+              "updatedAt" = NOW()
+          WHERE id = ${input.quoteId}
+        `);
+
+        // Log the cancellation
+        await db.execute(sql`
+          INSERT INTO activity_log ("userId", "actionType", details, "createdAt")
+          VALUES (${ctx.user.id}, 'SUPPLIER_CANCELLED', ${JSON.stringify({
+            quoteId: input.quoteId,
+            reason: input.reason || 'בוטל על ידי המשרד'
+          })}, NOW())
+        `);
+
+        return { 
+          success: true, 
+          message: "ספק בוטל בהצלחה - ההצעה חזרה לממתין לספק"
+        };
+      }),
+
+    // Cancel supplier job (before supplier accepts)
+    cancelJob: protectedProcedure
+      .input(z.object({
+        jobId: z.number(),
+        reason: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new Error("Not authenticated");
+        if (ctx.user.role !== 'admin' && ctx.user.role !== 'employee') {
+          throw new Error("רק עובדים יכולים לבטל ספק");
+        }
+
+        const db = await getDb();
+        if (!db) throw new Error("Database not available");
+
+        // Get job details
+        const jobResult = await db.execute(sql`
+          SELECT id, "quoteId", "quoteItemId", "supplierId", status, "isAccepted", "isCancelled"
+          FROM supplier_jobs WHERE id = ${input.jobId}
+        `);
+
+        if (!jobResult.rows || jobResult.rows.length === 0) {
+          throw new Error("עבודה לא נמצאה");
+        }
+
+        const job = jobResult.rows[0] as any;
+
+        // Can only cancel if supplier hasn't accepted yet
+        if (job.isAccepted) {
+          throw new Error("לא ניתן לבטל ספק לאחר שהוא אישר את העבודה");
+        }
+
+        if (job.isCancelled) {
+          throw new Error("עבודה זו כבר בוטלה");
+        }
+
+        // Cancel the job
+        await db.execute(sql`
+          UPDATE supplier_jobs
+          SET "isCancelled" = true,
+              "cancelledAt" = NOW(),
+              "cancelledReason" = ${input.reason || 'בוטל על ידי המשרד'},
+              status = 'cancelled',
+              "updatedAt" = NOW()
+          WHERE id = ${input.jobId}
+        `);
+
+        // Remove supplier from quote item
+        await db.execute(sql`
+          UPDATE quote_items
+          SET "supplierId" = NULL,
+              "supplierCost" = NULL,
+              "deliveryDays" = NULL
+          WHERE id = ${job.quoteItemId}
+        `);
+
+        // Check if all items in quote have no supplier - if so, revert quote status
+        const unassignedResult = await db.execute(sql`
+          SELECT COUNT(*) as total,
+                 COUNT(CASE WHEN "supplierId" IS NULL THEN 1 END) as unassigned
+          FROM quote_items
+          WHERE "quoteId" = ${job.quoteId}
+        `);
+
+        const counts = unassignedResult.rows[0] as any;
+        const allUnassigned = parseInt(counts.total) === parseInt(counts.unassigned);
+
+        if (allUnassigned) {
+          // Revert quote to approved status (waiting for supplier assignment)
+          await db.execute(sql`
+            UPDATE quotes
+            SET status = 'approved',
+                "updatedAt" = NOW()
+            WHERE id = ${job.quoteId}
+          `);
+        }
+
+        // Log the cancellation
+        await db.execute(sql`
+          INSERT INTO activity_log ("userId", "actionType", details, "createdAt")
+          VALUES (${ctx.user.id}, 'SUPPLIER_CANCELLED', ${JSON.stringify({
+            jobId: input.jobId,
+            quoteId: job.quoteId,
+            supplierId: job.supplierId,
+            reason: input.reason || 'בוטל על ידי המשרד'
+          })}, NOW())
+        `);
+
+        return { 
+          success: true, 
+          message: "ספק בוטל בהצלחה",
+          quoteReverted: allUnassigned
+        };
+      }),
   }),
 
   // ==================== COURIER API ====================
