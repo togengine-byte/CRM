@@ -55,6 +55,12 @@ import {
   Zap,
   Shield,
   DollarSign,
+  Database,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  Save,
+  Award,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -77,6 +83,13 @@ export default function Suppliers() {
     companyName: "",
     address: "",
   });
+  const [isDataDialogOpen, setIsDataDialogOpen] = useState(false);
+  const [editingJob, setEditingJob] = useState<number | null>(null);
+  const [editJobForm, setEditJobForm] = useState({
+    supplierRating: 0,
+    courierConfirmedReady: true,
+    promisedDeliveryDays: 3,
+  });
 
   const utils = trpc.useUtils();
 
@@ -96,6 +109,14 @@ export default function Suppliers() {
     { enabled: !!selectedSupplier }
   );
   const { data: openJobs = [] } = trpc.suppliers.openJobs.useQuery(
+    { supplierId: selectedSupplier! },
+    { enabled: !!selectedSupplier }
+  );
+  const { data: jobsHistory = [], refetch: refetchJobsHistory } = trpc.suppliers.jobsHistory.useQuery(
+    { supplierId: selectedSupplier! },
+    { enabled: !!selectedSupplier && isDataDialogOpen }
+  );
+  const { data: scoreDetails, refetch: refetchScoreDetails } = trpc.suppliers.scoreDetails.useQuery(
     { supplierId: selectedSupplier! },
     { enabled: !!selectedSupplier }
   );
@@ -126,6 +147,18 @@ export default function Suppliers() {
     },
   });
 
+  const updateJobDataMutation = trpc.suppliers.updateJobData.useMutation({
+    onSuccess: () => {
+      toast.success("נתוני עבודה עודכנו בהצלחה");
+      setEditingJob(null);
+      refetchJobsHistory();
+      refetchScoreDetails();
+    },
+    onError: (error) => {
+      toast.error(error.message || "שגיאה בעדכון נתונים");
+    },
+  });
+
   const handleCreate = () => {
     if (!createForm.name || !createForm.email) {
       toast.error("שם ואימייל הם שדות חובה");
@@ -136,6 +169,25 @@ export default function Suppliers() {
 
   const handleStatusChange = (supplierId: number, newStatus: 'active' | 'deactivated') => {
     updateMutation.mutate({ id: supplierId, status: newStatus });
+  };
+
+  const handleEditJob = (job: any) => {
+    setEditingJob(job.id);
+    setEditJobForm({
+      supplierRating: job.supplierRating || 0,
+      courierConfirmedReady: job.courierConfirmedReady ?? true,
+      promisedDeliveryDays: job.promisedDeliveryDays || 3,
+    });
+  };
+
+  const handleSaveJobData = () => {
+    if (!editingJob) return;
+    updateJobDataMutation.mutate({
+      jobId: editingJob,
+      supplierRating: editJobForm.supplierRating || undefined,
+      courierConfirmedReady: editJobForm.courierConfirmedReady,
+      promisedDeliveryDays: editJobForm.promisedDeliveryDays || undefined,
+    });
   };
 
   const getStatusBadge = (status: string) => {
@@ -399,10 +451,11 @@ export default function Suppliers() {
 
           {supplierDetails && (
             <Tabs defaultValue="info" className="mt-6">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="info">פרטים</TabsTrigger>
                 <TabsTrigger value="prices">מחירים ({supplierPrices.length})</TabsTrigger>
                 <TabsTrigger value="jobs">עבודות ({openJobs.length})</TabsTrigger>
+                <TabsTrigger value="data" onClick={() => setIsDataDialogOpen(true)}>דאטה</TabsTrigger>
               </TabsList>
 
               <TabsContent value="info" className="space-y-4 mt-4">
@@ -611,7 +664,205 @@ export default function Suppliers() {
                   </CardContent>
                 </Card>
               </TabsContent>
+
+              {/* טאב דאטה */}
+              <TabsContent value="data" className="mt-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Database className="h-5 w-5" />
+                      היסטוריית עבודות
+                    </CardTitle>
+                    <CardDescription>כל העבודות שהספק ביצע - לחץ לעריכה</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {jobsHistory.length === 0 ? (
+                      <p className="text-center text-muted-foreground py-4">
+                        אין היסטוריית עבודות לספק זה
+                      </p>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="text-right">מס' עבודה</TableHead>
+                              <TableHead className="text-right">מוצר</TableHead>
+                              <TableHead className="text-right">ימים לביצוע</TableHead>
+                              <TableHead className="text-right">הבטחה</TableHead>
+                              <TableHead className="text-right">עמד בהבטחה</TableHead>
+                              <TableHead className="text-right">אישור שליח</TableHead>
+                              <TableHead className="text-right">דירוג</TableHead>
+                              <TableHead className="text-right">פעולות</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {jobsHistory.map((job: any) => (
+                              <TableRow key={job.id} className={editingJob === job.id ? "bg-blue-50" : ""}>
+                                <TableCell>{job.id}</TableCell>
+                                <TableCell className="max-w-[150px] truncate">{job.productName}</TableCell>
+                                <TableCell>
+                                  {editingJob === job.id ? (
+                                    <Input
+                                      type="number"
+                                      className="w-16 h-8"
+                                      value={editJobForm.promisedDeliveryDays}
+                                      onChange={(e) => setEditJobForm({...editJobForm, promisedDeliveryDays: parseInt(e.target.value) || 0})}
+                                    />
+                                  ) : (
+                                    job.promisedDeliveryDays || "-"
+                                  )}
+                                </TableCell>
+                                <TableCell>{job.actualDays !== null ? `${job.actualDays} ימים` : "-"}</TableCell>
+                                <TableCell>
+                                  {job.actualDays !== null && job.promisedDeliveryDays ? (
+                                    job.actualDays <= job.promisedDeliveryDays ? (
+                                      <Badge className="bg-green-100 text-green-800">כן</Badge>
+                                    ) : (
+                                      <Badge className="bg-red-100 text-red-800">לא</Badge>
+                                    )
+                                  ) : "-"}
+                                </TableCell>
+                                <TableCell>
+                                  {editingJob === job.id ? (
+                                    <Select
+                                      value={editJobForm.courierConfirmedReady ? "true" : "false"}
+                                      onValueChange={(v) => setEditJobForm({...editJobForm, courierConfirmedReady: v === "true"})}
+                                    >
+                                      <SelectTrigger className="w-20 h-8">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="true">כן</SelectItem>
+                                        <SelectItem value="false">לא</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  ) : (
+                                    job.courierConfirmedReady ? (
+                                      <CheckCircle className="h-4 w-4 text-green-500" />
+                                    ) : job.courierConfirmedReady === false ? (
+                                      <XCircle className="h-4 w-4 text-red-500" />
+                                    ) : (
+                                      <AlertCircle className="h-4 w-4 text-gray-400" />
+                                    )
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  {editingJob === job.id ? (
+                                    <Select
+                                      value={String(editJobForm.supplierRating)}
+                                      onValueChange={(v) => setEditJobForm({...editJobForm, supplierRating: parseInt(v)})}
+                                    >
+                                      <SelectTrigger className="w-16 h-8">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="0">-</SelectItem>
+                                        <SelectItem value="1">1</SelectItem>
+                                        <SelectItem value="2">2</SelectItem>
+                                        <SelectItem value="3">3</SelectItem>
+                                        <SelectItem value="4">4</SelectItem>
+                                        <SelectItem value="5">5</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  ) : (
+                                    job.supplierRating ? (
+                                      <span className="flex items-center gap-1">
+                                        <Star className="h-3 w-3 text-yellow-500" />
+                                        {job.supplierRating}
+                                      </span>
+                                    ) : "-"
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  {editingJob === job.id ? (
+                                    <div className="flex gap-1">
+                                      <Button size="sm" variant="ghost" onClick={handleSaveJobData}>
+                                        <Save className="h-4 w-4" />
+                                      </Button>
+                                      <Button size="sm" variant="ghost" onClick={() => setEditingJob(null)}>
+                                        <XCircle className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  ) : (
+                                    <Button size="sm" variant="ghost" onClick={() => handleEditJob(job)}>
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
             </Tabs>
+          )}
+
+          {/* כרטיס ציון סופי */}
+          {supplierDetails && scoreDetails && (
+            <Card className="mt-6 border-2 border-primary/20">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Award className="h-5 w-5 text-primary" />
+                  ציון ספק כולל
+                </CardTitle>
+                <CardDescription>
+                  מבוסס על {scoreDetails.totalJobs} עבודות
+                  {scoreDetails.totalJobs < 10 && " (ספק חדש - אין מספיק דאטה)"}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                  <div className="flex justify-between border-b pb-2">
+                    <span className="text-muted-foreground">ציון בסיס:</span>
+                    <span className="font-medium">{scoreDetails.breakdown.baseScore.toFixed(1)}</span>
+                  </div>
+                  <div className="flex justify-between border-b pb-2">
+                    <span className="text-muted-foreground">מחיר:</span>
+                    <span className={`font-medium ${scoreDetails.breakdown.priceScore >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {scoreDetails.breakdown.priceScore >= 0 ? '+' : ''}{scoreDetails.breakdown.priceScore.toFixed(1)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-b pb-2">
+                    <span className="text-muted-foreground">עמידה בהבטחות:</span>
+                    <span className={`font-medium ${scoreDetails.breakdown.promiseScore >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {scoreDetails.breakdown.promiseScore >= 0 ? '+' : ''}{scoreDetails.breakdown.promiseScore.toFixed(1)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-b pb-2">
+                    <span className="text-muted-foreground">אישור שליח:</span>
+                    <span className={`font-medium ${scoreDetails.breakdown.courierScore >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {scoreDetails.breakdown.courierScore >= 0 ? '+' : ''}{scoreDetails.breakdown.courierScore.toFixed(1)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-b pb-2">
+                    <span className="text-muted-foreground">סיום מוקדם:</span>
+                    <span className={`font-medium ${scoreDetails.breakdown.earlyScore >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {scoreDetails.breakdown.earlyScore >= 0 ? '+' : ''}{scoreDetails.breakdown.earlyScore.toFixed(1)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-b pb-2">
+                    <span className="text-muted-foreground">עומס נוכחי:</span>
+                    <span className={`font-medium ${scoreDetails.breakdown.loadScore >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {scoreDetails.breakdown.loadScore >= 0 ? '+' : ''}{scoreDetails.breakdown.loadScore.toFixed(1)}
+                    </span>
+                  </div>
+                </div>
+                <div className="mt-4 pt-4 border-t flex justify-between items-center">
+                  <span className="text-lg font-semibold">ציון סופי:</span>
+                  <span className={`text-2xl font-bold ${
+                    scoreDetails.totalScore >= 110 ? 'text-green-600' :
+                    scoreDetails.totalScore >= 100 ? 'text-blue-600' :
+                    scoreDetails.totalScore >= 90 ? 'text-yellow-600' : 'text-red-600'
+                  }`}>
+                    {scoreDetails.totalScore.toFixed(1)}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
           )}
         </SheetContent>
       </Sheet>

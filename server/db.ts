@@ -3708,3 +3708,293 @@ export async function setEmailOnStatusChangeSetting(value: EmailOnStatusChange, 
 
   return { success: true };
 }
+
+
+// ==================== SUPPLIER JOBS DATA & SCORING ====================
+
+import { supplierJobs } from "../drizzle/schema";
+
+// Get all jobs history for a specific supplier
+export async function getSupplierJobsHistory(supplierId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const result = await db.execute(sql`
+    SELECT 
+      sj.id,
+      sj."quoteId",
+      sj."customerId",
+      sj."sizeQuantityId",
+      sj.quantity,
+      sj."pricePerUnit",
+      sj.status,
+      sj."supplierMarkedReady",
+      sj."supplierReadyAt",
+      sj."courierConfirmedReady",
+      sj."supplierRating",
+      sj."promisedDeliveryDays",
+      sj."createdAt",
+      sj."deliveredAt",
+      customer.name as "customerName",
+      customer."companyName" as "customerCompany",
+      ps.name as "sizeName",
+      bp.name as "productName",
+      CASE 
+        WHEN sj."supplierReadyAt" IS NOT NULL THEN 
+          EXTRACT(EPOCH FROM (sj."supplierReadyAt" - sj."createdAt")) / 86400
+        ELSE NULL
+      END as "actualDeliveryDays"
+    FROM supplier_jobs sj
+    LEFT JOIN users customer ON sj."customerId" = customer.id
+    LEFT JOIN size_quantities sq ON sj."sizeQuantityId" = sq.id
+    LEFT JOIN product_sizes ps ON sq.size_id = ps.id
+    LEFT JOIN base_products bp ON ps.product_id = bp.id
+    WHERE sj."supplierId" = ${supplierId}
+    ORDER BY sj.id DESC
+  `);
+
+  return result.rows.map((row: any) => ({
+    id: row.id,
+    quoteId: row.quoteId,
+    customerId: row.customerId,
+    sizeQuantityId: row.sizeQuantityId,
+    quantity: row.quantity,
+    pricePerUnit: row.pricePerUnit,
+    status: row.status,
+    supplierMarkedReady: row.supplierMarkedReady,
+    supplierReadyAt: row.supplierReadyAt,
+    courierConfirmedReady: row.courierConfirmedReady,
+    supplierRating: row.supplierRating ? parseFloat(row.supplierRating) : null,
+    promisedDeliveryDays: row.promisedDeliveryDays,
+    createdAt: row.createdAt,
+    deliveredAt: row.deliveredAt,
+    customerName: row.customerName || 'לקוח לא מזוהה',
+    customerCompany: row.customerCompany,
+    productName: row.productName ? `${row.productName} - ${row.sizeName}` : 'מוצר לא מזוהה',
+    actualDeliveryDays: row.actualDeliveryDays ? parseFloat(row.actualDeliveryDays) : null,
+  }));
+}
+
+// Update supplier job data (admin only)
+export async function updateSupplierJobData(
+  jobId: number, 
+  data: {
+    supplierRating?: number;
+    courierConfirmedReady?: boolean;
+    promisedDeliveryDays?: number;
+    supplierReadyAt?: Date | null;
+  },
+  adminId: number
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const updateFields: string[] = [];
+  const values: any[] = [];
+
+  if (data.supplierRating !== undefined) {
+    updateFields.push(`"supplierRating" = ${data.supplierRating}`);
+  }
+  if (data.courierConfirmedReady !== undefined) {
+    updateFields.push(`"courierConfirmedReady" = ${data.courierConfirmedReady}`);
+  }
+  if (data.promisedDeliveryDays !== undefined) {
+    updateFields.push(`"promisedDeliveryDays" = ${data.promisedDeliveryDays}`);
+  }
+  if (data.supplierReadyAt !== undefined) {
+    if (data.supplierReadyAt === null) {
+      updateFields.push(`"supplierReadyAt" = NULL`);
+    } else {
+      updateFields.push(`"supplierReadyAt" = '${data.supplierReadyAt.toISOString()}'`);
+    }
+  }
+
+  if (updateFields.length === 0) {
+    return { success: false, error: 'No fields to update' };
+  }
+
+  await db.execute(sql.raw(`
+    UPDATE supplier_jobs 
+    SET ${updateFields.join(', ')}, "updatedAt" = NOW()
+    WHERE id = ${jobId}
+  `));
+
+  await logActivity(adminId, 'supplier_job_data_updated', { jobId, ...data });
+
+  return { success: true };
+}
+
+// Get detailed score breakdown for a supplier (using the new algorithm)
+export async function getSupplierScoreDetails(supplierId: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  // Get all completed jobs for this supplier
+  const jobsResult = await db.execute(sql`
+    SELECT 
+      id,
+      "supplierRating",
+      "courierConfirmedReady",
+      "promisedDeliveryDays",
+      "createdAt",
+      "supplierReadyAt",
+      status
+    FROM supplier_jobs
+    WHERE "supplierId" = ${supplierId}
+  `);
+
+  const jobs = jobsResult.rows as any[];
+  const totalJobs = jobs.length;
+  const completedJobs = jobs.filter(j => j.supplierReadyAt !== null);
+
+  // Calculate base score based on experience
+  let baseScore: number;
+  if (totalJobs === 0) {
+    baseScore = 70;
+  } else if (totalJobs < 5) {
+    baseScore = 80;
+  } else if (totalJobs < 10) {
+    baseScore = 90;
+  } else {
+    baseScore = 100;
+  }
+
+  // Calculate price score
+  const priceResult = await db.execute(sql`
+    WITH supplier_avg AS (
+      SELECT AVG(CAST("pricePerUnit" AS DECIMAL)) as avg_price
+      FROM supplier_prices
+      WHERE "supplierId" = ${supplierId}
+    ),
+    market_avg AS (
+      SELECT AVG(CAST("pricePerUnit" AS DECIMAL)) as avg_price
+      FROM supplier_prices
+    )
+    SELECT 
+      supplier_avg.avg_price as supplier_price,
+      market_avg.avg_price as market_price
+    FROM supplier_avg, market_avg
+  `);
+
+  const priceRow = priceResult.rows[0] as any;
+  const supplierPrice = parseFloat(priceRow?.supplier_price) || 0;
+  const marketPrice = parseFloat(priceRow?.market_price) || 0;
+
+  let priceScore = 0;
+  let priceDiff = 0;
+  if (marketPrice > 0 && supplierPrice > 0) {
+    priceDiff = ((marketPrice - supplierPrice) / marketPrice) * 100;
+    priceScore = Math.max(-10, Math.min(10, priceDiff * 0.5));
+  }
+
+  // Calculate promise keeping score
+  let promiseScore = 0;
+  let promiseRate = 0;
+  const jobsWithPromise = completedJobs.filter(j => j.promisedDeliveryDays !== null);
+  if (jobsWithPromise.length > 0) {
+    const onTimeJobs = jobsWithPromise.filter(j => {
+      const actualDays = (new Date(j.supplierReadyAt).getTime() - new Date(j.createdAt).getTime()) / (1000 * 60 * 60 * 24);
+      return actualDays <= j.promisedDeliveryDays;
+    });
+    promiseRate = (onTimeJobs.length / jobsWithPromise.length) * 100;
+    promiseScore = Math.max(-8, Math.min(8, (promiseRate - 80) * 0.4));
+  }
+
+  // Calculate courier confirmation score
+  let courierScore = 0;
+  let courierRate = 0;
+  const jobsWithCourierData = completedJobs.filter(j => j.courierConfirmedReady !== null);
+  if (jobsWithCourierData.length > 0) {
+    const confirmedJobs = jobsWithCourierData.filter(j => j.courierConfirmedReady === true);
+    courierRate = (confirmedJobs.length / jobsWithCourierData.length) * 100;
+    courierScore = Math.max(-6, Math.min(6, (courierRate - 80) * 0.3));
+  }
+
+  // Calculate early completion bonus
+  let earlyBonus = 0;
+  let avgEarlyDays = 0;
+  if (jobsWithPromise.length > 0) {
+    const earlyDays = jobsWithPromise.map(j => {
+      const actualDays = (new Date(j.supplierReadyAt).getTime() - new Date(j.createdAt).getTime()) / (1000 * 60 * 60 * 24);
+      return j.promisedDeliveryDays - actualDays;
+    }).filter(d => d > 0);
+    
+    if (earlyDays.length > 0) {
+      avgEarlyDays = earlyDays.reduce((a, b) => a + b, 0) / earlyDays.length;
+      earlyBonus = Math.min(3, avgEarlyDays);
+    }
+  }
+
+  // Calculate current workload penalty
+  const openJobsResult = await db.execute(sql`
+    SELECT COUNT(*) as count
+    FROM supplier_jobs
+    WHERE "supplierId" = ${supplierId} AND status IN ('pending', 'in_progress')
+  `);
+  const openJobs = parseInt((openJobsResult.rows[0] as any)?.count) || 0;
+  const workloadPenalty = Math.min(3, openJobs * 0.5);
+
+  // Calculate consistency score (stability)
+  let consistencyScore = 0;
+  if (completedJobs.length >= 3) {
+    const deliveryTimes = completedJobs.map(j => {
+      return (new Date(j.supplierReadyAt).getTime() - new Date(j.createdAt).getTime()) / (1000 * 60 * 60 * 24);
+    });
+    const avgTime = deliveryTimes.reduce((a, b) => a + b, 0) / deliveryTimes.length;
+    const variance = deliveryTimes.reduce((sum, t) => sum + Math.pow(t - avgTime, 2), 0) / deliveryTimes.length;
+    const stdDev = Math.sqrt(variance);
+    const cv = avgTime > 0 ? (stdDev / avgTime) * 100 : 0;
+    consistencyScore = Math.max(0, Math.min(2, 2 - cv * 0.1));
+  }
+
+  // Calculate total score
+  const totalScore = baseScore + priceScore + promiseScore + courierScore + earlyBonus - workloadPenalty + consistencyScore;
+
+  return {
+    supplierId,
+    totalJobs,
+    completedJobs: completedJobs.length,
+    scores: {
+      base: {
+        value: baseScore,
+        description: totalJobs === 0 ? 'ספק חדש' : 
+                     totalJobs < 5 ? '1-4 עבודות' :
+                     totalJobs < 10 ? '5-9 עבודות' : '10+ עבודות'
+      },
+      price: {
+        value: Math.round(priceScore * 10) / 10,
+        diff: Math.round(priceDiff * 10) / 10,
+        supplierAvg: Math.round(supplierPrice),
+        marketAvg: Math.round(marketPrice),
+        description: priceDiff > 0 ? `זול ב-${Math.round(priceDiff)}%` : 
+                     priceDiff < 0 ? `יקר ב-${Math.round(Math.abs(priceDiff))}%` : 'ממוצע'
+      },
+      promise: {
+        value: Math.round(promiseScore * 10) / 10,
+        rate: Math.round(promiseRate),
+        description: `${Math.round(promiseRate)}% עמידה בהבטחות`
+      },
+      courier: {
+        value: Math.round(courierScore * 10) / 10,
+        rate: Math.round(courierRate),
+        description: `${Math.round(courierRate)}% אישור שליח`
+      },
+      early: {
+        value: Math.round(earlyBonus * 10) / 10,
+        avgDays: Math.round(avgEarlyDays * 10) / 10,
+        description: avgEarlyDays > 0 ? `ממוצע ${Math.round(avgEarlyDays * 10) / 10} ימים מוקדם` : 'ללא סיום מוקדם'
+      },
+      workload: {
+        value: -Math.round(workloadPenalty * 10) / 10,
+        openJobs,
+        description: `${openJobs} עבודות פתוחות`
+      },
+      consistency: {
+        value: Math.round(consistencyScore * 10) / 10,
+        description: consistencyScore > 1.5 ? 'עקבי מאוד' :
+                     consistencyScore > 0.5 ? 'עקבי' : 'משתנה'
+      }
+    },
+    totalScore: Math.round(totalScore * 10) / 10
+  };
+}

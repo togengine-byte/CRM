@@ -219,6 +219,7 @@ export const supplierJobs = pgTable("supplier_jobs", {
   supplierReadyAt: timestamp("supplierReadyAt"),
   courierConfirmedReady: boolean("courierConfirmedReady").default(false),
   supplierRating: decimal("supplierRating", { precision: 3, scale: 1 }),
+  promisedDeliveryDays: integer("promisedDeliveryDays").default(3),
   fileValidationWarnings: jsonb("fileValidationWarnings").default('[]'),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),

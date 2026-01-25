@@ -132,6 +132,9 @@ import {
   getEmailOnStatusChangeSetting,
   setEmailOnStatusChangeSetting,
   type EmailOnStatusChange,
+  getSupplierJobsHistory,
+  updateSupplierJobData,
+  getSupplierScoreDetails,
 } from "./db";
 
 export const appRouter = router({
@@ -1265,6 +1268,50 @@ export const appRouter = router({
           input.supplierId,
           input.items
         );
+      }),
+
+    // Get supplier jobs history (for data view)
+    jobsHistory: protectedProcedure
+      .input(z.object({ supplierId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        if (!ctx.user) throw new Error("Not authenticated");
+        if (ctx.user.role !== 'admin' && ctx.user.role !== 'employee') {
+          throw new Error("Only employees can view supplier job history");
+        }
+        return await getSupplierJobsHistory(input.supplierId);
+      }),
+
+    // Update supplier job data (admin only)
+    updateJobData: adminProcedure
+      .input(z.object({
+        jobId: z.number(),
+        supplierRating: z.number().min(1).max(5).optional(),
+        courierConfirmedReady: z.boolean().optional(),
+        promisedDeliveryDays: z.number().int().positive().optional(),
+        supplierReadyAt: z.string().datetime().nullable().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new Error("Not authenticated");
+        const { jobId, supplierReadyAt, ...data } = input;
+        return await updateSupplierJobData(
+          jobId,
+          {
+            ...data,
+            supplierReadyAt: supplierReadyAt ? new Date(supplierReadyAt) : (supplierReadyAt === null ? null : undefined),
+          },
+          ctx.user.id
+        );
+      }),
+
+    // Get supplier score details
+    scoreDetails: protectedProcedure
+      .input(z.object({ supplierId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        if (!ctx.user) throw new Error("Not authenticated");
+        if (ctx.user.role !== 'admin' && ctx.user.role !== 'employee') {
+          throw new Error("Only employees can view supplier scores");
+        }
+        return await getSupplierScoreDetails(input.supplierId);
       }),
   }),
 
