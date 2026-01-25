@@ -28,13 +28,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import {
@@ -61,6 +54,8 @@ import {
   AlertCircle,
   Save,
   Award,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -74,8 +69,8 @@ export default function Suppliers() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [selectedSupplier, setSelectedSupplier] = useState<number | null>(null);
-  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [expandedSupplierId, setExpandedSupplierId] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState("info");
   const [createForm, setCreateForm] = useState({
     name: "",
     email: "",
@@ -83,7 +78,6 @@ export default function Suppliers() {
     companyName: "",
     address: "",
   });
-  const [isDataDialogOpen, setIsDataDialogOpen] = useState(false);
   const [editingJob, setEditingJob] = useState<number | null>(null);
   const [editJobForm, setEditJobForm] = useState({
     supplierRating: 0,
@@ -101,24 +95,24 @@ export default function Suppliers() {
 
   const { data: stats } = trpc.suppliers.stats.useQuery();
   const { data: supplierDetails } = trpc.suppliers.getById.useQuery(
-    { id: selectedSupplier! },
-    { enabled: !!selectedSupplier }
+    { id: expandedSupplierId! },
+    { enabled: !!expandedSupplierId }
   );
   const { data: supplierPrices = [] } = trpc.suppliers.prices.useQuery(
-    { supplierId: selectedSupplier! },
-    { enabled: !!selectedSupplier }
+    { supplierId: expandedSupplierId! },
+    { enabled: !!expandedSupplierId }
   );
   const { data: openJobs = [] } = trpc.suppliers.openJobs.useQuery(
-    { supplierId: selectedSupplier! },
-    { enabled: !!selectedSupplier }
+    { supplierId: expandedSupplierId! },
+    { enabled: !!expandedSupplierId }
   );
   const { data: jobsHistory = [], refetch: refetchJobsHistory } = trpc.suppliers.jobsHistory.useQuery(
-    { supplierId: selectedSupplier! },
-    { enabled: !!selectedSupplier && isDataDialogOpen }
+    { supplierId: expandedSupplierId! },
+    { enabled: !!expandedSupplierId && activeTab === "data" }
   );
   const { data: scoreDetails, refetch: refetchScoreDetails } = trpc.suppliers.scoreDetails.useQuery(
-    { supplierId: selectedSupplier! },
-    { enabled: !!selectedSupplier }
+    { supplierId: expandedSupplierId! },
+    { enabled: !!expandedSupplierId }
   );
 
   // Mutations
@@ -190,6 +184,15 @@ export default function Suppliers() {
     });
   };
 
+  const handleRowClick = (supplierId: number) => {
+    if (expandedSupplierId === supplierId) {
+      setExpandedSupplierId(null);
+    } else {
+      setExpandedSupplierId(supplierId);
+      setActiveTab("info");
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "active":
@@ -203,6 +206,13 @@ export default function Suppliers() {
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
+  };
+
+  const getScoreColor = (score: number) => {
+    if (score >= 110) return "text-green-600";
+    if (score >= 100) return "text-blue-600";
+    if (score >= 90) return "text-yellow-600";
+    return "text-red-600";
   };
 
   return (
@@ -356,19 +366,20 @@ export default function Suppliers() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="text-right w-8"></TableHead>
                 <TableHead className="text-right">שם</TableHead>
                 <TableHead className="text-right">חברה</TableHead>
                 <TableHead className="text-right">אימייל</TableHead>
                 <TableHead className="text-right">טלפון</TableHead>
                 <TableHead className="text-right">סטטוס</TableHead>
-                <TableHead className="text-right">תאריך הצטרפות</TableHead>
+                <TableHead className="text-right">ציון</TableHead>
                 <TableHead className="text-right">פעולות</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {suppliers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     לא נמצאו ספקים
                   </TableCell>
                 </TableRow>
@@ -377,19 +388,29 @@ export default function Suppliers() {
                   <>
                     <TableRow
                       key={supplier.id}
-                      onClick={() => {
-                        setSelectedSupplier(supplier.id);
-                        setIsDetailsOpen(selectedSupplier === supplier.id ? !isDetailsOpen : true);
-                      }}
-                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => handleRowClick(supplier.id)}
+                      className={`cursor-pointer hover:bg-muted/50 transition-colors ${expandedSupplierId === supplier.id ? 'bg-muted/30' : ''}`}
                     >
+                      <TableCell>
+                        {expandedSupplierId === supplier.id ? (
+                          <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </TableCell>
                       <TableCell className="font-medium">{supplier.name || "-"}</TableCell>
                       <TableCell>{supplier.companyName || "-"}</TableCell>
-                      <TableCell>{supplier.email || "-"}</TableCell>
-                      <TableCell>{supplier.phone || "-"}</TableCell>
+                      <TableCell className="text-muted-foreground">{supplier.email || "-"}</TableCell>
+                      <TableCell className="text-muted-foreground">{supplier.phone || "-"}</TableCell>
                       <TableCell>{getStatusBadge(supplier.status)}</TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {new Date(supplier.createdAt).toLocaleDateString("he-IL")}
+                      <TableCell>
+                        {supplier.totalJobs > 0 ? (
+                          <span className={`font-bold ${getScoreColor(supplier.score || 0)}`}>
+                            {(supplier.score || 0).toFixed(0)}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">חדש</span>
+                        )}
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <DropdownMenu>
@@ -399,12 +420,7 @@ export default function Suppliers() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setSelectedSupplier(supplier.id);
-                                setIsDetailsOpen(true);
-                              }}
-                            >
+                            <DropdownMenuItem onClick={() => handleRowClick(supplier.id)}>
                               <Eye className="ml-2 h-4 w-4" />
                               צפה בפרטים
                             </DropdownMenuItem>
@@ -429,443 +445,337 @@ export default function Suppliers() {
                         </DropdownMenu>
                       </TableCell>
                     </TableRow>
-                  </>))
+
+                    {/* Expanded Row - Details */}
+                    {expandedSupplierId === supplier.id && supplierDetails && (
+                      <TableRow className="bg-muted/20 hover:bg-muted/20">
+                        <TableCell colSpan={8} className="p-0">
+                          <div className="p-6 space-y-6">
+                            {/* Tabs */}
+                            <Tabs value={activeTab} onValueChange={setActiveTab}>
+                              <TabsList className="grid w-full grid-cols-4 max-w-md">
+                                <TabsTrigger value="info">פרטים</TabsTrigger>
+                                <TabsTrigger value="prices">מחירים</TabsTrigger>
+                                <TabsTrigger value="jobs">עבודות</TabsTrigger>
+                                <TabsTrigger value="data">דאטה</TabsTrigger>
+                              </TabsList>
+
+                              {/* Tab: Info */}
+                              <TabsContent value="info" className="mt-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                  {/* פרטי קשר */}
+                                  <div className="space-y-3">
+                                    <h4 className="font-semibold text-sm text-muted-foreground">פרטי קשר</h4>
+                                    <div className="grid grid-cols-2 gap-4 text-sm">
+                                      <div className="flex items-center gap-2">
+                                        <Mail className="h-4 w-4 text-muted-foreground" />
+                                        <span>{supplierDetails.email || "-"}</span>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <Phone className="h-4 w-4 text-muted-foreground" />
+                                        <span>{supplierDetails.phone || "-"}</span>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <MapPin className="h-4 w-4 text-muted-foreground" />
+                                        <span>{supplierDetails.address || "-"}</span>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <Briefcase className="h-4 w-4 text-muted-foreground" />
+                                        <span>{supplierDetails.openJobsCount} עבודות פתוחות</span>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* דירוגים */}
+                                  {supplierDetails.ratings && (
+                                    <div className="space-y-3">
+                                      <h4 className="font-semibold text-sm text-muted-foreground">דירוגים</h4>
+                                      <div className="space-y-2">
+                                        <div className="flex items-center justify-between text-sm">
+                                          <div className="flex items-center gap-2">
+                                            <Star className="h-4 w-4 text-yellow-500" />
+                                            <span>איכות</span>
+                                          </div>
+                                          <span>{supplierDetails.ratings.quality.score}%</span>
+                                        </div>
+                                        <div className="flex items-center justify-between text-sm">
+                                          <div className="flex items-center gap-2">
+                                            <Shield className="h-4 w-4 text-green-500" />
+                                            <span>אמינות</span>
+                                          </div>
+                                          <span>{supplierDetails.ratings.reliability.score}%</span>
+                                        </div>
+                                        <div className="flex items-center justify-between text-sm">
+                                          <div className="flex items-center gap-2">
+                                            <Zap className="h-4 w-4 text-blue-500" />
+                                            <span>מהירות</span>
+                                          </div>
+                                          <span>{supplierDetails.ratings.speed.score}%</span>
+                                        </div>
+                                        <div className="flex items-center justify-between text-sm">
+                                          <div className="flex items-center gap-2">
+                                            <DollarSign className="h-4 w-4 text-purple-500" />
+                                            <span>מחיר</span>
+                                          </div>
+                                          <span>{supplierDetails.ratings.price.score}%</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </TabsContent>
+
+                              {/* Tab: Prices */}
+                              <TabsContent value="prices" className="mt-4">
+                                {supplierPrices.length === 0 ? (
+                                  <p className="text-center text-muted-foreground py-4">אין מחירים מוגדרים</p>
+                                ) : (
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead className="text-right">מוצר</TableHead>
+                                        <TableHead className="text-right">וריאנט</TableHead>
+                                        <TableHead className="text-right">מחיר</TableHead>
+                                        <TableHead className="text-right">ימי אספקה</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {supplierPrices.map((price: any) => (
+                                        <TableRow key={price.id}>
+                                          <TableCell>{price.productName}</TableCell>
+                                          <TableCell>{price.sizeName}</TableCell>
+                                          <TableCell className="font-medium">₪{Number(price.price).toLocaleString()}</TableCell>
+                                          <TableCell>{price.deliveryDays} ימים</TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                )}
+                              </TabsContent>
+
+                              {/* Tab: Jobs */}
+                              <TabsContent value="jobs" className="mt-4">
+                                {openJobs.length === 0 ? (
+                                  <p className="text-center text-muted-foreground py-4">אין עבודות פתוחות</p>
+                                ) : (
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead className="text-right">הצעה #</TableHead>
+                                        <TableHead className="text-right">מוצר</TableHead>
+                                        <TableHead className="text-right">כמות</TableHead>
+                                        <TableHead className="text-right">עלות</TableHead>
+                                        <TableHead className="text-right">סטטוס</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {openJobs.map((job: any) => (
+                                        <TableRow key={job.quoteItemId}>
+                                          <TableCell>{job.quoteId}</TableCell>
+                                          <TableCell>{job.productName} - {job.sizeName}</TableCell>
+                                          <TableCell>{job.quantity}</TableCell>
+                                          <TableCell>{job.supplierCost ? `₪${Number(job.supplierCost).toLocaleString()}` : "-"}</TableCell>
+                                          <TableCell><Badge variant="outline">{job.quoteStatus}</Badge></TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                )}
+                              </TabsContent>
+
+                              {/* Tab: Data - Job History with Edit */}
+                              <TabsContent value="data" className="mt-4">
+                                {jobsHistory.length === 0 ? (
+                                  <p className="text-center text-muted-foreground py-4">אין היסטוריית עבודות</p>
+                                ) : (
+                                  <div className="overflow-x-auto">
+                                    <Table>
+                                      <TableHeader>
+                                        <TableRow>
+                                          <TableHead className="text-right">מס'</TableHead>
+                                          <TableHead className="text-right">מוצר</TableHead>
+                                          <TableHead className="text-right">ימי הבטחה</TableHead>
+                                          <TableHead className="text-right">ימים בפועל</TableHead>
+                                          <TableHead className="text-right">עמד בהבטחה</TableHead>
+                                          <TableHead className="text-right">אישור שליח</TableHead>
+                                          <TableHead className="text-right">דירוג</TableHead>
+                                          <TableHead className="text-right">פעולות</TableHead>
+                                        </TableRow>
+                                      </TableHeader>
+                                      <TableBody>
+                                        {jobsHistory.map((job: any) => (
+                                          <TableRow key={job.id} className={editingJob === job.id ? "bg-blue-50" : ""}>
+                                            <TableCell>{job.id}</TableCell>
+                                            <TableCell className="max-w-[120px] truncate">{job.productName}</TableCell>
+                                            <TableCell>
+                                              {editingJob === job.id ? (
+                                                <Input
+                                                  type="number"
+                                                  className="w-16 h-8"
+                                                  value={editJobForm.promisedDeliveryDays}
+                                                  onChange={(e) => setEditJobForm({...editJobForm, promisedDeliveryDays: parseInt(e.target.value) || 0})}
+                                                />
+                                              ) : (
+                                                job.promisedDeliveryDays || "-"
+                                              )}
+                                            </TableCell>
+                                            <TableCell>{job.actualDays !== null ? job.actualDays : "-"}</TableCell>
+                                            <TableCell>
+                                              {job.actualDays !== null && job.promisedDeliveryDays ? (
+                                                job.actualDays <= job.promisedDeliveryDays ? (
+                                                  <Badge className="bg-green-100 text-green-800">כן</Badge>
+                                                ) : (
+                                                  <Badge className="bg-red-100 text-red-800">לא</Badge>
+                                                )
+                                              ) : "-"}
+                                            </TableCell>
+                                            <TableCell>
+                                              {editingJob === job.id ? (
+                                                <Select
+                                                  value={editJobForm.courierConfirmedReady ? "true" : "false"}
+                                                  onValueChange={(v) => setEditJobForm({...editJobForm, courierConfirmedReady: v === "true"})}
+                                                >
+                                                  <SelectTrigger className="w-16 h-8">
+                                                    <SelectValue />
+                                                  </SelectTrigger>
+                                                  <SelectContent>
+                                                    <SelectItem value="true">כן</SelectItem>
+                                                    <SelectItem value="false">לא</SelectItem>
+                                                  </SelectContent>
+                                                </Select>
+                                              ) : (
+                                                job.courierConfirmedReady ? (
+                                                  <CheckCircle className="h-4 w-4 text-green-500" />
+                                                ) : job.courierConfirmedReady === false ? (
+                                                  <XCircle className="h-4 w-4 text-red-500" />
+                                                ) : (
+                                                  <AlertCircle className="h-4 w-4 text-gray-400" />
+                                                )
+                                              )}
+                                            </TableCell>
+                                            <TableCell>
+                                              {editingJob === job.id ? (
+                                                <Select
+                                                  value={String(editJobForm.supplierRating)}
+                                                  onValueChange={(v) => setEditJobForm({...editJobForm, supplierRating: parseInt(v)})}
+                                                >
+                                                  <SelectTrigger className="w-14 h-8">
+                                                    <SelectValue />
+                                                  </SelectTrigger>
+                                                  <SelectContent>
+                                                    <SelectItem value="0">-</SelectItem>
+                                                    <SelectItem value="1">1</SelectItem>
+                                                    <SelectItem value="2">2</SelectItem>
+                                                    <SelectItem value="3">3</SelectItem>
+                                                    <SelectItem value="4">4</SelectItem>
+                                                    <SelectItem value="5">5</SelectItem>
+                                                  </SelectContent>
+                                                </Select>
+                                              ) : (
+                                                job.supplierRating ? (
+                                                  <span className="flex items-center gap-1">
+                                                    <Star className="h-3 w-3 text-yellow-500" />
+                                                    {job.supplierRating}
+                                                  </span>
+                                                ) : "-"
+                                              )}
+                                            </TableCell>
+                                            <TableCell>
+                                              {editingJob === job.id ? (
+                                                <div className="flex gap-1">
+                                                  <Button size="sm" variant="ghost" onClick={handleSaveJobData}>
+                                                    <Save className="h-4 w-4" />
+                                                  </Button>
+                                                  <Button size="sm" variant="ghost" onClick={() => setEditingJob(null)}>
+                                                    <XCircle className="h-4 w-4" />
+                                                  </Button>
+                                                </div>
+                                              ) : (
+                                                <Button size="sm" variant="ghost" onClick={() => handleEditJob(job)}>
+                                                  <Edit className="h-4 w-4" />
+                                                </Button>
+                                              )}
+                                            </TableCell>
+                                          </TableRow>
+                                        ))}
+                                      </TableBody>
+                                    </Table>
+                                  </div>
+                                )}
+                              </TabsContent>
+                            </Tabs>
+
+                            {/* Score Card - Always visible at bottom */}
+                            {scoreDetails && (
+                              <div className="border-t pt-4 mt-4">
+                                <div className="flex items-center gap-2 mb-3">
+                                  <Award className="h-5 w-5 text-primary" />
+                                  <h4 className="font-semibold">פירוט ציון ספק</h4>
+                                  <span className="text-sm text-muted-foreground">
+                                    ({scoreDetails.totalJobs} עבודות)
+                                  </span>
+                                </div>
+                                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 text-sm">
+                                  <div className="bg-gray-50 rounded p-2 text-center">
+                                    <div className="text-muted-foreground text-xs">בסיס</div>
+                                    <div className="font-bold">{scoreDetails.scores?.base?.value || 70}</div>
+                                    <div className="text-xs text-muted-foreground truncate">{scoreDetails.scores?.base?.description}</div>
+                                  </div>
+                                  <div className="bg-gray-50 rounded p-2 text-center">
+                                    <div className="text-muted-foreground text-xs">מחיר</div>
+                                    <div className={`font-bold ${(scoreDetails.scores?.price?.value || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                      {(scoreDetails.scores?.price?.value || 0) >= 0 ? '+' : ''}{(scoreDetails.scores?.price?.value || 0).toFixed(1)}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground truncate">{scoreDetails.scores?.price?.description}</div>
+                                  </div>
+                                  <div className="bg-gray-50 rounded p-2 text-center">
+                                    <div className="text-muted-foreground text-xs">הבטחות</div>
+                                    <div className={`font-bold ${(scoreDetails.scores?.promise?.value || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                      {(scoreDetails.scores?.promise?.value || 0) >= 0 ? '+' : ''}{(scoreDetails.scores?.promise?.value || 0).toFixed(1)}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground truncate">{scoreDetails.scores?.promise?.description}</div>
+                                  </div>
+                                  <div className="bg-gray-50 rounded p-2 text-center">
+                                    <div className="text-muted-foreground text-xs">שליח</div>
+                                    <div className={`font-bold ${(scoreDetails.scores?.courier?.value || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                      {(scoreDetails.scores?.courier?.value || 0) >= 0 ? '+' : ''}{(scoreDetails.scores?.courier?.value || 0).toFixed(1)}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground truncate">{scoreDetails.scores?.courier?.description}</div>
+                                  </div>
+                                  <div className="bg-gray-50 rounded p-2 text-center">
+                                    <div className="text-muted-foreground text-xs">מוקדם</div>
+                                    <div className={`font-bold ${(scoreDetails.scores?.early?.value || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                      {(scoreDetails.scores?.early?.value || 0) >= 0 ? '+' : ''}{(scoreDetails.scores?.early?.value || 0).toFixed(1)}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground truncate">{scoreDetails.scores?.early?.description}</div>
+                                  </div>
+                                  <div className="bg-gray-50 rounded p-2 text-center">
+                                    <div className="text-muted-foreground text-xs">עומס</div>
+                                    <div className={`font-bold ${(scoreDetails.scores?.workload?.value || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                      {(scoreDetails.scores?.workload?.value || 0) >= 0 ? '+' : ''}{(scoreDetails.scores?.workload?.value || 0).toFixed(1)}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground truncate">{scoreDetails.scores?.workload?.description}</div>
+                                  </div>
+                                  <div className="bg-primary/10 rounded p-2 text-center border-2 border-primary/30">
+                                    <div className="text-muted-foreground text-xs">סופי</div>
+                                    <div className={`font-bold text-lg ${getScoreColor(scoreDetails.totalScore)}`}>
+                                      {scoreDetails.totalScore?.toFixed(0) || 70}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </>
+                ))
               )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
-
-      {/* Supplier Details Sheet */}
-      <Sheet open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle className="flex items-center gap-2">
-              <Building2 className="h-5 w-5" />
-              {supplierDetails?.name || "פרטי ספק"}
-            </SheetTitle>
-            <SheetDescription>
-              {supplierDetails?.companyName || ""}
-            </SheetDescription>
-          </SheetHeader>
-
-          {supplierDetails && (
-            <Tabs defaultValue="info" className="mt-6">
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="info">פרטים</TabsTrigger>
-                <TabsTrigger value="prices">מחירים ({supplierPrices.length})</TabsTrigger>
-                <TabsTrigger value="jobs">עבודות ({openJobs.length})</TabsTrigger>
-                <TabsTrigger value="data" onClick={() => setIsDataDialogOpen(true)}>דאטה</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="info" className="space-y-4 mt-4">
-                {/* פרטי קשר */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg">פרטי קשר</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="flex items-center gap-3">
-                      <Mail className="h-4 w-4 text-muted-foreground" />
-                      <span>{supplierDetails.email || "-"}</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Phone className="h-4 w-4 text-muted-foreground" />
-                      <span>{supplierDetails.phone || "-"}</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <span>{supplierDetails.address || "-"}</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Briefcase className="h-4 w-4 text-muted-foreground" />
-                      <span>{supplierDetails.openJobsCount} עבודות פתוחות</span>
-                    </div>
-                    <div className="pt-2">
-                      {getStatusBadge(supplierDetails.status)}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* דירוגים */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg">דירוגים</CardTitle>
-                    <CardDescription>ביצועים מבוססים על היסטוריית עבודות</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {supplierDetails.ratings ? (
-                      <>
-                        {/* איכות */}
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <Star className="h-4 w-4 text-yellow-500" />
-                              <span className="font-medium">איכות</span>
-                            </div>
-                            <span className="text-sm text-muted-foreground">
-                              {supplierDetails.ratings.quality.score}% ({supplierDetails.ratings.quality.avgRating.toFixed(1)}/5 מ-{supplierDetails.ratings.quality.totalRatings} דירוגים)
-                            </span>
-                          </div>
-                          <div className="h-2 bg-muted rounded-full overflow-hidden">
-                            <div 
-                              className="h-full bg-yellow-500 transition-all" 
-                              style={{ width: `${supplierDetails.ratings.quality.score}%` }}
-                            />
-                          </div>
-                        </div>
-
-                        {/* אמינות */}
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <Shield className="h-4 w-4 text-green-500" />
-                              <span className="font-medium">אמינות</span>
-                            </div>
-                            <span className="text-sm text-muted-foreground">
-                              {supplierDetails.ratings.reliability.score}% ({supplierDetails.ratings.reliability.reliableJobs}/{supplierDetails.ratings.reliability.totalReadyJobs} עבודות)
-                            </span>
-                          </div>
-                          <div className="h-2 bg-muted rounded-full overflow-hidden">
-                            <div 
-                              className="h-full bg-green-500 transition-all" 
-                              style={{ width: `${supplierDetails.ratings.reliability.score}%` }}
-                            />
-                          </div>
-                        </div>
-
-                        {/* מהירות */}
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <Zap className="h-4 w-4 text-blue-500" />
-                              <span className="font-medium">מהירות</span>
-                            </div>
-                            <span className="text-sm text-muted-foreground">
-                              {supplierDetails.ratings.speed.score}% (ממוצע {supplierDetails.ratings.speed.avgDeliveryDays} ימים)
-                            </span>
-                          </div>
-                          <div className="h-2 bg-muted rounded-full overflow-hidden">
-                            <div 
-                              className="h-full bg-blue-500 transition-all" 
-                              style={{ width: `${supplierDetails.ratings.speed.score}%` }}
-                            />
-                          </div>
-                        </div>
-
-                        {/* מחיר */}
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <DollarSign className="h-4 w-4 text-purple-500" />
-                              <span className="font-medium">מחיר</span>
-                            </div>
-                            <span className="text-sm text-muted-foreground">
-                              {supplierDetails.ratings.price.score}% (ספק: ₪{supplierDetails.ratings.price.supplierAvg} / שוק: ₪{supplierDetails.ratings.price.marketAvg})
-                            </span>
-                          </div>
-                          <div className="h-2 bg-muted rounded-full overflow-hidden">
-                            <div 
-                              className="h-full bg-purple-500 transition-all" 
-                              style={{ width: `${supplierDetails.ratings.price.score}%` }}
-                            />
-                          </div>
-                        </div>
-                      </>
-                    ) : (
-                      <p className="text-center text-muted-foreground py-4">
-                        אין נתוני דירוג לספק זה
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="prices" className="mt-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">מחירון ספק</CardTitle>
-                    <CardDescription>מחירים לפי וריאנט מוצר</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {supplierPrices.length === 0 ? (
-                      <p className="text-center text-muted-foreground py-4">
-                        אין מחירים מוגדרים לספק זה
-                      </p>
-                    ) : (
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="text-right">מוצר</TableHead>
-                            <TableHead className="text-right">וריאנט</TableHead>
-                            <TableHead className="text-right">מחיר</TableHead>
-                            <TableHead className="text-right">ימי אספקה</TableHead>
-                            <TableHead className="text-right">כמות מינימום</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {supplierPrices.map((price: any) => (
-                            <TableRow key={price.id}>
-                              <TableCell>{price.productName}</TableCell>
-                              <TableCell>{price.sizeName} {price.dimensions ? `(${price.dimensions})` : ''}</TableCell>
-                              <TableCell className="font-medium">
-                                ₪{Number(price.price).toLocaleString()}
-                              </TableCell>
-                              <TableCell>{price.deliveryDays} ימים</TableCell>
-                              <TableCell>{price.quantity}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="jobs" className="mt-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">עבודות פתוחות</CardTitle>
-                    <CardDescription>עבודות שהוקצו לספק זה</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {openJobs.length === 0 ? (
-                      <p className="text-center text-muted-foreground py-4">
-                        אין עבודות פתוחות לספק זה
-                      </p>
-                    ) : (
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="text-right">הצעה #</TableHead>
-                            <TableHead className="text-right">מוצר</TableHead>
-                            <TableHead className="text-right">כמות</TableHead>
-                            <TableHead className="text-right">עלות</TableHead>
-                            <TableHead className="text-right">סטטוס</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {openJobs.map((job: any) => (
-                            <TableRow key={job.quoteItemId}>
-                              <TableCell>{job.quoteId}</TableCell>
-                              <TableCell>{job.productName} - {job.sizeName} {job.dimensions ? `(${job.dimensions})` : ''}</TableCell>
-                              <TableCell>{job.quantity}</TableCell>
-                              <TableCell>
-                                {job.supplierCost ? `₪${Number(job.supplierCost).toLocaleString()}` : "-"}
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant="outline">{job.quoteStatus}</Badge>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              {/* טאב דאטה */}
-              <TabsContent value="data" className="mt-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Database className="h-5 w-5" />
-                      היסטוריית עבודות
-                    </CardTitle>
-                    <CardDescription>כל העבודות שהספק ביצע - לחץ לעריכה</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {jobsHistory.length === 0 ? (
-                      <p className="text-center text-muted-foreground py-4">
-                        אין היסטוריית עבודות לספק זה
-                      </p>
-                    ) : (
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="text-right">מס' עבודה</TableHead>
-                              <TableHead className="text-right">מוצר</TableHead>
-                              <TableHead className="text-right">ימים לביצוע</TableHead>
-                              <TableHead className="text-right">הבטחה</TableHead>
-                              <TableHead className="text-right">עמד בהבטחה</TableHead>
-                              <TableHead className="text-right">אישור שליח</TableHead>
-                              <TableHead className="text-right">דירוג</TableHead>
-                              <TableHead className="text-right">פעולות</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {jobsHistory.map((job: any) => (
-                              <TableRow key={job.id} className={editingJob === job.id ? "bg-blue-50" : ""}>
-                                <TableCell>{job.id}</TableCell>
-                                <TableCell className="max-w-[150px] truncate">{job.productName}</TableCell>
-                                <TableCell>
-                                  {editingJob === job.id ? (
-                                    <Input
-                                      type="number"
-                                      className="w-16 h-8"
-                                      value={editJobForm.promisedDeliveryDays}
-                                      onChange={(e) => setEditJobForm({...editJobForm, promisedDeliveryDays: parseInt(e.target.value) || 0})}
-                                    />
-                                  ) : (
-                                    job.promisedDeliveryDays || "-"
-                                  )}
-                                </TableCell>
-                                <TableCell>{job.actualDays !== null ? `${job.actualDays} ימים` : "-"}</TableCell>
-                                <TableCell>
-                                  {job.actualDays !== null && job.promisedDeliveryDays ? (
-                                    job.actualDays <= job.promisedDeliveryDays ? (
-                                      <Badge className="bg-green-100 text-green-800">כן</Badge>
-                                    ) : (
-                                      <Badge className="bg-red-100 text-red-800">לא</Badge>
-                                    )
-                                  ) : "-"}
-                                </TableCell>
-                                <TableCell>
-                                  {editingJob === job.id ? (
-                                    <Select
-                                      value={editJobForm.courierConfirmedReady ? "true" : "false"}
-                                      onValueChange={(v) => setEditJobForm({...editJobForm, courierConfirmedReady: v === "true"})}
-                                    >
-                                      <SelectTrigger className="w-20 h-8">
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="true">כן</SelectItem>
-                                        <SelectItem value="false">לא</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  ) : (
-                                    job.courierConfirmedReady ? (
-                                      <CheckCircle className="h-4 w-4 text-green-500" />
-                                    ) : job.courierConfirmedReady === false ? (
-                                      <XCircle className="h-4 w-4 text-red-500" />
-                                    ) : (
-                                      <AlertCircle className="h-4 w-4 text-gray-400" />
-                                    )
-                                  )}
-                                </TableCell>
-                                <TableCell>
-                                  {editingJob === job.id ? (
-                                    <Select
-                                      value={String(editJobForm.supplierRating)}
-                                      onValueChange={(v) => setEditJobForm({...editJobForm, supplierRating: parseInt(v)})}
-                                    >
-                                      <SelectTrigger className="w-16 h-8">
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="0">-</SelectItem>
-                                        <SelectItem value="1">1</SelectItem>
-                                        <SelectItem value="2">2</SelectItem>
-                                        <SelectItem value="3">3</SelectItem>
-                                        <SelectItem value="4">4</SelectItem>
-                                        <SelectItem value="5">5</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  ) : (
-                                    job.supplierRating ? (
-                                      <span className="flex items-center gap-1">
-                                        <Star className="h-3 w-3 text-yellow-500" />
-                                        {job.supplierRating}
-                                      </span>
-                                    ) : "-"
-                                  )}
-                                </TableCell>
-                                <TableCell>
-                                  {editingJob === job.id ? (
-                                    <div className="flex gap-1">
-                                      <Button size="sm" variant="ghost" onClick={handleSaveJobData}>
-                                        <Save className="h-4 w-4" />
-                                      </Button>
-                                      <Button size="sm" variant="ghost" onClick={() => setEditingJob(null)}>
-                                        <XCircle className="h-4 w-4" />
-                                      </Button>
-                                    </div>
-                                  ) : (
-                                    <Button size="sm" variant="ghost" onClick={() => handleEditJob(job)}>
-                                      <Edit className="h-4 w-4" />
-                                    </Button>
-                                  )}
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
-          )}
-
-          {/* כרטיס ציון סופי */}
-          {supplierDetails && scoreDetails && (
-            <Card className="mt-6 border-2 border-primary/20">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Award className="h-5 w-5 text-primary" />
-                  ציון ספק כולל
-                </CardTitle>
-                <CardDescription>
-                  מבוסס על {scoreDetails.totalJobs} עבודות
-                  {scoreDetails.totalJobs < 10 && " (ספק חדש - אין מספיק דאטה)"}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                  <div className="flex justify-between border-b pb-2">
-                    <span className="text-muted-foreground">ציון בסיס:</span>
-                    <span className="font-medium">{scoreDetails.breakdown.baseScore.toFixed(1)}</span>
-                  </div>
-                  <div className="flex justify-between border-b pb-2">
-                    <span className="text-muted-foreground">מחיר:</span>
-                    <span className={`font-medium ${scoreDetails.breakdown.priceScore >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {scoreDetails.breakdown.priceScore >= 0 ? '+' : ''}{scoreDetails.breakdown.priceScore.toFixed(1)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between border-b pb-2">
-                    <span className="text-muted-foreground">עמידה בהבטחות:</span>
-                    <span className={`font-medium ${scoreDetails.breakdown.promiseScore >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {scoreDetails.breakdown.promiseScore >= 0 ? '+' : ''}{scoreDetails.breakdown.promiseScore.toFixed(1)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between border-b pb-2">
-                    <span className="text-muted-foreground">אישור שליח:</span>
-                    <span className={`font-medium ${scoreDetails.breakdown.courierScore >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {scoreDetails.breakdown.courierScore >= 0 ? '+' : ''}{scoreDetails.breakdown.courierScore.toFixed(1)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between border-b pb-2">
-                    <span className="text-muted-foreground">סיום מוקדם:</span>
-                    <span className={`font-medium ${scoreDetails.breakdown.earlyScore >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {scoreDetails.breakdown.earlyScore >= 0 ? '+' : ''}{scoreDetails.breakdown.earlyScore.toFixed(1)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between border-b pb-2">
-                    <span className="text-muted-foreground">עומס נוכחי:</span>
-                    <span className={`font-medium ${scoreDetails.breakdown.loadScore >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {scoreDetails.breakdown.loadScore >= 0 ? '+' : ''}{scoreDetails.breakdown.loadScore.toFixed(1)}
-                    </span>
-                  </div>
-                </div>
-                <div className="mt-4 pt-4 border-t flex justify-between items-center">
-                  <span className="text-lg font-semibold">ציון סופי:</span>
-                  <span className={`text-2xl font-bold ${
-                    scoreDetails.totalScore >= 110 ? 'text-green-600' :
-                    scoreDetails.totalScore >= 100 ? 'text-blue-600' :
-                    scoreDetails.totalScore >= 90 ? 'text-yellow-600' : 'text-red-600'
-                  }`}>
-                    {scoreDetails.totalScore.toFixed(1)}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </SheetContent>
-      </Sheet>
     </div>
   );
 }
