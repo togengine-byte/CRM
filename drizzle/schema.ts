@@ -110,13 +110,18 @@ export const validationProfiles = pgTable("validation_profiles", {
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
-// Pricelists table
+// Pricelists table - מחירונים עם אחוז רווח
+// PRICING SYSTEM UPDATE: Added markupPercentage for automatic profit calculation
 export const pricelists = pgTable("pricelists", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
+  // אחוז הרווח שיתווסף למחיר הספק (לדוגמה: 30 = 30% רווח)
+  markupPercentage: decimal("markupPercentage", { precision: 5, scale: 2 }).default("0").notNull(),
   isDefault: boolean("isDefault").default(false),
   isActive: boolean("isActive").default(true),
+  // סדר תצוגה במערכת
+  displayOrder: integer("displayOrder").default(0),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
@@ -140,6 +145,7 @@ export const customerPricelists = pgTable("customer_pricelists", {
 });
 
 // Quotes table with versioning
+// PRICING SYSTEM UPDATE: Added pricelistId for quote-level markup
 export const quotes = pgTable("quotes", {
   id: serial("id").primaryKey(),
   customerId: integer("customerId").notNull(),
@@ -148,7 +154,11 @@ export const quotes = pgTable("quotes", {
   version: integer("version").default(1).notNull(),
   quoteNumber: integer("quoteNumber"),
   parentQuoteId: integer("parentQuoteId"),
+  // מחירון שהוחל על ההצעה - קובע את אחוז הרווח
+  pricelistId: integer("pricelistId"),
   finalValue: decimal("finalValue", { precision: 12, scale: 2 }),
+  // עלות ספק כוללת (לחישוב רווח)
+  totalSupplierCost: decimal("totalSupplierCost", { precision: 12, scale: 2 }),
   rejectionReason: text("rejectionReason"),
   dealRating: integer("dealRating"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -156,14 +166,19 @@ export const quotes = pgTable("quotes", {
 });
 
 // Quote items table - עובד עם sizeQuantityId
+// PRICING SYSTEM UPDATE: Added isManualPrice flag for manual price override
 export const quoteItems = pgTable("quote_items", {
   id: serial("id").primaryKey(),
   quoteId: integer("quoteId").notNull(),
   sizeQuantityId: integer("sizeQuantityId").notNull(),
   quantity: integer("quantity").notNull(),
+  // מחיר ללקוח (אחרי החלת מחירון או ידני)
   priceAtTimeOfQuote: decimal("priceAtTimeOfQuote", { precision: 10, scale: 2 }).notNull(),
+  // האם המחיר הוזן ידנית (לא מחושב ממחירון)
+  isManualPrice: boolean("isManualPrice").default(false),
   isUpsell: boolean("isUpsell").default(false),
   supplierId: integer("supplierId"),
+  // מחיר ספק ליחידה
   supplierCost: decimal("supplierCost", { precision: 10, scale: 2 }),
   deliveryDays: integer("deliveryDays"),
   pickedUp: boolean("pickedUp").default(false),

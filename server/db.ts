@@ -4164,3 +4164,676 @@ export async function getSupplierScoreDetails(supplierId: number) {
     totalScore: Math.round(totalScore * 10) / 10
   };
 }
+
+
+// ==================== PRICELIST MANAGEMENT ====================
+// PRICING SYSTEM: Complete pricelist management with markup percentages
+
+/**
+ * Get all pricelists with their markup percentages
+ * Returns active pricelists ordered by displayOrder
+ */
+export async function getPricelists() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db.select({
+    id: pricelists.id,
+    name: pricelists.name,
+    description: pricelists.description,
+    markupPercentage: pricelists.markupPercentage,
+    isDefault: pricelists.isDefault,
+    isActive: pricelists.isActive,
+    displayOrder: pricelists.displayOrder,
+    createdAt: pricelists.createdAt,
+    updatedAt: pricelists.updatedAt,
+  })
+    .from(pricelists)
+    .where(eq(pricelists.isActive, true))
+    .orderBy(pricelists.displayOrder, pricelists.name);
+}
+
+/**
+ * Get a single pricelist by ID
+ */
+export async function getPricelistById(pricelistId: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  if (!Number.isInteger(pricelistId) || pricelistId <= 0) {
+    throw new Error("Invalid pricelist ID");
+  }
+
+  const [pricelist] = await db.select()
+    .from(pricelists)
+    .where(eq(pricelists.id, pricelistId))
+    .limit(1);
+
+  return pricelist || null;
+}
+
+/**
+ * Create a new pricelist
+ */
+export async function createPricelist(input: {
+  name: string;
+  description?: string;
+  markupPercentage: number;
+  isDefault?: boolean;
+  displayOrder?: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Validate input
+  if (!input.name || input.name.trim().length === 0) {
+    throw new Error("Pricelist name is required");
+  }
+  if (typeof input.markupPercentage !== 'number' || input.markupPercentage < 0 || input.markupPercentage > 1000) {
+    throw new Error("Markup percentage must be between 0 and 1000");
+  }
+
+  // If this is set as default, unset other defaults
+  if (input.isDefault) {
+    await db.update(pricelists)
+      .set({ isDefault: false, updatedAt: new Date() })
+      .where(eq(pricelists.isDefault, true));
+  }
+
+  const result = await db.insert(pricelists).values({
+    name: input.name.trim(),
+    description: input.description?.trim() || null,
+    markupPercentage: input.markupPercentage.toString(),
+    isDefault: input.isDefault || false,
+    isActive: true,
+    displayOrder: input.displayOrder || 0,
+  }).returning();
+
+  await logActivity(null, "pricelist_created", { 
+    pricelistId: result[0].id, 
+    name: input.name,
+    markupPercentage: input.markupPercentage 
+  });
+
+  return result[0];
+}
+
+/**
+ * Update an existing pricelist
+ */
+export async function updatePricelist(input: {
+  id: number;
+  name?: string;
+  description?: string;
+  markupPercentage?: number;
+  isDefault?: boolean;
+  displayOrder?: number;
+  isActive?: boolean;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  if (!Number.isInteger(input.id) || input.id <= 0) {
+    throw new Error("Invalid pricelist ID");
+  }
+
+  const updateData: Record<string, unknown> = {
+    updatedAt: new Date(),
+  };
+
+  if (input.name !== undefined) {
+    if (input.name.trim().length === 0) {
+      throw new Error("Pricelist name cannot be empty");
+    }
+    updateData.name = input.name.trim();
+  }
+  if (input.description !== undefined) {
+    updateData.description = input.description?.trim() || null;
+  }
+  if (input.markupPercentage !== undefined) {
+    if (typeof input.markupPercentage !== 'number' || input.markupPercentage < 0 || input.markupPercentage > 1000) {
+      throw new Error("Markup percentage must be between 0 and 1000");
+    }
+    updateData.markupPercentage = input.markupPercentage.toString();
+  }
+  if (input.displayOrder !== undefined) {
+    updateData.displayOrder = input.displayOrder;
+  }
+  if (input.isActive !== undefined) {
+    updateData.isActive = input.isActive;
+  }
+
+  // Handle default flag
+  if (input.isDefault === true) {
+    // Unset other defaults first
+    await db.update(pricelists)
+      .set({ isDefault: false, updatedAt: new Date() })
+      .where(eq(pricelists.isDefault, true));
+    updateData.isDefault = true;
+  } else if (input.isDefault === false) {
+    updateData.isDefault = false;
+  }
+
+  await db.update(pricelists)
+    .set(updateData)
+    .where(eq(pricelists.id, input.id));
+
+  await logActivity(null, "pricelist_updated", { pricelistId: input.id, changes: updateData });
+
+  return { success: true };
+}
+
+/**
+ * Delete a pricelist (soft delete - sets isActive to false)
+ */
+export async function deletePricelist(pricelistId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  if (!Number.isInteger(pricelistId) || pricelistId <= 0) {
+    throw new Error("Invalid pricelist ID");
+  }
+
+  await db.update(pricelists)
+    .set({ isActive: false, updatedAt: new Date() })
+    .where(eq(pricelists.id, pricelistId));
+
+  await logActivity(null, "pricelist_deleted", { pricelistId });
+
+  return { success: true };
+}
+
+/**
+ * Get the default pricelist for a customer
+ * First checks customer-specific assignment, then falls back to system default
+ */
+export async function getCustomerDefaultPricelist(customerId: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  // First, try to get customer-specific pricelist
+  const [customerPricelist] = await db.select({
+    pricelist: pricelists,
+  })
+    .from(customerPricelists)
+    .innerJoin(pricelists, eq(customerPricelists.pricelistId, pricelists.id))
+    .where(and(
+      eq(customerPricelists.customerId, customerId),
+      eq(pricelists.isActive, true)
+    ))
+    .limit(1);
+
+  if (customerPricelist) {
+    return customerPricelist.pricelist;
+  }
+
+  // Fall back to system default
+  const [defaultPricelist] = await db.select()
+    .from(pricelists)
+    .where(and(
+      eq(pricelists.isDefault, true),
+      eq(pricelists.isActive, true)
+    ))
+    .limit(1);
+
+  return defaultPricelist || null;
+}
+
+/**
+ * Set a customer's default pricelist
+ */
+export async function setCustomerPricelist(customerId: number, pricelistId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  if (!Number.isInteger(customerId) || customerId <= 0) {
+    throw new Error("Invalid customer ID");
+  }
+  if (!Number.isInteger(pricelistId) || pricelistId <= 0) {
+    throw new Error("Invalid pricelist ID");
+  }
+
+  // Verify pricelist exists and is active
+  const [pricelist] = await db.select()
+    .from(pricelists)
+    .where(and(
+      eq(pricelists.id, pricelistId),
+      eq(pricelists.isActive, true)
+    ))
+    .limit(1);
+
+  if (!pricelist) {
+    throw new Error("Pricelist not found or inactive");
+  }
+
+  // Remove existing assignments for this customer
+  await db.delete(customerPricelists)
+    .where(eq(customerPricelists.customerId, customerId));
+
+  // Create new assignment
+  await db.insert(customerPricelists).values({
+    customerId,
+    pricelistId,
+  });
+
+  await logActivity(null, "customer_pricelist_set", { customerId, pricelistId, pricelistName: pricelist.name });
+
+  return { success: true, pricelist };
+}
+
+/**
+ * Calculate customer price from supplier cost using pricelist markup
+ * @param supplierCost - The cost from the supplier
+ * @param markupPercentage - The markup percentage (e.g., 30 for 30%)
+ * @returns The calculated customer price
+ */
+export function calculateCustomerPrice(supplierCost: number, markupPercentage: number): number {
+  if (typeof supplierCost !== 'number' || supplierCost < 0) {
+    throw new Error("Invalid supplier cost");
+  }
+  if (typeof markupPercentage !== 'number' || markupPercentage < 0) {
+    throw new Error("Invalid markup percentage");
+  }
+  
+  const markup = supplierCost * (markupPercentage / 100);
+  return Math.round((supplierCost + markup) * 100) / 100; // Round to 2 decimal places
+}
+
+
+// ==================== AUTOMATIC QUOTE PRICING ====================
+// PRICING SYSTEM: Auto-populate quotes with supplier recommendations and pricelist markup
+
+import { getTopSupplierRecommendations } from "./supplierRecommendations";
+
+/**
+ * Auto-populate a quote with recommended suppliers and calculated prices
+ * This is called when an employee opens a draft quote for pricing
+ */
+export async function autoPopulateQuotePricing(quoteId: number, pricelistId?: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  if (!Number.isInteger(quoteId) || quoteId <= 0) {
+    throw new Error("Invalid quote ID");
+  }
+
+  // Get the quote
+  const [quote] = await db.select()
+    .from(quotes)
+    .where(eq(quotes.id, quoteId))
+    .limit(1);
+
+  if (!quote) {
+    throw new Error("Quote not found");
+  }
+
+  // Determine which pricelist to use
+  let activePricelist = null;
+  let markupPercentage = 0;
+
+  if (pricelistId) {
+    // Use specified pricelist
+    activePricelist = await getPricelistById(pricelistId);
+  } else if (quote.pricelistId) {
+    // Use quote's existing pricelist
+    activePricelist = await getPricelistById(quote.pricelistId);
+  } else {
+    // Get customer's default pricelist
+    activePricelist = await getCustomerDefaultPricelist(quote.customerId);
+  }
+
+  if (activePricelist) {
+    markupPercentage = parseFloat(activePricelist.markupPercentage?.toString() || '0');
+  }
+
+  // Get all items in the quote
+  const items = await db.select()
+    .from(quoteItems)
+    .where(eq(quoteItems.quoteId, quoteId));
+
+  const pricedItems = [];
+  let totalSupplierCost = 0;
+  let totalCustomerPrice = 0;
+
+  for (const item of items) {
+    // Get recommended suppliers for this item
+    const recommendations = await getTopSupplierRecommendations(item.sizeQuantityId, undefined, 5);
+    
+    let selectedSupplier = null;
+    let supplierCost = 0;
+    let deliveryDays = 3;
+    let customerPrice = 0;
+
+    if (recommendations && recommendations.length > 0) {
+      // Use the top recommended supplier
+      selectedSupplier = recommendations[0];
+      // Get supplier price from metrics
+      supplierCost = selectedSupplier.metrics?.supplierPrice || 0;
+      // Default delivery days (can be enhanced later)
+      deliveryDays = 3;
+      
+      // Calculate customer price using markup
+      customerPrice = calculateCustomerPrice(supplierCost, markupPercentage);
+    }
+
+    // Check if item already has manual price set
+    const isManual = item.isManualPrice || false;
+    const existingPrice = parseFloat(item.priceAtTimeOfQuote?.toString() || '0');
+
+    // Only update if not manually priced
+    if (!isManual) {
+      await db.update(quoteItems)
+        .set({
+          supplierId: selectedSupplier?.supplierId || null,
+          supplierCost: supplierCost.toString(),
+          deliveryDays: deliveryDays,
+          priceAtTimeOfQuote: customerPrice.toString(),
+          isManualPrice: false,
+        })
+        .where(eq(quoteItems.id, item.id));
+
+      totalSupplierCost += supplierCost * item.quantity;
+      totalCustomerPrice += customerPrice * item.quantity;
+    } else {
+      // Keep existing manual price
+      totalSupplierCost += parseFloat(item.supplierCost?.toString() || '0') * item.quantity;
+      totalCustomerPrice += existingPrice * item.quantity;
+    }
+
+    pricedItems.push({
+      itemId: item.id,
+      sizeQuantityId: item.sizeQuantityId,
+      quantity: item.quantity,
+      supplierId: selectedSupplier?.supplierId || item.supplierId,
+      supplierName: selectedSupplier?.supplierName || null,
+      supplierCost: isManual ? parseFloat(item.supplierCost?.toString() || '0') : supplierCost,
+      customerPrice: isManual ? existingPrice : customerPrice,
+      isManualPrice: isManual,
+      deliveryDays: isManual ? item.deliveryDays : deliveryDays,
+      recommendations: recommendations?.slice(0, 5) || [], // Include top 5 alternatives
+    });
+  }
+
+  // Update quote with pricelist and totals
+  await db.update(quotes)
+    .set({
+      pricelistId: activePricelist?.id || null,
+      totalSupplierCost: totalSupplierCost.toString(),
+      finalValue: totalCustomerPrice.toString(),
+      updatedAt: new Date(),
+    })
+    .where(eq(quotes.id, quoteId));
+
+  return {
+    quoteId,
+    pricelist: activePricelist ? {
+      id: activePricelist.id,
+      name: activePricelist.name,
+      markupPercentage,
+    } : null,
+    items: pricedItems,
+    totals: {
+      supplierCost: Math.round(totalSupplierCost * 100) / 100,
+      customerPrice: Math.round(totalCustomerPrice * 100) / 100,
+      profit: Math.round((totalCustomerPrice - totalSupplierCost) * 100) / 100,
+      profitPercentage: totalSupplierCost > 0 
+        ? Math.round(((totalCustomerPrice - totalSupplierCost) / totalSupplierCost) * 10000) / 100 
+        : 0,
+    },
+  };
+}
+
+/**
+ * Update a single quote item with supplier and price
+ * Supports both automatic pricing (from pricelist) and manual override
+ */
+export async function updateQuoteItemPricing(input: {
+  itemId: number;
+  supplierId?: number;
+  supplierCost?: number;
+  customerPrice?: number;
+  isManualPrice?: boolean;
+  deliveryDays?: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  if (!Number.isInteger(input.itemId) || input.itemId <= 0) {
+    throw new Error("Invalid item ID");
+  }
+
+  // Get the item and its quote
+  const [item] = await db.select({
+    item: quoteItems,
+    quote: quotes,
+  })
+    .from(quoteItems)
+    .innerJoin(quotes, eq(quoteItems.quoteId, quotes.id))
+    .where(eq(quoteItems.id, input.itemId))
+    .limit(1);
+
+  if (!item) {
+    throw new Error("Quote item not found");
+  }
+
+  const updateData: Record<string, unknown> = {};
+
+  // Update supplier if provided
+  if (input.supplierId !== undefined) {
+    updateData.supplierId = input.supplierId;
+  }
+
+  // Update supplier cost if provided
+  if (input.supplierCost !== undefined) {
+    if (typeof input.supplierCost !== 'number' || input.supplierCost < 0) {
+      throw new Error("Invalid supplier cost");
+    }
+    updateData.supplierCost = input.supplierCost.toString();
+  }
+
+  // Update delivery days if provided
+  if (input.deliveryDays !== undefined) {
+    updateData.deliveryDays = input.deliveryDays;
+  }
+
+  // Handle customer price
+  if (input.customerPrice !== undefined) {
+    if (typeof input.customerPrice !== 'number' || input.customerPrice < 0) {
+      throw new Error("Invalid customer price");
+    }
+    updateData.priceAtTimeOfQuote = input.customerPrice.toString();
+    updateData.isManualPrice = input.isManualPrice !== false; // Default to true if price is manually set
+  } else if (input.isManualPrice === false && input.supplierCost !== undefined) {
+    // Recalculate price from pricelist if switching back to automatic
+    const pricelist = item.quote.pricelistId 
+      ? await getPricelistById(item.quote.pricelistId)
+      : await getCustomerDefaultPricelist(item.quote.customerId);
+    
+    const markupPercentage = parseFloat(pricelist?.markupPercentage?.toString() || '0');
+    const calculatedPrice = calculateCustomerPrice(input.supplierCost, markupPercentage);
+    updateData.priceAtTimeOfQuote = calculatedPrice.toString();
+    updateData.isManualPrice = false;
+  }
+
+  if (input.isManualPrice !== undefined) {
+    updateData.isManualPrice = input.isManualPrice;
+  }
+
+  // Apply update
+  await db.update(quoteItems)
+    .set(updateData)
+    .where(eq(quoteItems.id, input.itemId));
+
+  // Recalculate quote totals
+  await recalculateQuoteTotals(item.item.quoteId);
+
+  return { success: true };
+}
+
+/**
+ * Recalculate quote totals based on all items
+ */
+export async function recalculateQuoteTotals(quoteId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const items = await db.select()
+    .from(quoteItems)
+    .where(eq(quoteItems.quoteId, quoteId));
+
+  let totalSupplierCost = 0;
+  let totalCustomerPrice = 0;
+
+  for (const item of items) {
+    const supplierCost = parseFloat(item.supplierCost?.toString() || '0');
+    const customerPrice = parseFloat(item.priceAtTimeOfQuote?.toString() || '0');
+    
+    totalSupplierCost += supplierCost * item.quantity;
+    totalCustomerPrice += customerPrice * item.quantity;
+  }
+
+  await db.update(quotes)
+    .set({
+      totalSupplierCost: totalSupplierCost.toString(),
+      finalValue: totalCustomerPrice.toString(),
+      updatedAt: new Date(),
+    })
+    .where(eq(quotes.id, quoteId));
+
+  return {
+    totalSupplierCost: Math.round(totalSupplierCost * 100) / 100,
+    totalCustomerPrice: Math.round(totalCustomerPrice * 100) / 100,
+    profit: Math.round((totalCustomerPrice - totalSupplierCost) * 100) / 100,
+  };
+}
+
+/**
+ * Change the pricelist for a quote and recalculate all non-manual prices
+ */
+export async function changeQuotePricelist(quoteId: number, pricelistId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  if (!Number.isInteger(quoteId) || quoteId <= 0) {
+    throw new Error("Invalid quote ID");
+  }
+  if (!Number.isInteger(pricelistId) || pricelistId <= 0) {
+    throw new Error("Invalid pricelist ID");
+  }
+
+  // Verify pricelist exists
+  const pricelist = await getPricelistById(pricelistId);
+  if (!pricelist) {
+    throw new Error("Pricelist not found");
+  }
+
+  const markupPercentage = parseFloat(pricelist.markupPercentage?.toString() || '0');
+
+  // Get all items that are NOT manually priced
+  const items = await db.select()
+    .from(quoteItems)
+    .where(and(
+      eq(quoteItems.quoteId, quoteId),
+      eq(quoteItems.isManualPrice, false)
+    ));
+
+  // Recalculate prices for non-manual items
+  for (const item of items) {
+    const supplierCost = parseFloat(item.supplierCost?.toString() || '0');
+    const newPrice = calculateCustomerPrice(supplierCost, markupPercentage);
+
+    await db.update(quoteItems)
+      .set({ priceAtTimeOfQuote: newPrice.toString() })
+      .where(eq(quoteItems.id, item.id));
+  }
+
+  // Update quote pricelist
+  await db.update(quotes)
+    .set({ 
+      pricelistId: pricelistId,
+      updatedAt: new Date(),
+    })
+    .where(eq(quotes.id, quoteId));
+
+  // Recalculate totals
+  const totals = await recalculateQuoteTotals(quoteId);
+
+  await logActivity(null, "quote_pricelist_changed", { 
+    quoteId, 
+    pricelistId, 
+    pricelistName: pricelist.name,
+    markupPercentage 
+  });
+
+  return {
+    success: true,
+    pricelist: {
+      id: pricelist.id,
+      name: pricelist.name,
+      markupPercentage,
+    },
+    totals,
+  };
+}
+
+/**
+ * Send quote to customer (change status from draft to sent)
+ */
+export async function sendQuoteToCustomer(quoteId: number, employeeId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  if (!Number.isInteger(quoteId) || quoteId <= 0) {
+    throw new Error("Invalid quote ID");
+  }
+
+  // Get the quote
+  const [quote] = await db.select()
+    .from(quotes)
+    .where(eq(quotes.id, quoteId))
+    .limit(1);
+
+  if (!quote) {
+    throw new Error("Quote not found");
+  }
+
+  if (quote.status !== 'draft') {
+    throw new Error("Only draft quotes can be sent to customers");
+  }
+
+  // Verify quote has items with prices
+  const items = await db.select()
+    .from(quoteItems)
+    .where(eq(quoteItems.quoteId, quoteId));
+
+  if (items.length === 0) {
+    throw new Error("Cannot send empty quote");
+  }
+
+  const hasUnpricedItems = items.some(item => 
+    !item.priceAtTimeOfQuote || parseFloat(item.priceAtTimeOfQuote.toString()) <= 0
+  );
+
+  if (hasUnpricedItems) {
+    throw new Error("All items must have prices before sending to customer");
+  }
+
+  // Update status to sent
+  await db.update(quotes)
+    .set({ 
+      status: 'sent',
+      employeeId: employeeId,
+      updatedAt: new Date(),
+    })
+    .where(eq(quotes.id, quoteId));
+
+  await logActivity(employeeId, "quote_sent_to_customer", { 
+    quoteId, 
+    customerId: quote.customerId,
+    finalValue: quote.finalValue 
+  });
+
+  // TODO: Send email notification to customer
+
+  return { success: true, status: 'sent' };
+}

@@ -46,6 +46,11 @@ import {
   Package,
   History,
   Trash2,
+  DollarSign,
+  Calculator,
+  Loader2,
+  Save,
+  RotateCcw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -71,6 +76,13 @@ export default function Quotes() {
   const [showHistory, setShowHistory] = useState(false);
   const [showSupplierModal, setShowSupplierModal] = useState(false);
   const [selectedQuoteForSupplier, setSelectedQuoteForSupplier] = useState<number | null>(null);
+  
+  // Pricing editor state
+  const [isPricingDialogOpen, setIsPricingDialogOpen] = useState(false);
+  const [pricingQuoteId, setPricingQuoteId] = useState<number | null>(null);
+  const [pricingData, setPricingData] = useState<any>(null);
+  const [selectedPricelistId, setSelectedPricelistId] = useState<number | null>(null);
+  const [editedPrices, setEditedPrices] = useState<Record<number, { customerPrice: number; isManual: boolean }>>({});
   
   // Create quote form state
   const [createForm, setCreateForm] = useState({
@@ -144,6 +156,56 @@ export default function Quotes() {
     },
     onError: (error) => {
       toast.error(`שגיאה ביצירת גרסה חדשה: ${error.message}`);
+    },
+  });
+
+  // Pricing queries and mutations
+  const { data: pricelists } = trpc.pricelists.list.useQuery();
+
+  const autoPopulateMutation = trpc.quotePricing.autoPopulate.useMutation({
+    onSuccess: (data) => {
+      setPricingData(data);
+      setSelectedPricelistId(data.pricelist?.id || null);
+      setEditedPrices({});
+      toast.success("מחירים נטענו אוטומטית");
+    },
+    onError: (error) => {
+      toast.error(`שגיאה בטעינת מחירים: ${error.message}`);
+    },
+  });
+
+  const changePricelistMutation = trpc.quotePricing.changePricelist.useMutation({
+    onSuccess: (data) => {
+      if (pricingQuoteId) {
+        autoPopulateMutation.mutate({ quoteId: pricingQuoteId, pricelistId: data.pricelist.id });
+      }
+      toast.success(`מחירון שונה ל-${data.pricelist.name}`);
+    },
+    onError: (error) => {
+      toast.error(`שגיאה בשינוי מחירון: ${error.message}`);
+    },
+  });
+
+  const updateItemMutation = trpc.quotePricing.updateItem.useMutation({
+    onSuccess: () => {
+      if (pricingQuoteId) {
+        autoPopulateMutation.mutate({ quoteId: pricingQuoteId });
+      }
+    },
+    onError: (error) => {
+      toast.error(`שגיאה בעדכון מחיר: ${error.message}`);
+    },
+  });
+
+  const sendToCustomerMutation = trpc.quotePricing.sendToCustomer.useMutation({
+    onSuccess: () => {
+      toast.success("הצעה נשלחה ללקוח בהצלחה");
+      setIsPricingDialogOpen(false);
+      setPricingData(null);
+      refetch();
+    },
+    onError: (error) => {
+      toast.error(`שגיאה בשליחת ההצעה: ${error.message}`);
     },
   });
 
@@ -247,6 +309,63 @@ export default function Quotes() {
     });
   };
 
+  // Open pricing editor for a quote
+  const handleOpenPricingEditor = (quoteId: number) => {
+    setPricingQuoteId(quoteId);
+    setIsPricingDialogOpen(true);
+    setEditedPrices({});
+    autoPopulateMutation.mutate({ quoteId });
+  };
+
+  // Handle pricelist change
+  const handlePricelistChange = (pricelistId: string) => {
+    const id = parseInt(pricelistId);
+    setSelectedPricelistId(id);
+    if (pricingQuoteId) {
+      changePricelistMutation.mutate({ quoteId: pricingQuoteId, pricelistId: id });
+    }
+  };
+
+  // Handle manual price edit
+  const handlePriceEdit = (itemId: number, newPrice: number) => {
+    setEditedPrices(prev => ({
+      ...prev,
+      [itemId]: { customerPrice: newPrice, isManual: true }
+    }));
+  };
+
+  // Save edited price
+  const handleSavePrice = (itemId: number) => {
+    const edited = editedPrices[itemId];
+    if (edited) {
+      updateItemMutation.mutate({
+        itemId,
+        customerPrice: edited.customerPrice,
+        isManualPrice: true,
+      });
+    }
+  };
+
+  // Reset price to automatic
+  const handleResetPrice = (itemId: number) => {
+    updateItemMutation.mutate({
+      itemId,
+      isManualPrice: false,
+    });
+    setEditedPrices(prev => {
+      const newPrices = { ...prev };
+      delete newPrices[itemId];
+      return newPrices;
+    });
+  };
+
+  // Send quote to customer
+  const handleSendToCustomer = () => {
+    if (pricingQuoteId) {
+      sendToCustomerMutation.mutate({ quoteId: pricingQuoteId });
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "draft":
@@ -333,17 +452,17 @@ export default function Quotes() {
     if (quote.status === "draft") {
       buttons.push(
         <Button
-          key="send"
+          key="pricing"
           size="sm"
           variant="outline"
-          className="text-blue-600 border-blue-200 hover:bg-blue-50"
+          className="text-green-600 border-green-200 hover:bg-green-50"
           onClick={(e) => {
             e.stopPropagation();
-            handleOpenStatusDialog(quote.id, "sent");
+            handleOpenPricingEditor(quote.id);
           }}
         >
-          <Send className="ml-1 h-3 w-3" />
-          שלח ללקוח
+          <Calculator className="ml-1 h-3 w-3" />
+          תמחור ושליחה
         </Button>
       );
     }
@@ -896,6 +1015,183 @@ export default function Quotes() {
           refetch();
         }}
       />
+
+      {/* Pricing Editor Dialog */}
+      <Dialog open={isPricingDialogOpen} onOpenChange={(open) => {
+        if (!open) {
+          setIsPricingDialogOpen(false);
+          setPricingData(null);
+          setPricingQuoteId(null);
+        }
+      }}>
+        <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Calculator className="h-5 w-5 text-green-600" />
+              תמחור הצעת מחיר
+            </DialogTitle>
+            <DialogDescription>
+              הגדר מחירון, בחר ספקים וערוך מחירים לפני שליחה ללקוח
+            </DialogDescription>
+          </DialogHeader>
+
+          {autoPopulateMutation.isPending ? (
+            <div className="flex flex-col items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-green-600 mb-4" />
+              <p className="text-gray-500">טוען מחירים וספקים מומלצים...</p>
+            </div>
+          ) : pricingData ? (
+            <div className="space-y-6">
+              {/* Pricelist Selection */}
+              <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
+                <Label className="font-medium">מחירון:</Label>
+                <Select
+                  value={selectedPricelistId?.toString() || ''}
+                  onValueChange={handlePricelistChange}
+                >
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="בחר מחירון" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {pricelists?.map((pl: any) => (
+                      <SelectItem key={pl.id} value={pl.id.toString()}>
+                        {pl.name} ({parseFloat(pl.markupPercentage || 0).toFixed(0)}%)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {pricingData.pricelist && (
+                  <Badge variant="secondary">
+                    רווח: {pricingData.pricelist.markupPercentage}%
+                  </Badge>
+                )}
+              </div>
+
+              {/* Items Table */}
+              <div className="border rounded-lg overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-gray-50">
+                      <TableHead>פריט</TableHead>
+                      <TableHead>כמות</TableHead>
+                      <TableHead>ספק</TableHead>
+                      <TableHead>מחיר ספק</TableHead>
+                      <TableHead>מחיר ללקוח</TableHead>
+                      <TableHead>פעולות</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pricingData.items?.map((item: any) => {
+                      const editedPrice = editedPrices[item.itemId];
+                      const currentPrice = editedPrice?.customerPrice ?? item.customerPrice;
+                      const isEdited = !!editedPrice;
+                      
+                      return (
+                        <TableRow key={item.itemId} className={item.isManualPrice ? 'bg-yellow-50' : ''}>
+                          <TableCell className="font-medium">
+                            {item.productName || `פריט #${item.sizeQuantityId}`}
+                          </TableCell>
+                          <TableCell>{item.quantity}</TableCell>
+                          <TableCell>
+                            <div className="text-sm">
+                              {item.supplierName || 'לא נבחר'}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-gray-600">₪{item.supplierCost?.toFixed(2) || '0'}</span>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={currentPrice}
+                                onChange={(e) => handlePriceEdit(item.itemId, parseFloat(e.target.value) || 0)}
+                                className={cn(
+                                  "w-24 text-right",
+                                  item.isManualPrice && "border-yellow-400 bg-yellow-50",
+                                  isEdited && "border-blue-400 bg-blue-50"
+                                )}
+                              />
+                              {item.isManualPrice && (
+                                <Badge variant="outline" className="text-xs bg-yellow-100 border-yellow-300">
+                                  ידני
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              {isEdited && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleSavePrice(item.itemId)}
+                                  disabled={updateItemMutation.isPending}
+                                >
+                                  <Save className="h-4 w-4 text-green-600" />
+                                </Button>
+                              )}
+                              {item.isManualPrice && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleResetPrice(item.itemId)}
+                                  disabled={updateItemMutation.isPending}
+                                  title="החזר למחיר אוטומטי"
+                                >
+                                  <RotateCcw className="h-4 w-4 text-gray-500" />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Totals Summary */}
+              <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg">
+                <div className="text-center">
+                  <p className="text-sm text-gray-500">עלות ספקים</p>
+                  <p className="text-lg font-semibold text-gray-700">₪{pricingData.totals?.supplierCost?.toLocaleString() || '0'}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-sm text-gray-500">מחיר ללקוח</p>
+                  <p className="text-lg font-bold text-green-600">₪{pricingData.totals?.customerPrice?.toLocaleString() || '0'}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-sm text-gray-500">רווח</p>
+                  <p className="text-lg font-semibold text-blue-600">
+                    ₪{pricingData.totals?.profit?.toLocaleString() || '0'}
+                    <span className="text-sm text-gray-500 mr-1">({pricingData.totals?.profitPercentage || 0}%)</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setIsPricingDialogOpen(false)}>
+              ביטול
+            </Button>
+            <Button
+              onClick={handleSendToCustomer}
+              disabled={sendToCustomerMutation.isPending || !pricingData}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {sendToCustomerMutation.isPending ? (
+                <><Loader2 className="h-4 w-4 ml-2 animate-spin" /> שולח...</>
+              ) : (
+                <><Send className="h-4 w-4 ml-2" /> שלח ללקוח</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

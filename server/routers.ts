@@ -135,6 +135,21 @@ import {
   getSupplierJobsHistory,
   updateSupplierJobData,
   getSupplierScoreDetails,
+  // Pricelist Management API
+  getPricelists,
+  getPricelistById,
+  createPricelist,
+  updatePricelist,
+  deletePricelist,
+  getCustomerDefaultPricelist,
+  setCustomerPricelist,
+  calculateCustomerPrice,
+  // Quote Pricing API
+  autoPopulateQuotePricing,
+  updateQuoteItemPricing,
+  recalculateQuoteTotals,
+  changeQuotePricelist,
+  sendQuoteToCustomer,
 } from "./db";
 
 export const appRouter = router({
@@ -1049,17 +1064,6 @@ export const appRouter = router({
       }),
   }),
 
-  pricelists: router({
-    list: protectedProcedure
-      .query(async ({ ctx }) => {
-        if (!ctx.user) throw new Error("Not authenticated");
-        if (ctx.user.role !== 'admin' && ctx.user.role !== 'employee') {
-          throw new Error("Only employees can view pricelists");
-        }
-        return await getAllPricelists();
-      }),
-  }),
-
   // ==================== SUPPLIERS ====================
   suppliers: router({
     list: protectedProcedure
@@ -1856,6 +1860,173 @@ export const appRouter = router({
         }
         
         return result;
+      }),
+  }),
+
+  // ==================== PRICELIST MANAGEMENT API ====================
+  pricelists: router({
+    // Get all active pricelists
+    list: protectedProcedure
+      .query(async ({ ctx }) => {
+        if (!ctx.user) throw new Error("Not authenticated");
+        if (ctx.user.role !== 'admin' && ctx.user.role !== 'employee') {
+          throw new Error("Only employees can view pricelists");
+        }
+        return await getPricelists();
+      }),
+
+    // Get single pricelist by ID
+    getById: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ ctx, input }) => {
+        if (!ctx.user) throw new Error("Not authenticated");
+        if (ctx.user.role !== 'admin' && ctx.user.role !== 'employee') {
+          throw new Error("Only employees can view pricelists");
+        }
+        return await getPricelistById(input.id);
+      }),
+
+    // Create new pricelist (admin only)
+    create: protectedProcedure
+      .input(z.object({
+        name: z.string().min(1),
+        description: z.string().optional(),
+        markupPercentage: z.number().min(0).max(1000),
+        isDefault: z.boolean().optional(),
+        displayOrder: z.number().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new Error("Not authenticated");
+        if (ctx.user.role !== 'admin') {
+          throw new Error("Only admins can create pricelists");
+        }
+        return await createPricelist(input);
+      }),
+
+    // Update pricelist (admin only)
+    update: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        name: z.string().min(1).optional(),
+        description: z.string().optional(),
+        markupPercentage: z.number().min(0).max(1000).optional(),
+        isDefault: z.boolean().optional(),
+        displayOrder: z.number().optional(),
+        isActive: z.boolean().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new Error("Not authenticated");
+        if (ctx.user.role !== 'admin') {
+          throw new Error("Only admins can update pricelists");
+        }
+        return await updatePricelist(input);
+      }),
+
+    // Delete pricelist (admin only)
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new Error("Not authenticated");
+        if (ctx.user.role !== 'admin') {
+          throw new Error("Only admins can delete pricelists");
+        }
+        return await deletePricelist(input.id);
+      }),
+
+    // Get customer's default pricelist
+    getCustomerDefault: protectedProcedure
+      .input(z.object({ customerId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        if (!ctx.user) throw new Error("Not authenticated");
+        if (ctx.user.role !== 'admin' && ctx.user.role !== 'employee') {
+          throw new Error("Only employees can view customer pricelists");
+        }
+        return await getCustomerDefaultPricelist(input.customerId);
+      }),
+
+    // Set customer's pricelist
+    setCustomer: protectedProcedure
+      .input(z.object({
+        customerId: z.number(),
+        pricelistId: z.number(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new Error("Not authenticated");
+        if (ctx.user.role !== 'admin' && ctx.user.role !== 'employee') {
+          throw new Error("Only employees can set customer pricelists");
+        }
+        return await setCustomerPricelist(input.customerId, input.pricelistId);
+      }),
+  }),
+
+  // ==================== QUOTE PRICING API ====================
+  quotePricing: router({
+    // Auto-populate quote with recommended suppliers and prices
+    autoPopulate: protectedProcedure
+      .input(z.object({
+        quoteId: z.number(),
+        pricelistId: z.number().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new Error("Not authenticated");
+        if (ctx.user.role !== 'admin' && ctx.user.role !== 'employee') {
+          throw new Error("Only employees can price quotes");
+        }
+        return await autoPopulateQuotePricing(input.quoteId, input.pricelistId);
+      }),
+
+    // Update single item pricing
+    updateItem: protectedProcedure
+      .input(z.object({
+        itemId: z.number(),
+        supplierId: z.number().optional(),
+        supplierCost: z.number().min(0).optional(),
+        customerPrice: z.number().min(0).optional(),
+        isManualPrice: z.boolean().optional(),
+        deliveryDays: z.number().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new Error("Not authenticated");
+        if (ctx.user.role !== 'admin' && ctx.user.role !== 'employee') {
+          throw new Error("Only employees can update quote pricing");
+        }
+        return await updateQuoteItemPricing(input);
+      }),
+
+    // Change quote pricelist
+    changePricelist: protectedProcedure
+      .input(z.object({
+        quoteId: z.number(),
+        pricelistId: z.number(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new Error("Not authenticated");
+        if (ctx.user.role !== 'admin' && ctx.user.role !== 'employee') {
+          throw new Error("Only employees can change quote pricelist");
+        }
+        return await changeQuotePricelist(input.quoteId, input.pricelistId);
+      }),
+
+    // Recalculate quote totals
+    recalculate: protectedProcedure
+      .input(z.object({ quoteId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new Error("Not authenticated");
+        if (ctx.user.role !== 'admin' && ctx.user.role !== 'employee') {
+          throw new Error("Only employees can recalculate quotes");
+        }
+        return await recalculateQuoteTotals(input.quoteId);
+      }),
+
+    // Send quote to customer
+    sendToCustomer: protectedProcedure
+      .input(z.object({ quoteId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (!ctx.user) throw new Error("Not authenticated");
+        if (ctx.user.role !== 'admin' && ctx.user.role !== 'employee') {
+          throw new Error("Only employees can send quotes to customers");
+        }
+        return await sendQuoteToCustomer(input.quoteId, ctx.user.id);
       }),
   }),
 });
