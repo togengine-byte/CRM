@@ -74,6 +74,7 @@ export default function Suppliers() {
     supplierRating: 0,
     courierConfirmedReady: true,
     promisedDeliveryDays: 3,
+    supplierReadyAt: "" as string | null,
   });
 
   const utils = trpc.useUtils();
@@ -90,7 +91,6 @@ export default function Suppliers() {
     { enabled: !!expandedSupplierId }
   );
   
-  // Only fetch jobs history when user clicks the button
   const { data: jobsHistory = [], refetch: refetchJobsHistory, isLoading: isLoadingHistory } = trpc.suppliers.jobsHistory.useQuery(
     { supplierId: showHistoryForSupplier! },
     { enabled: !!showHistoryForSupplier }
@@ -157,6 +157,7 @@ export default function Suppliers() {
       supplierRating: job.supplierRating || 0,
       courierConfirmedReady: job.courierConfirmedReady ?? true,
       promisedDeliveryDays: job.promisedDeliveryDays || 3,
+      supplierReadyAt: job.supplierReadyAt ? new Date(job.supplierReadyAt).toISOString().slice(0, 16) : "",
     });
   };
 
@@ -167,6 +168,7 @@ export default function Suppliers() {
       supplierRating: editJobForm.supplierRating || undefined,
       courierConfirmedReady: editJobForm.courierConfirmedReady,
       promisedDeliveryDays: editJobForm.promisedDeliveryDays || undefined,
+      supplierReadyAt: editJobForm.supplierReadyAt ? new Date(editJobForm.supplierReadyAt).toISOString() : null,
     });
   };
 
@@ -176,7 +178,7 @@ export default function Suppliers() {
       setShowHistoryForSupplier(null);
     } else {
       setExpandedSupplierId(supplierId);
-      setShowHistoryForSupplier(null); // Reset history when opening new supplier
+      setShowHistoryForSupplier(null);
     }
   };
 
@@ -209,6 +211,18 @@ export default function Suppliers() {
   const formatScoreValue = (value: number | undefined) => {
     if (value === undefined || value === null) return "0";
     return value >= 0 ? `+${value.toFixed(1)}` : value.toFixed(1);
+  };
+
+  const formatDate = (dateStr: string | null | undefined) => {
+    if (!dateStr) return "-";
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: '2-digit' });
+  };
+
+  const formatDateTime = (dateStr: string | null | undefined) => {
+    if (!dateStr) return "-";
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
   };
 
   return (
@@ -460,7 +474,7 @@ export default function Suppliers() {
                               </div>
                             </div>
 
-                            {/* ציונים - בשורה אחת, מינימליסטי */}
+                            {/* ציונים */}
                             {scoreDetails && (
                               <div className="space-y-3">
                                 <h4 className="font-semibold text-sm">ציונים ({scoreDetails.totalJobs || 0} עבודות)</h4>
@@ -543,20 +557,37 @@ export default function Suppliers() {
                                         <TableHeader>
                                           <TableRow>
                                             <TableHead className="text-right">#</TableHead>
+                                            <TableHead className="text-right">תאריך</TableHead>
                                             <TableHead className="text-right">מוצר</TableHead>
+                                            <TableHead className="text-right">לקוח</TableHead>
+                                            <TableHead className="text-right">כמות</TableHead>
+                                            <TableHead className="text-right">מחיר</TableHead>
+                                            <TableHead className="text-right">סטטוס</TableHead>
                                             <TableHead className="text-right">ימי הבטחה</TableHead>
+                                            <TableHead className="text-right">תאריך מוכן</TableHead>
                                             <TableHead className="text-right">ימים בפועל</TableHead>
                                             <TableHead className="text-right">עמד בהבטחה</TableHead>
                                             <TableHead className="text-right">אישור שליח</TableHead>
                                             <TableHead className="text-right">דירוג</TableHead>
-                                            <TableHead className="text-right w-20">עריכה</TableHead>
+                                            <TableHead className="text-right w-24">עריכה</TableHead>
                                           </TableRow>
                                         </TableHeader>
                                         <TableBody>
                                           {jobsHistory.map((job: any) => (
                                             <TableRow key={job.id} className={editingJob === job.id ? "bg-blue-50" : ""}>
                                               <TableCell className="font-medium">{job.id}</TableCell>
-                                              <TableCell className="max-w-[150px] truncate">{job.productName || "-"}</TableCell>
+                                              <TableCell className="text-sm">{formatDate(job.createdAt)}</TableCell>
+                                              <TableCell className="max-w-[120px] truncate text-sm">{job.productName || "-"}</TableCell>
+                                              <TableCell className="max-w-[100px] truncate text-sm">{job.customerName || "-"}</TableCell>
+                                              <TableCell>{job.quantity || "-"}</TableCell>
+                                              <TableCell dir="ltr">₪{job.pricePerUnit || "-"}</TableCell>
+                                              <TableCell>
+                                                <Badge variant="outline" className="text-xs">
+                                                  {job.status === 'completed' ? 'הושלם' : 
+                                                   job.status === 'pending' ? 'ממתין' : 
+                                                   job.status === 'in_progress' ? 'בעבודה' : job.status}
+                                                </Badge>
+                                              </TableCell>
                                               <TableCell>
                                                 {editingJob === job.id ? (
                                                   <Input
@@ -569,10 +600,26 @@ export default function Suppliers() {
                                                   job.promisedDeliveryDays || "-"
                                                 )}
                                               </TableCell>
-                                              <TableCell>{job.actualDays !== null && job.actualDays !== undefined ? Math.round(job.actualDays) : "-"}</TableCell>
                                               <TableCell>
-                                                {job.actualDays !== null && job.actualDays !== undefined && job.promisedDeliveryDays ? (
-                                                  job.actualDays <= job.promisedDeliveryDays ? (
+                                                {editingJob === job.id ? (
+                                                  <Input
+                                                    type="datetime-local"
+                                                    className="w-40 h-8 text-xs"
+                                                    value={editJobForm.supplierReadyAt || ""}
+                                                    onChange={(e) => setEditJobForm({...editJobForm, supplierReadyAt: e.target.value || null})}
+                                                  />
+                                                ) : (
+                                                  formatDateTime(job.supplierReadyAt)
+                                                )}
+                                              </TableCell>
+                                              <TableCell>
+                                                {job.actualDeliveryDays !== null && job.actualDeliveryDays !== undefined 
+                                                  ? Math.round(job.actualDeliveryDays) 
+                                                  : "-"}
+                                              </TableCell>
+                                              <TableCell>
+                                                {job.actualDeliveryDays !== null && job.actualDeliveryDays !== undefined && job.promisedDeliveryDays ? (
+                                                  job.actualDeliveryDays <= job.promisedDeliveryDays ? (
                                                     <CheckCircle className="h-4 w-4 text-green-500" />
                                                   ) : (
                                                     <XCircle className="h-4 w-4 text-red-500" />
