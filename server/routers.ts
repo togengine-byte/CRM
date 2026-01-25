@@ -753,6 +753,11 @@ export const appRouter = router({
       }))
       .mutation(async ({ ctx, input }) => {
         if (!ctx.user) throw new Error("Not authenticated");
+        // SECURITY FIX: Only customers, admins, and employees can create quote requests
+        // Suppliers and couriers should not be able to create quotes
+        if (ctx.user.role !== 'customer' && ctx.user.role !== 'admin' && ctx.user.role !== 'employee') {
+          throw new Error("Only customers can request quotes. Suppliers and couriers are not authorized.");
+        }
         return await createQuoteRequest({
           customerId: ctx.user.id,
           items: input.items || [],
@@ -1401,7 +1406,8 @@ export const appRouter = router({
         if (ctx.user.role !== 'admin' && ctx.user.role !== 'employee') {
           throw new Error("Only employees can delete internal notes");
         }
-        return await deleteNote(input.noteId, ctx.user.id);
+        // Pass user role for ownership verification in deleteNote
+        return await deleteNote(input.noteId, ctx.user.id, ctx.user.role);
       }),
   }),
 

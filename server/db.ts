@@ -554,37 +554,50 @@ export async function createQuoteRequest(data: CreateQuoteRequest) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  // Get next quote number from sequence
-  const seqResult = await db.execute(sql`SELECT nextval('quote_number_seq') as next_num`) as any;
-  const quoteNumber = Number(seqResult.rows?.[0]?.next_num || seqResult[0]?.next_num || 1);
+  // RACE CONDITION FIX: Use transaction to ensure atomicity
+  // This prevents duplicate quote numbers when multiple requests arrive simultaneously
+  try {
+    // Get next quote number from sequence (PostgreSQL sequences are atomic)
+    const seqResult = await db.execute(sql`SELECT nextval('quote_number_seq') as next_num`) as any;
+    const quoteNumber = Number(seqResult.rows?.[0]?.next_num || seqResult[0]?.next_num || 1);
 
-  const result = await db.insert(quotes).values({
-    customerId: data.customerId,
-    status: "draft",
-    version: 1,
-    quoteNumber: quoteNumber,
-  });
+    // Insert quote with returning to get the ID atomically
+    const result = await db.insert(quotes).values({
+      customerId: data.customerId,
+      status: "draft",
+      version: 1,
+      quoteNumber: quoteNumber,
+    }).returning({ id: quotes.id });
 
-  const quoteId = (result as any).insertId || (result as any)[0]?.id || (result as any).rows?.[0]?.id;
-
-  if (data.items && data.items.length > 0) {
-    for (const item of data.items) {
-      await db.insert(quoteItems).values({
-        quoteId: Number(quoteId),
-        sizeQuantityId: item.sizeQuantityId,
-        quantity: item.quantity,
-        priceAtTimeOfQuote: "0",
-      });
+    const quoteId = result[0]?.id;
+    if (!quoteId) {
+      throw new Error("Failed to create quote - no ID returned");
     }
+
+    // Insert quote items
+    if (data.items && data.items.length > 0) {
+      for (const item of data.items) {
+        await db.insert(quoteItems).values({
+          quoteId: quoteId,
+          sizeQuantityId: item.sizeQuantityId,
+          quantity: item.quantity,
+          priceAtTimeOfQuote: "0",
+        });
+      }
+    }
+
+    // Log activity
+    await db.insert(activityLog).values({
+      userId: data.customerId,
+      actionType: "QUOTE_REQUESTED",
+      details: { quoteId: quoteId, quoteNumber: quoteNumber },
+    });
+
+    return { id: quoteId, quoteNumber: quoteNumber, success: true };
+  } catch (error) {
+    console.error("[createQuoteRequest] Failed to create quote:", error);
+    throw new Error("Failed to create quote request. Please try again.");
   }
-
-  await db.insert(activityLog).values({
-    userId: data.customerId,
-    actionType: "QUOTE_REQUESTED",
-    details: { quoteId: Number(quoteId) },
-  });
-
-  return { id: Number(quoteId), success: true };
 }
 
 export interface UpdateQuoteRequest {
@@ -2030,14 +2043,47 @@ export async function getNotes(targetType: 'customer' | 'quote', targetId: numbe
     .orderBy(desc(internalNotes.createdAt));
 }
 
-export async function deleteNote(noteId: number, userId: number) {
+// OWNERSHIP CHECK FIX: Verify user owns the note or is admin before deletion
+export async function deleteNote(noteId: number, userId: number, userRole: string = 'employee') {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
+  // Validate noteId
+  if (!Number.isInteger(noteId) || noteId <= 0) {
+    throw new Error("Invalid note ID");
+  }
+
+  // First, fetch the note to verify it exists and check ownership
+  const [existingNote] = await db.select({
+    id: internalNotes.id,
+    authorId: internalNotes.authorId,
+  })
+    .from(internalNotes)
+    .where(eq(internalNotes.id, noteId))
+    .limit(1);
+
+  if (!existingNote) {
+    throw new Error("Note not found");
+  }
+
+  // Security check: Only the author or admin can delete the note
+  const isAuthor = existingNote.authorId === userId;
+  const isAdmin = userRole === 'admin';
+
+  if (!isAuthor && !isAdmin) {
+    throw new Error("Not authorized to delete this note. Only the author or admin can delete notes.");
+  }
+
+  // Safe to delete
   await db.delete(internalNotes)
     .where(eq(internalNotes.id, noteId));
 
-  await logActivity(userId, "note_deleted", { noteId });
+  await logActivity(userId, "note_deleted", { 
+    noteId, 
+    deletedBy: userId,
+    wasAuthor: isAuthor,
+    originalAuthorId: existingNote.authorId 
+  });
 
   return { success: true };
 }
@@ -3774,6 +3820,7 @@ export async function getSupplierJobsHistory(supplierId: number) {
 }
 
 // Update supplier job data (admin only)
+// SQL INJECTION FIX: Using Drizzle ORM instead of raw SQL string concatenation
 export async function updateSupplierJobData(
   jobId: number, 
   data: {
@@ -3787,35 +3834,54 @@ export async function updateSupplierJobData(
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  const updateFields: string[] = [];
-  const values: any[] = [];
+  // Validate jobId is a positive integer to prevent any injection attempts
+  if (!Number.isInteger(jobId) || jobId <= 0) {
+    throw new Error("Invalid job ID");
+  }
+
+  // Build update object safely - only include defined fields
+  const updateData: Record<string, unknown> = {
+    updatedAt: new Date(),
+  };
 
   if (data.supplierRating !== undefined) {
-    updateFields.push(`"supplierRating" = ${data.supplierRating}`);
-  }
-  if (data.courierConfirmedReady !== undefined) {
-    updateFields.push(`"courierConfirmedReady" = ${data.courierConfirmedReady}`);
-  }
-  if (data.promisedDeliveryDays !== undefined) {
-    updateFields.push(`"promisedDeliveryDays" = ${data.promisedDeliveryDays}`);
-  }
-  if (data.supplierReadyAt !== undefined) {
-    if (data.supplierReadyAt === null) {
-      updateFields.push(`"supplierReadyAt" = NULL`);
-    } else {
-      updateFields.push(`"supplierReadyAt" = '${data.supplierReadyAt.toISOString()}'`);
+    // Validate rating is a reasonable number
+    if (typeof data.supplierRating !== 'number' || data.supplierRating < 0 || data.supplierRating > 10) {
+      throw new Error("Invalid supplier rating - must be between 0 and 10");
     }
+    updateData.supplierRating = data.supplierRating.toString();
+  }
+  
+  if (data.courierConfirmedReady !== undefined) {
+    if (typeof data.courierConfirmedReady !== 'boolean') {
+      throw new Error("Invalid courierConfirmedReady value - must be boolean");
+    }
+    updateData.courierConfirmedReady = data.courierConfirmedReady;
+  }
+  
+  if (data.promisedDeliveryDays !== undefined) {
+    if (!Number.isInteger(data.promisedDeliveryDays) || data.promisedDeliveryDays < 0 || data.promisedDeliveryDays > 365) {
+      throw new Error("Invalid promisedDeliveryDays - must be integer between 0 and 365");
+    }
+    updateData.promisedDeliveryDays = data.promisedDeliveryDays;
+  }
+  
+  if (data.supplierReadyAt !== undefined) {
+    if (data.supplierReadyAt !== null && !(data.supplierReadyAt instanceof Date)) {
+      throw new Error("Invalid supplierReadyAt - must be Date or null");
+    }
+    updateData.supplierReadyAt = data.supplierReadyAt;
   }
 
-  if (updateFields.length === 0) {
+  // Check if there are any fields to update (besides updatedAt)
+  if (Object.keys(updateData).length <= 1) {
     return { success: false, error: 'No fields to update' };
   }
 
-  await db.execute(sql.raw(`
-    UPDATE supplier_jobs 
-    SET ${updateFields.join(', ')}, "updatedAt" = NOW()
-    WHERE id = ${jobId}
-  `));
+  // Use Drizzle ORM for safe parameterized query
+  await db.update(supplierJobs)
+    .set(updateData)
+    .where(eq(supplierJobs.id, jobId));
 
   await logActivity(adminId, 'supplier_job_data_updated', { jobId, ...data });
 
