@@ -47,6 +47,7 @@ import {
   Save,
   ChevronDown,
   ChevronUp,
+  History,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -60,6 +61,7 @@ export default function Suppliers() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [expandedSupplierId, setExpandedSupplierId] = useState<number | null>(null);
+  const [showHistoryForSupplier, setShowHistoryForSupplier] = useState<number | null>(null);
   const [createForm, setCreateForm] = useState({
     name: "",
     email: "",
@@ -87,10 +89,13 @@ export default function Suppliers() {
     { id: expandedSupplierId! },
     { enabled: !!expandedSupplierId }
   );
-  const { data: jobsHistory = [], refetch: refetchJobsHistory } = trpc.suppliers.jobsHistory.useQuery(
-    { supplierId: expandedSupplierId! },
-    { enabled: !!expandedSupplierId }
+  
+  // Only fetch jobs history when user clicks the button
+  const { data: jobsHistory = [], refetch: refetchJobsHistory, isLoading: isLoadingHistory } = trpc.suppliers.jobsHistory.useQuery(
+    { supplierId: showHistoryForSupplier! },
+    { enabled: !!showHistoryForSupplier }
   );
+  
   const { data: scoreDetails, refetch: refetchScoreDetails } = trpc.suppliers.scoreDetails.useQuery(
     { supplierId: expandedSupplierId! },
     { enabled: !!expandedSupplierId }
@@ -168,9 +173,15 @@ export default function Suppliers() {
   const handleRowClick = (supplierId: number) => {
     if (expandedSupplierId === supplierId) {
       setExpandedSupplierId(null);
+      setShowHistoryForSupplier(null);
     } else {
       setExpandedSupplierId(supplierId);
+      setShowHistoryForSupplier(null); // Reset history when opening new supplier
     }
+  };
+
+  const handleShowHistory = (supplierId: number) => {
+    setShowHistoryForSupplier(supplierId);
   };
 
   const getStatusBadge = (status: string) => {
@@ -498,127 +509,152 @@ export default function Suppliers() {
                               </div>
                             )}
 
-                            {/* היסטוריית עבודות */}
+                            {/* כפתור להצגת היסטוריית עבודות */}
                             <div className="space-y-3">
-                              <h4 className="font-semibold text-sm">היסטוריית עבודות</h4>
-                              {jobsHistory.length === 0 ? (
-                                <p className="text-muted-foreground text-sm">אין היסטוריית עבודות</p>
+                              {showHistoryForSupplier !== supplier.id ? (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => handleShowHistory(supplier.id)}
+                                >
+                                  <History className="ml-2 h-4 w-4" />
+                                  הצג היסטוריית עבודות
+                                </Button>
                               ) : (
-                                <div className="overflow-x-auto">
-                                  <Table>
-                                    <TableHeader>
-                                      <TableRow>
-                                        <TableHead className="text-right">#</TableHead>
-                                        <TableHead className="text-right">מוצר</TableHead>
-                                        <TableHead className="text-right">ימי הבטחה</TableHead>
-                                        <TableHead className="text-right">ימים בפועל</TableHead>
-                                        <TableHead className="text-right">עמד בהבטחה</TableHead>
-                                        <TableHead className="text-right">אישור שליח</TableHead>
-                                        <TableHead className="text-right">דירוג</TableHead>
-                                        <TableHead className="text-right w-20">עריכה</TableHead>
-                                      </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                      {jobsHistory.map((job: any) => (
-                                        <TableRow key={job.id} className={editingJob === job.id ? "bg-blue-50" : ""}>
-                                          <TableCell className="font-medium">{job.id}</TableCell>
-                                          <TableCell className="max-w-[150px] truncate">{job.productName || "-"}</TableCell>
-                                          <TableCell>
-                                            {editingJob === job.id ? (
-                                              <Input
-                                                type="number"
-                                                className="w-16 h-8"
-                                                value={editJobForm.promisedDeliveryDays}
-                                                onChange={(e) => setEditJobForm({...editJobForm, promisedDeliveryDays: parseInt(e.target.value) || 0})}
-                                              />
-                                            ) : (
-                                              job.promisedDeliveryDays || "-"
-                                            )}
-                                          </TableCell>
-                                          <TableCell>{job.actualDays !== null ? job.actualDays : "-"}</TableCell>
-                                          <TableCell>
-                                            {job.actualDays !== null && job.promisedDeliveryDays ? (
-                                              job.actualDays <= job.promisedDeliveryDays ? (
-                                                <CheckCircle className="h-4 w-4 text-green-500" />
-                                              ) : (
-                                                <XCircle className="h-4 w-4 text-red-500" />
-                                              )
-                                            ) : (
-                                              <span className="text-muted-foreground">-</span>
-                                            )}
-                                          </TableCell>
-                                          <TableCell>
-                                            {editingJob === job.id ? (
-                                              <Select
-                                                value={editJobForm.courierConfirmedReady ? "true" : "false"}
-                                                onValueChange={(v) => setEditJobForm({...editJobForm, courierConfirmedReady: v === "true"})}
-                                              >
-                                                <SelectTrigger className="w-16 h-8">
-                                                  <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                  <SelectItem value="true">כן</SelectItem>
-                                                  <SelectItem value="false">לא</SelectItem>
-                                                </SelectContent>
-                                              </Select>
-                                            ) : (
-                                              job.courierConfirmedReady === true ? (
-                                                <CheckCircle className="h-4 w-4 text-green-500" />
-                                              ) : job.courierConfirmedReady === false ? (
-                                                <XCircle className="h-4 w-4 text-red-500" />
-                                              ) : (
-                                                <AlertCircle className="h-4 w-4 text-gray-400" />
-                                              )
-                                            )}
-                                          </TableCell>
-                                          <TableCell>
-                                            {editingJob === job.id ? (
-                                              <Select
-                                                value={String(editJobForm.supplierRating)}
-                                                onValueChange={(v) => setEditJobForm({...editJobForm, supplierRating: parseInt(v)})}
-                                              >
-                                                <SelectTrigger className="w-16 h-8">
-                                                  <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                  <SelectItem value="0">-</SelectItem>
-                                                  <SelectItem value="1">1</SelectItem>
-                                                  <SelectItem value="2">2</SelectItem>
-                                                  <SelectItem value="3">3</SelectItem>
-                                                  <SelectItem value="4">4</SelectItem>
-                                                  <SelectItem value="5">5</SelectItem>
-                                                </SelectContent>
-                                              </Select>
-                                            ) : (
-                                              job.supplierRating ? (
-                                                <span className="flex items-center gap-1">
-                                                  <Star className="h-3 w-3 text-yellow-500" />
-                                                  {job.supplierRating}
-                                                </span>
-                                              ) : "-"
-                                            )}
-                                          </TableCell>
-                                          <TableCell>
-                                            {editingJob === job.id ? (
-                                              <div className="flex gap-1">
-                                                <Button size="sm" variant="ghost" onClick={handleSaveJobData}>
-                                                  <Save className="h-4 w-4 text-green-600" />
-                                                </Button>
-                                                <Button size="sm" variant="ghost" onClick={() => setEditingJob(null)}>
-                                                  <XCircle className="h-4 w-4 text-red-600" />
-                                                </Button>
-                                              </div>
-                                            ) : (
-                                              <Button size="sm" variant="ghost" onClick={() => handleEditJob(job)}>
-                                                <Edit className="h-4 w-4" />
-                                              </Button>
-                                            )}
-                                          </TableCell>
-                                        </TableRow>
-                                      ))}
-                                    </TableBody>
-                                  </Table>
-                                </div>
+                                <>
+                                  <div className="flex items-center justify-between">
+                                    <h4 className="font-semibold text-sm">היסטוריית עבודות</h4>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm"
+                                      onClick={() => setShowHistoryForSupplier(null)}
+                                    >
+                                      <XCircle className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                  
+                                  {isLoadingHistory ? (
+                                    <p className="text-muted-foreground text-sm">טוען...</p>
+                                  ) : jobsHistory.length === 0 ? (
+                                    <p className="text-muted-foreground text-sm">אין היסטוריית עבודות</p>
+                                  ) : (
+                                    <div className="overflow-x-auto">
+                                      <Table>
+                                        <TableHeader>
+                                          <TableRow>
+                                            <TableHead className="text-right">#</TableHead>
+                                            <TableHead className="text-right">מוצר</TableHead>
+                                            <TableHead className="text-right">ימי הבטחה</TableHead>
+                                            <TableHead className="text-right">ימים בפועל</TableHead>
+                                            <TableHead className="text-right">עמד בהבטחה</TableHead>
+                                            <TableHead className="text-right">אישור שליח</TableHead>
+                                            <TableHead className="text-right">דירוג</TableHead>
+                                            <TableHead className="text-right w-20">עריכה</TableHead>
+                                          </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                          {jobsHistory.map((job: any) => (
+                                            <TableRow key={job.id} className={editingJob === job.id ? "bg-blue-50" : ""}>
+                                              <TableCell className="font-medium">{job.id}</TableCell>
+                                              <TableCell className="max-w-[150px] truncate">{job.productName || "-"}</TableCell>
+                                              <TableCell>
+                                                {editingJob === job.id ? (
+                                                  <Input
+                                                    type="number"
+                                                    className="w-16 h-8"
+                                                    value={editJobForm.promisedDeliveryDays}
+                                                    onChange={(e) => setEditJobForm({...editJobForm, promisedDeliveryDays: parseInt(e.target.value) || 0})}
+                                                  />
+                                                ) : (
+                                                  job.promisedDeliveryDays || "-"
+                                                )}
+                                              </TableCell>
+                                              <TableCell>{job.actualDays !== null && job.actualDays !== undefined ? Math.round(job.actualDays) : "-"}</TableCell>
+                                              <TableCell>
+                                                {job.actualDays !== null && job.actualDays !== undefined && job.promisedDeliveryDays ? (
+                                                  job.actualDays <= job.promisedDeliveryDays ? (
+                                                    <CheckCircle className="h-4 w-4 text-green-500" />
+                                                  ) : (
+                                                    <XCircle className="h-4 w-4 text-red-500" />
+                                                  )
+                                                ) : (
+                                                  <span className="text-muted-foreground">-</span>
+                                                )}
+                                              </TableCell>
+                                              <TableCell>
+                                                {editingJob === job.id ? (
+                                                  <Select
+                                                    value={editJobForm.courierConfirmedReady ? "true" : "false"}
+                                                    onValueChange={(v) => setEditJobForm({...editJobForm, courierConfirmedReady: v === "true"})}
+                                                  >
+                                                    <SelectTrigger className="w-16 h-8">
+                                                      <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                      <SelectItem value="true">כן</SelectItem>
+                                                      <SelectItem value="false">לא</SelectItem>
+                                                    </SelectContent>
+                                                  </Select>
+                                                ) : (
+                                                  job.courierConfirmedReady === true ? (
+                                                    <CheckCircle className="h-4 w-4 text-green-500" />
+                                                  ) : job.courierConfirmedReady === false ? (
+                                                    <XCircle className="h-4 w-4 text-red-500" />
+                                                  ) : (
+                                                    <AlertCircle className="h-4 w-4 text-gray-400" />
+                                                  )
+                                                )}
+                                              </TableCell>
+                                              <TableCell>
+                                                {editingJob === job.id ? (
+                                                  <Select
+                                                    value={String(editJobForm.supplierRating)}
+                                                    onValueChange={(v) => setEditJobForm({...editJobForm, supplierRating: parseInt(v)})}
+                                                  >
+                                                    <SelectTrigger className="w-16 h-8">
+                                                      <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                      <SelectItem value="0">-</SelectItem>
+                                                      <SelectItem value="1">1</SelectItem>
+                                                      <SelectItem value="2">2</SelectItem>
+                                                      <SelectItem value="3">3</SelectItem>
+                                                      <SelectItem value="4">4</SelectItem>
+                                                      <SelectItem value="5">5</SelectItem>
+                                                    </SelectContent>
+                                                  </Select>
+                                                ) : (
+                                                  job.supplierRating ? (
+                                                    <span className="flex items-center gap-1">
+                                                      <Star className="h-3 w-3 text-yellow-500" />
+                                                      {job.supplierRating}
+                                                    </span>
+                                                  ) : "-"
+                                                )}
+                                              </TableCell>
+                                              <TableCell>
+                                                {editingJob === job.id ? (
+                                                  <div className="flex gap-1">
+                                                    <Button size="sm" variant="ghost" onClick={handleSaveJobData}>
+                                                      <Save className="h-4 w-4 text-green-600" />
+                                                    </Button>
+                                                    <Button size="sm" variant="ghost" onClick={() => setEditingJob(null)}>
+                                                      <XCircle className="h-4 w-4 text-red-600" />
+                                                    </Button>
+                                                  </div>
+                                                ) : (
+                                                  <Button size="sm" variant="ghost" onClick={() => handleEditJob(job)}>
+                                                    <Edit className="h-4 w-4" />
+                                                  </Button>
+                                                )}
+                                              </TableCell>
+                                            </TableRow>
+                                          ))}
+                                        </TableBody>
+                                      </Table>
+                                    </div>
+                                  )}
+                                </>
                               )}
                             </div>
 
