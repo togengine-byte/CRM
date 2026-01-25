@@ -23,6 +23,9 @@ import { getDb } from "./db";
 // ============================================
 // CONFIGURATION - Scoring Parameters
 // ============================================
+// TODO: Consider moving these values to system_settings table for runtime configuration
+// This would allow admins to adjust scoring parameters without code changes
+// For now, these are documented defaults that can be overridden via environment variables
 
 const SCORING_CONFIG = {
   // ציון בסיס לפי מספר עבודות

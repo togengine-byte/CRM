@@ -280,8 +280,10 @@ export const supplierPortalRouter = router({
         throw new Error("You can only update your own prices");
       }
 
-      // Update price
-      const updateData: any = { updatedAt: new Date() };
+      // Update price - TYPE SAFETY FIX: Using proper type instead of 'any'
+      const updateData: { updatedAt: Date; pricePerUnit?: string; deliveryDays?: number } = { 
+        updatedAt: new Date() 
+      };
       if (input.price !== undefined) updateData.pricePerUnit = input.price.toString();
       if (input.deliveryDays !== undefined) updateData.deliveryDays = input.deliveryDays;
 

@@ -36,6 +36,44 @@ export async function getDb() {
   return _db;
 }
 
+// ERROR HANDLING CONSISTENCY FIX: Centralized database availability check
+// This provides consistent error handling across all database functions
+export class DatabaseNotAvailableError extends Error {
+  constructor(functionName: string) {
+    super(`Database not available in ${functionName}`);
+    this.name = 'DatabaseNotAvailableError';
+  }
+}
+
+/**
+ * Helper function for consistent database availability handling
+ * Use this for READ operations that can safely return empty/null
+ * @param db - The database instance
+ * @param functionName - Name of the calling function for logging
+ * @returns true if database is available, false otherwise
+ */
+export function checkDbForRead(db: ReturnType<typeof drizzle> | null, functionName: string): db is ReturnType<typeof drizzle> {
+  if (!db) {
+    console.warn(`[${functionName}] Database not available - returning empty result`);
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Helper function for consistent database availability handling
+ * Use this for WRITE operations that must throw on failure
+ * @param db - The database instance
+ * @param functionName - Name of the calling function for logging
+ * @throws DatabaseNotAvailableError if database is not available
+ */
+export function requireDbForWrite(db: ReturnType<typeof drizzle> | null, functionName: string): asserts db is ReturnType<typeof drizzle> {
+  if (!db) {
+    console.error(`[${functionName}] Database not available - operation cannot proceed`);
+    throw new DatabaseNotAvailableError(functionName);
+  }
+}
+
 export async function upsertUser(user: InsertUser): Promise<void> {
   if (!user.openId) {
     throw new Error("User openId is required for upsert");
@@ -481,9 +519,17 @@ export async function getQuoteById(quoteId: number) {
   };
 }
 
+// INFINITE LOOP FIX: Added protection against circular references in quote chain
+// Uses visited set to prevent infinite loops and max iteration limit as safety net
 export async function getQuoteHistory(quoteId: number) {
   const db = await getDb();
   if (!db) return [];
+
+  // Validate quoteId
+  if (!Number.isInteger(quoteId) || quoteId <= 0) {
+    console.error("[getQuoteHistory] Invalid quoteId:", quoteId);
+    return [];
+  }
 
   const [currentQuote] = await db.select()
     .from(quotes)
@@ -492,20 +538,47 @@ export async function getQuoteHistory(quoteId: number) {
 
   if (!currentQuote) return [];
 
+  // Find root quote with circular reference protection
   let rootId = quoteId;
   if (currentQuote.parentQuoteId) {
     let parentId: number | null = currentQuote.parentQuoteId;
-    while (parentId) {
+    const visitedParents = new Set<number>();
+    visitedParents.add(quoteId); // Add current quote to prevent self-reference
+    
+    // Safety limit: maximum 1000 iterations to prevent infinite loops
+    const MAX_PARENT_ITERATIONS = 1000;
+    let iterations = 0;
+    
+    while (parentId && iterations < MAX_PARENT_ITERATIONS) {
+      // Check for circular reference
+      if (visitedParents.has(parentId)) {
+        console.warn(`[getQuoteHistory] Circular reference detected at quote ${parentId}. Breaking loop.`);
+        break;
+      }
+      visitedParents.add(parentId);
+      iterations++;
+      
       const [parent] = await db.select()
         .from(quotes)
         .where(eq(quotes.id, parentId))
         .limit(1);
-      if (parent && parent.parentQuoteId) {
-        parentId = parent.parentQuoteId;
-      } else {
+        
+      if (!parent) {
+        // Parent not found, use last valid parentId as root
         rootId = parentId;
         break;
       }
+      
+      if (parent.parentQuoteId) {
+        parentId = parent.parentQuoteId;
+      } else {
+        rootId = parent.id;
+        break;
+      }
+    }
+    
+    if (iterations >= MAX_PARENT_ITERATIONS) {
+      console.error(`[getQuoteHistory] Max iterations reached for quote ${quoteId}. Possible data corruption.`);
     }
   }
 
@@ -523,8 +596,17 @@ export async function getQuoteHistory(quoteId: number) {
   const history: typeof allQuotes = [];
   const visited = new Set<number>();
   
-  const collectChain = async (id: number) => {
+  // Safety limit for collecting chain
+  const MAX_CHAIN_SIZE = 10000;
+  
+  const collectChain = async (id: number, depth: number = 0) => {
+    // Prevent infinite recursion
     if (visited.has(id)) return;
+    if (depth > MAX_CHAIN_SIZE) {
+      console.error(`[getQuoteHistory] Max chain depth reached. Stopping collection.`);
+      return;
+    }
+    
     visited.add(id);
     
     const quote = allQuotes.find(q => q.id === id);
@@ -532,7 +614,7 @@ export async function getQuoteHistory(quoteId: number) {
       history.push(quote);
       const children = allQuotes.filter(q => q.parentQuoteId === id);
       for (const child of children) {
-        await collectChain(child.id);
+        await collectChain(child.id, depth + 1);
       }
     }
   };
@@ -3629,6 +3711,7 @@ export async function deleteProductAddon(addonId: number) {
 }
 
 // ===== PRICE CALCULATION =====
+// VALIDATION FIX: Added check that sizeId belongs to productId
 export async function calculateProductPrice(input: {
   productId: number;
   sizeId: number;
@@ -3639,13 +3722,32 @@ export async function calculateProductPrice(input: {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  // Get size base price
+  // Validate input parameters
+  if (!Number.isInteger(input.productId) || input.productId <= 0) {
+    throw new Error("Invalid productId - must be a positive integer");
+  }
+  if (!Number.isInteger(input.sizeId) || input.sizeId <= 0) {
+    throw new Error("Invalid sizeId - must be a positive integer");
+  }
+  if (input.quantityId !== undefined && (!Number.isInteger(input.quantityId) || input.quantityId <= 0)) {
+    throw new Error("Invalid quantityId - must be a positive integer");
+  }
+  if (input.customQuantity !== undefined && (typeof input.customQuantity !== 'number' || input.customQuantity <= 0)) {
+    throw new Error("Invalid customQuantity - must be a positive number");
+  }
+
+  // Get size base price - MUST verify it belongs to the specified product
   const [size] = await db.select()
     .from(productSizes)
-    .where(eq(productSizes.id, input.sizeId))
+    .where(and(
+      eq(productSizes.id, input.sizeId),
+      eq(productSizes.productId, input.productId)
+    ))
     .limit(1);
 
-  if (!size) throw new Error("Size not found");
+  if (!size) {
+    throw new Error("Size not found or does not belong to the specified product");
+  }
 
   let basePrice = parseFloat(size.basePrice || '0');
   let multiplier = 1;
