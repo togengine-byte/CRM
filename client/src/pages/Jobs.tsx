@@ -389,19 +389,19 @@ export default function Jobs() {
                                 <p className="text-sm text-muted-foreground">מס׳ הצעת מחיר</p>
                                 <p className="font-medium">{jobDetails.quoteId}</p>
                               </div>
-                              {jobDetails.readyAt && (
+                              {jobDetails.supplierReadyAt && (
                                 <div>
                                   <p className="text-sm text-muted-foreground">מוכן בתאריך</p>
                                   <p className="font-medium">
-                                    {new Date(jobDetails.readyAt).toLocaleDateString("he-IL")}
+                                    {new Date(jobDetails.supplierReadyAt).toLocaleDateString("he-IL")}
                                   </p>
                                 </div>
                               )}
-                              {jobDetails.deliveredAt && (
+                              {(jobDetails as any).deliveredAt && (
                                 <div>
                                   <p className="text-sm text-muted-foreground">נמסר בתאריך</p>
                                   <p className="font-medium">
-                                    {new Date(jobDetails.deliveredAt).toLocaleDateString("he-IL")}
+                                    {new Date((jobDetails as any).deliveredAt).toLocaleDateString("he-IL")}
                                   </p>
                                 </div>
                               )}
@@ -415,14 +415,14 @@ export default function Jobs() {
                                   <span className="font-medium text-amber-800">אזהרות לקבצים להדפסה</span>
                                 </div>
                                 <div className="space-y-2">
-                                  {jobDetails.fileValidationWarnings.map((fileWarning, idx) => (
+                                  {jobDetails.fileValidationWarnings.map((fileWarning: any, idx: number) => (
                                     <div key={idx} className="text-sm">
                                       <div className="flex items-center gap-1 text-amber-700 font-medium">
                                         <FileWarning className="h-3 w-3" />
                                         {fileWarning.fileName}
                                       </div>
                                       <ul className="mr-5 mt-1 space-y-0.5">
-                                        {fileWarning.warnings.map((warning, wIdx) => (
+                                        {fileWarning.warnings.map((warning: string, wIdx: number) => (
                                           <li key={wIdx} className="text-amber-600 text-xs">• {warning}</li>
                                         ))}
                                       </ul>

@@ -485,7 +485,7 @@ export const supplierPortalRouter = router({
           sj.quantity,
           sj."pricePerUnit",
           sj."promisedDeliveryDays",
-          sj."supplierAcceptedAt",
+          sj."acceptedAt",
           sj."createdAt",
           customer.name as "customerName",
           customer."companyName" as "customerCompany",
@@ -501,7 +501,7 @@ export const supplierPortalRouter = router({
         WHERE sj."supplierId" = ${targetSupplierId}
           AND sj.status = 'accepted'
           AND sj."isCancelled" = false
-        ORDER BY sj."supplierAcceptedAt" DESC
+        ORDER BY sj."acceptedAt" DESC
       `);
 
       // Get attachments for each job
@@ -521,7 +521,7 @@ export const supplierPortalRouter = router({
             quantity: row.quantity,
             pricePerUnit: parseFloat(row.pricePerUnit),
             promisedDeliveryDays: row.promisedDeliveryDays,
-            acceptedAt: row.supplierAcceptedAt,
+            acceptedAt: row.acceptedAt,
             createdAt: row.createdAt,
             customerName: row.customerName || 'לקוח לא מזוהה',
             customerCompany: row.customerCompany,
@@ -583,8 +583,8 @@ export const supplierPortalRouter = router({
       await db.execute(sql`
         UPDATE supplier_jobs
         SET status = 'accepted',
-            "supplierAccepted" = true,
-            "supplierAcceptedAt" = NOW(),
+            "isAccepted" = true,
+            "acceptedAt" = NOW(),
             "updatedAt" = NOW()
         WHERE id = ${input.jobId}
       `);

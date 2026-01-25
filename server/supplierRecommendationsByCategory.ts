@@ -168,7 +168,7 @@ export async function getRecommendationsByCategory(
     }[];
   }>();
 
-  for (const [sqId, info] of itemCategoryInfo) {
+  for (const [sqId, info] of Array.from(itemCategoryInfo)) {
     if (!categoryGroups.has(info.categoryId)) {
       categoryGroups.set(info.categoryId, {
         categoryName: info.categoryName,
@@ -193,9 +193,9 @@ export async function getRecommendationsByCategory(
   // Step 5: For each category, find suppliers who can fulfill ALL items
   const recommendations: CategorySupplierRecommendation[] = [];
 
-  for (const [categoryId, categoryData] of categoryGroups) {
+  for (const [categoryId, categoryData] of Array.from(categoryGroups)) {
     const categoryItems = categoryData.items;
-    const categorySqIds = categoryItems.map(i => i.sizeQuantityId);
+    const categorySqIds = categoryItems.map((i: { quoteItemId: number; sizeQuantityId: number; productName: string; quantity: number }) => i.sizeQuantityId);
 
     // Find suppliers who have prices for ALL items in this category
     const supplierCoverage = new Map<number, {
@@ -206,7 +206,7 @@ export async function getRecommendationsByCategory(
 
     for (const sqId of categorySqIds) {
       const suppliersForSq = supplierPricesMap.get(sqId) || [];
-      const item = categoryItems.find(i => i.sizeQuantityId === sqId)!;
+      const item = categoryItems.find((i: { quoteItemId: number; sizeQuantityId: number; productName: string; quantity: number }) => i.sizeQuantityId === sqId)!;
 
       for (const sp of suppliersForSq) {
         if (!supplierCoverage.has(sp.supplierId)) {
@@ -230,7 +230,7 @@ export async function getRecommendationsByCategory(
 
     // Filter to suppliers who can fulfill ALL items in this category
     const fullCoverageSuppliers: number[] = [];
-    for (const [supplierId, coverage] of supplierCoverage) {
+    for (const [supplierId, coverage] of Array.from(supplierCoverage)) {
       if (coverage.canFulfill.length === categorySqIds.length) {
         fullCoverageSuppliers.push(supplierId);
       }
