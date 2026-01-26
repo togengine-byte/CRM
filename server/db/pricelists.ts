@@ -10,7 +10,11 @@ import {
   pricelists, 
   customerPricelists,
   quotes,
-  quoteItems
+  quoteItems,
+  sizeQuantities,
+  productSizes,
+  baseProducts,
+  users
 } from "../../drizzle/schema";
 import { logActivity } from "./activity";
 
@@ -491,27 +495,63 @@ export async function autoPopulateQuotePricing(quoteId: number, pricelistId?: nu
     markupPercentage = parseFloat(activePricelist.markupPercentage?.toString() || '0');
   }
 
-  const items = await db.select()
+  // Get items with full product and supplier details
+  const itemsWithDetails = await db.select({
+    itemId: quoteItems.id,
+    sizeQuantityId: quoteItems.sizeQuantityId,
+    quantity: quoteItems.quantity,
+    priceAtTimeOfQuote: quoteItems.priceAtTimeOfQuote,
+    supplierCost: quoteItems.supplierCost,
+    supplierId: quoteItems.supplierId,
+    isManualPrice: quoteItems.isManualPrice,
+    deliveryDays: quoteItems.deliveryDays,
+    // Product info
+    productName: baseProducts.name,
+    sizeName: productSizes.name,
+    sizeQuantity: sizeQuantities.quantity,
+    // Supplier info
+    supplierName: users.name,
+  })
     .from(quoteItems)
+    .leftJoin(sizeQuantities, eq(quoteItems.sizeQuantityId, sizeQuantities.id))
+    .leftJoin(productSizes, eq(sizeQuantities.sizeId, productSizes.id))
+    .leftJoin(baseProducts, eq(productSizes.productId, baseProducts.id))
+    .leftJoin(users, eq(quoteItems.supplierId, users.id))
     .where(eq(quoteItems.quoteId, quoteId));
 
   let totalSupplierCost = 0;
   let totalCustomerPrice = 0;
+  const processedItems = [];
 
-  for (const item of items) {
-    if (item.isManualPrice) continue;
-    
+  for (const item of itemsWithDetails) {
     const supplierCost = parseFloat(item.supplierCost?.toString() || '0');
-    if (supplierCost > 0) {
-      const customerPrice = calculateCustomerPrice(supplierCost, markupPercentage);
+    let customerPrice = parseFloat(item.priceAtTimeOfQuote?.toString() || '0');
+    
+    // Recalculate price if not manual and has supplier cost
+    if (!item.isManualPrice && supplierCost > 0) {
+      customerPrice = calculateCustomerPrice(supplierCost, markupPercentage);
       
       await db.update(quoteItems)
         .set({ priceAtTimeOfQuote: customerPrice.toString() })
-        .where(eq(quoteItems.id, item.id));
-      
-      totalSupplierCost += supplierCost * item.quantity;
-      totalCustomerPrice += customerPrice * item.quantity;
+        .where(eq(quoteItems.id, item.itemId));
     }
+    
+    totalSupplierCost += supplierCost * item.quantity;
+    totalCustomerPrice += customerPrice * item.quantity;
+    
+    processedItems.push({
+      itemId: item.itemId,
+      sizeQuantityId: item.sizeQuantityId,
+      quantity: item.quantity,
+      productName: item.productName || `פריט #${item.sizeQuantityId}`,
+      sizeName: item.sizeName ? `${item.sizeName} (${item.sizeQuantity} יח')` : '',
+      supplierId: item.supplierId,
+      supplierName: item.supplierName || 'לא נבחר',
+      supplierCost: supplierCost,
+      customerPrice: customerPrice,
+      isManualPrice: item.isManualPrice || false,
+      deliveryDays: item.deliveryDays,
+    });
   }
 
   if (activePricelist) {
@@ -525,6 +565,10 @@ export async function autoPopulateQuotePricing(quoteId: number, pricelistId?: nu
       .where(eq(quotes.id, quoteId));
   }
 
+  const profitPercentage = totalSupplierCost > 0 
+    ? Math.round(((totalCustomerPrice - totalSupplierCost) / totalSupplierCost) * 100) 
+    : 0;
+
   return {
     success: true,
     pricelist: activePricelist ? {
@@ -532,10 +576,12 @@ export async function autoPopulateQuotePricing(quoteId: number, pricelistId?: nu
       name: activePricelist.name,
       markupPercentage,
     } : null,
+    items: processedItems,
     totals: {
       supplierCost: totalSupplierCost,
       customerPrice: totalCustomerPrice,
       profit: totalCustomerPrice - totalSupplierCost,
+      profitPercentage,
     },
   };
 }
