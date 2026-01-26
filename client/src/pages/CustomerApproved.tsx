@@ -518,7 +518,7 @@ export default function CustomerApproved() {
 
       {/* Supplier Selection Dialog */}
       <Dialog open={isSupplierDialogOpen} onOpenChange={setIsSupplierDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Truck className="h-5 w-5" />
@@ -609,13 +609,13 @@ export default function CustomerApproved() {
                       <Award className="h-4 w-4 text-amber-600" />
                       <span>ספקים מומלצים לפי ציון כולל (מחיר, דירוג, אמינות, מהירות)</span>
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-2 max-h-[40vh] overflow-y-auto">
                       {allRecommendations.slice(0, 5).map((rec, index) => (
                         <div
                           key={rec.supplierId}
                           onClick={() => handleSelectRecommendedSupplier(rec)}
                           className={cn(
-                            "p-4 rounded-lg border-2 cursor-pointer transition-all",
+                            "p-3 rounded-lg border-2 cursor-pointer transition-all",
                             selectedSupplierId === rec.supplierId.toString()
                               ? "border-amber-500 bg-amber-50"
                               : "border-gray-200 hover:border-amber-300 hover:bg-amber-50/50"
