@@ -60,6 +60,29 @@ export const quotePricingRouter = router({
       return await changeQuotePricelist(input.quoteId, input.pricelistId);
     }),
 
+  // Select supplier and update prices (draft mode - no job creation)
+  selectSupplierForPricing: protectedProcedure
+    .input(z.object({
+      quoteId: z.number(),
+      supplierId: z.number(),
+      items: z.array(z.object({
+        quoteItemId: z.number(),
+        sizeQuantityId: z.number(),
+        pricePerUnit: z.number(),
+        deliveryDays: z.number(),
+      })),
+      markupPercentage: z.number().default(0),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.user) throw new Error("Not authenticated");
+      if (ctx.user.role !== 'admin' && ctx.user.role !== 'employee') {
+        throw new Error("Only employees can select suppliers");
+      }
+      // Import the function
+      const { selectSupplierForPricing } = await import("../db/pricelists");
+      return await selectSupplierForPricing(input.quoteId, input.supplierId, input.items, input.markupPercentage);
+    }),
+
   // Recalculate quote totals
   recalculate: protectedProcedure
     .input(z.object({ quoteId: z.number() }))
@@ -69,6 +92,14 @@ export const quotePricingRouter = router({
         throw new Error("Only employees can recalculate quotes");
       }
       return await recalculateQuoteTotals(input.quoteId);
+    }),
+
+  // Get default pricelist
+  getDefaultPricelist: protectedProcedure
+    .query(async ({ ctx }) => {
+      if (!ctx.user) throw new Error("Not authenticated");
+      const { getDefaultPricelist } = await import("../db/pricelists");
+      return await getDefaultPricelist();
     }),
 
   // Send quote to customer

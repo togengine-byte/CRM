@@ -325,7 +325,7 @@ export async function getRecommendationsByCategory(
       categoryId,
       categoryName: categoryData.categoryName,
       items: categoryItems,
-      suppliers: supplierScores.slice(0, 3), // Top 3 per category
+      suppliers: supplierScores.slice(0, 5), // Top 5 per category
     });
   }
 

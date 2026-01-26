@@ -470,6 +470,21 @@ export async function sendQuoteToCustomer(quoteId: number, employeeId: number) {
     throw new Error("Only draft quotes can be sent to customers");
   }
 
+  // Get customer info - use email field (not billingEmail)
+  const [customer] = await db.select({
+    id: users.id,
+    name: users.name,
+    email: users.email, // Primary email for quote notifications
+    billingEmail: users.billingEmail, // Only for invoices
+  })
+    .from(users)
+    .where(eq(users.id, quote.customerId))
+    .limit(1);
+
+  if (!customer) {
+    throw new Error("Customer not found");
+  }
+
   const items = await db.select()
     .from(quoteItems)
     .where(eq(quoteItems.quoteId, quoteId));
@@ -497,8 +512,17 @@ export async function sendQuoteToCustomer(quoteId: number, employeeId: number) {
   await logActivity(employeeId, "quote_sent_to_customer", { 
     quoteId, 
     customerId: quote.customerId,
+    customerEmail: customer.email, // Log which email was used
     finalValue: quote.finalValue 
   });
 
-  return { success: true, status: 'sent' };
+  // TODO: Implement actual email sending here
+  // Use customer.email (not customer.billingEmail) for quote notifications
+  console.log(`[Quote ${quoteId}] Would send email to: ${customer.email}`);
+
+  return { 
+    success: true, 
+    status: 'sent',
+    customerEmail: customer.email, // Return the email for frontend confirmation
+  };
 }

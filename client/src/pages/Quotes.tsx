@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -182,6 +182,14 @@ export default function Quotes() {
 
   // Pricing queries and mutations
   const { data: pricelists } = trpc.pricelists.list.useQuery();
+  const { data: defaultPricelist } = trpc.quotePricing.getDefaultPricelist.useQuery();
+
+  // Set default pricelist when loaded
+  useEffect(() => {
+    if (defaultPricelist && !selectedPricelistId) {
+      setSelectedPricelistId(defaultPricelist.id);
+    }
+  }, [defaultPricelist, selectedPricelistId]);
 
   const autoPopulateMutation = trpc.quotePricing.autoPopulate.useMutation({
     onSuccess: (data) => {
@@ -833,8 +841,12 @@ export default function Quotes() {
                                   quantity: item.quantity,
                                   productName: item.productName || getSizeQuantityName(item.sizeQuantityId),
                                 })) || []}
-                                quoteStatus="approved"
-                                onSupplierSelected={() => refetch()}
+                                quoteStatus={quote.status}
+                                onSupplierSelected={() => {
+                                  refetch();
+                                  utils.quotes.getById.refetch();
+                                }}
+                                markupPercentage={pricingData?.pricelist?.markupPercentage || selectedPricelistId ? parseFloat(pricelists?.find((pl: any) => pl.id === selectedPricelistId)?.markupPercentage || '0') : 0}
                               />
                             </div>
                           )}
@@ -882,11 +894,11 @@ export default function Quotes() {
                                             <Input
                                               type="number"
                                               min="0"
-                                              step="0.01"
-                                              value={currentPrice}
+                                              step="1"
+                                              value={Math.round(currentPrice)}
                                               onChange={(e) => {
                                                 e.stopPropagation();
-                                                handlePriceEdit(item.id, parseFloat(e.target.value) || 0);
+                                                handlePriceEdit(item.id, Math.round(parseFloat(e.target.value) || 0));
                                               }}
                                               onClick={(e) => e.stopPropagation()}
                                               className={cn(
@@ -1844,26 +1856,41 @@ function SupplierRecommendationsByCategory({
   quoteId,
   quoteItems,
   quoteStatus,
-  onSupplierSelected 
+  onSupplierSelected,
+  markupPercentage = 0,
 }: { 
   quoteId: number;
   quoteItems: { quoteItemId: number; sizeQuantityId: number; quantity: number; productName: string }[];
   quoteStatus: string;
   onSupplierSelected: () => void;
+  markupPercentage?: number;
 }) {
-  // Only allow assigning suppliers after customer approval
-  const canAssignSupplier = quoteStatus === 'approved' || quoteStatus === 'in_production';
-  const [confirmData, setConfirmData] = useState<ConfirmSupplierData | null>(null);
+  // In draft mode, clicking supplier just updates prices (no job creation)
+  // After approval, clicking supplier creates jobs
+  const isDraftMode = quoteStatus === 'draft' || quoteStatus === 'sent';
+  const canCreateJobs = quoteStatus === 'approved' || quoteStatus === 'in_production';
+  const [selectedSupplier, setSelectedSupplier] = useState<number | null>(null);
 
   const { data: recommendations, isLoading } = trpc.suppliers.recommendationsByCategory.useQuery(
     { quoteItems },
     { enabled: quoteItems.length > 0 }
   );
 
+  // Mutation for draft mode - just update prices
+  const selectSupplierMutation = trpc.quotePricing.selectSupplierForPricing.useMutation({
+    onSuccess: () => {
+      toast.success(`ספק נבחר והמחירים עודכנו!`);
+      onSupplierSelected();
+    },
+    onError: (error) => {
+      toast.error(`שגיאה בבחירת ספק: ${error.message}`);
+    },
+  });
+
+  // Mutation for after approval - create jobs
   const assignMutation = trpc.suppliers.assignToCategory.useMutation({
     onSuccess: () => {
       toast.success(`העבודה הועברה לספק בהצלחה!`);
-      setConfirmData(null);
       onSupplierSelected();
     },
     onError: (error) => {
@@ -1871,12 +1898,23 @@ function SupplierRecommendationsByCategory({
     },
   });
 
-  const handleConfirmSupplier = () => {
-    if (confirmData) {
+  const handleSelectSupplier = (category: CategoryRecommendation, supplier: CategoryRecommendation['suppliers'][0]) => {
+    setSelectedSupplier(supplier.supplierId);
+    
+    if (isDraftMode) {
+      // Draft mode - just update prices, no job creation
+      selectSupplierMutation.mutate({
+        quoteId,
+        supplierId: supplier.supplierId,
+        items: supplier.canFulfill,
+        markupPercentage,
+      });
+    } else if (canCreateJobs) {
+      // After approval - create supplier jobs
       assignMutation.mutate({
         quoteId,
-        supplierId: confirmData.supplier.supplierId,
-        items: confirmData.supplier.canFulfill,
+        supplierId: supplier.supplierId,
+        items: supplier.canFulfill,
       });
     }
   };
@@ -1900,144 +1938,71 @@ function SupplierRecommendationsByCategory({
     );
   }
 
+  const isPending = selectSupplierMutation.isPending || assignMutation.isPending;
+
   return (
-    <>
-      <div className="space-y-3">
-        {(recommendations as CategoryRecommendation[]).map((category) => (
-          <div key={category.categoryId} className="p-3 bg-background rounded border">
-            {/* Category Header */}
-            <div className="flex items-center justify-between mb-2">
-              <div>
-                <p className="font-medium text-sm">{category.categoryName}</p>
-                <p className="text-xs text-muted-foreground">
-                  {category.items.map(i => i.productName).join(', ')}
-                </p>
-              </div>
-              <Badge variant="outline" className="text-xs">
-                {category.items.length} פריטים
-              </Badge>
+    <div className="space-y-3">
+      {(recommendations as CategoryRecommendation[]).map((category) => (
+        <div key={category.categoryId} className="p-3 bg-background rounded border">
+          {/* Category Header */}
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <p className="font-medium text-sm">{category.categoryName}</p>
+              <p className="text-xs text-muted-foreground">
+                {category.items.map(i => i.productName).join(', ')}
+              </p>
             </div>
-
-            {/* Suppliers for this category */}
-            {category.suppliers.length === 0 ? (
-              <p className="text-xs text-muted-foreground">אין ספקים זמינים לתחום זה</p>
-            ) : (
-              <div className="flex gap-2">
-                {category.suppliers.map((supplier, index) => (
-                  <button
-                    key={supplier.supplierId}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (canAssignSupplier) {
-                        setConfirmData({
-                          categoryId: category.categoryId,
-                          categoryName: category.categoryName,
-                          supplier,
-                          items: category.items,
-                        });
-                      }
-                    }}
-                    disabled={!canAssignSupplier}
-                    className={cn(
-                      "flex-1 p-2 rounded border text-right transition-all",
-                      canAssignSupplier && "hover:shadow-sm",
-                      !canAssignSupplier && "opacity-60 cursor-not-allowed",
-                      index === 0 
-                        ? "bg-green-50 border-green-200" + (canAssignSupplier ? " hover:border-green-300" : "")
-                        : "bg-muted/50" + (canAssignSupplier ? " hover:bg-muted" : "")
-                    )}
-                  >
-                    <p className="font-medium text-sm truncate">{supplier.supplierName}</p>
-                    <div className="flex items-center justify-between mt-1">
-                      <span className="text-xs text-muted-foreground">⭐ {supplier.avgRating.toFixed(1)}</span>
-                      <span className="text-xs font-medium">₪{supplier.totalPrice.toLocaleString()}</span>
-                    </div>
-                    {index === 0 && (
-                      <Badge variant="outline" className="text-[10px] px-1 py-0 mt-1 bg-green-100 text-green-700 border-green-200">
-                        מומלץ
-                      </Badge>
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
+            <Badge variant="outline" className="text-xs">
+              {category.items.length} פריטים
+            </Badge>
           </div>
-        ))}
-      </div>
 
-      {/* Confirm Dialog */}
-      <Dialog open={!!confirmData} onOpenChange={() => setConfirmData(null)}>
-        <DialogContent className="sm:max-w-[450px]" dir="rtl">
-          <DialogHeader>
-            <DialogTitle>העברת עבודה לספק</DialogTitle>
-            <DialogDescription>
-              האם להעביר את העבודה לספק <strong>{confirmData?.supplier.supplierName}</strong>?
-            </DialogDescription>
-          </DialogHeader>
-          
-          {confirmData && (
-            <div className="space-y-3">
-              {/* Supplier Info */}
-              <div className="p-3 bg-muted rounded-lg space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">ספק:</span>
-                  <span className="font-medium">{confirmData.supplier.supplierName}</span>
-                </div>
-                {confirmData.supplier.supplierCompany && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">חברה:</span>
-                    <span className="font-medium">{confirmData.supplier.supplierCompany}</span>
+          {/* Suppliers for this category - show up to 5 */}
+          {category.suppliers.length === 0 ? (
+            <p className="text-xs text-muted-foreground">אין ספקים זמינים לתחום זה</p>
+          ) : (
+            <div className="flex gap-2 flex-wrap">
+              {category.suppliers.slice(0, 5).map((supplier, index) => (
+                <button
+                  key={supplier.supplierId}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSelectSupplier(category, supplier);
+                  }}
+                  disabled={isPending}
+                  className={cn(
+                    "flex-1 min-w-[120px] max-w-[180px] p-2 rounded border text-right transition-all",
+                    !isPending && "hover:shadow-sm cursor-pointer",
+                    isPending && selectedSupplier === supplier.supplierId && "opacity-70",
+                    isPending && selectedSupplier !== supplier.supplierId && "opacity-50",
+                    index === 0 
+                      ? "bg-green-50 border-green-200 hover:border-green-300"
+                      : "bg-muted/50 hover:bg-muted"
+                  )}
+                >
+                  {isPending && selectedSupplier === supplier.supplierId && (
+                    <Loader2 className="h-3 w-3 animate-spin absolute top-1 left-1" />
+                  )}
+                  <p className="font-medium text-sm truncate">{supplier.supplierName}</p>
+                  <div className="flex items-center justify-between mt-1">
+                    <span className="text-xs text-muted-foreground">⭐ {supplier.avgRating.toFixed(1)}</span>
+                    <span className="text-xs font-medium">₪{supplier.totalPrice.toLocaleString()}</span>
                   </div>
-                )}
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">דירוג:</span>
-                  <span className="font-medium">⭐ {confirmData.supplier.avgRating.toFixed(1)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">זמן אספקה:</span>
-                  <span className="font-medium">{confirmData.supplier.avgDeliveryDays} ימים</span>
-                </div>
-              </div>
-
-              {/* Items to transfer */}
-              <div>
-                <p className="text-sm font-medium mb-2">פריטים להעברה:</p>
-                <div className="space-y-1">
-                  {confirmData.items.map((item) => {
-                    const fulfillInfo = confirmData.supplier.canFulfill.find(
-                      f => f.quoteItemId === item.quoteItemId
-                    );
-                    return (
-                      <div key={item.quoteItemId} className="flex justify-between text-sm p-2 bg-background rounded border">
-                        <span>{item.productName} × {item.quantity}</span>
-                        <span className="font-medium">₪{fulfillInfo?.pricePerUnit || 0}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Total */}
-              <div className="flex justify-between p-3 bg-green-50 rounded-lg border border-green-200">
-                <span className="font-medium">סה"כ לתחום:</span>
-                <span className="font-bold text-lg">₪{confirmData.supplier.totalPrice.toLocaleString()}</span>
-              </div>
+                  <div className="flex items-center justify-between mt-1">
+                    <span className="text-xs text-muted-foreground">{supplier.avgDeliveryDays} ימים</span>
+                    <span className="text-xs text-muted-foreground">{supplier.reliabilityPct}% אמינות</span>
+                  </div>
+                  {index === 0 && (
+                    <Badge variant="outline" className="text-[10px] px-1 py-0 mt-1 bg-green-100 text-green-700 border-green-200">
+                      מומלץ
+                    </Badge>
+                  )}
+                </button>
+              ))}
             </div>
           )}
-
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setConfirmData(null)}>
-              ביטול
-            </Button>
-            <Button 
-              onClick={handleConfirmSupplier}
-              disabled={assignMutation.isPending}
-            >
-              {assignMutation.isPending ? "מעביר..." : "אשר והעבר לספק"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+        </div>
+      ))}
+    </div>
   );
 }

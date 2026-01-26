@@ -585,3 +585,114 @@ export async function autoPopulateQuotePricing(quoteId: number, pricelistId?: nu
     },
   };
 }
+
+
+/**
+ * Select supplier for pricing (draft mode - no job creation)
+ * Updates quote items with supplier prices and calculates customer price with markup
+ */
+export async function selectSupplierForPricing(
+  quoteId: number,
+  supplierId: number,
+  items: { quoteItemId: number; sizeQuantityId: number; pricePerUnit: number; deliveryDays: number }[],
+  markupPercentage: number = 0
+): Promise<{ success: boolean; updatedItems: any[]; totals: any }> {
+  const db = await getDb();
+  if (!db) return { success: false, updatedItems: [], totals: {} };
+
+  const updatedItems: any[] = [];
+  let totalSupplierCost = 0;
+  let totalCustomerPrice = 0;
+
+  for (const item of items) {
+    // Calculate customer price with markup (rounded to whole shekels)
+    const supplierCost = item.pricePerUnit;
+    const customerPrice = Math.round(supplierCost * (1 + markupPercentage / 100));
+    
+    // Update quote item with supplier info and prices
+    await db.update(quoteItems)
+      .set({
+        supplierId: supplierId,
+        supplierCost: supplierCost.toString(),
+        priceAtTimeOfQuote: customerPrice.toString(),
+        deliveryDays: item.deliveryDays,
+        isManualPrice: false,
+      })
+      .where(eq(quoteItems.id, item.quoteItemId));
+
+    totalSupplierCost += supplierCost;
+    totalCustomerPrice += customerPrice;
+
+    updatedItems.push({
+      quoteItemId: item.quoteItemId,
+      supplierId,
+      supplierCost,
+      customerPrice,
+      deliveryDays: item.deliveryDays,
+    });
+  }
+
+  // Update quote totals
+  await db.update(quotes)
+    .set({
+      totalSupplierCost: totalSupplierCost.toString(),
+      finalValue: totalCustomerPrice.toString(),
+      updatedAt: new Date(),
+    })
+    .where(eq(quotes.id, quoteId));
+
+  const profitPercentage = totalSupplierCost > 0 
+    ? Math.round(((totalCustomerPrice - totalSupplierCost) / totalSupplierCost) * 100) 
+    : 0;
+
+  return {
+    success: true,
+    updatedItems,
+    totals: {
+      supplierCost: totalSupplierCost,
+      customerPrice: totalCustomerPrice,
+      profit: totalCustomerPrice - totalSupplierCost,
+      profitPercentage,
+    },
+  };
+}
+
+/**
+ * Get default pricelist
+ */
+export async function getDefaultPricelist(): Promise<{ id: number; name: string; markupPercentage: number } | null> {
+  const db = await getDb();
+  if (!db) return null;
+
+  const result = await db.select({
+    id: pricelists.id,
+    name: pricelists.name,
+    markupPercentage: pricelists.markupPercentage,
+  })
+    .from(pricelists)
+    .where(eq(pricelists.isDefault, true))
+    .limit(1);
+
+  if (result.length === 0) {
+    // If no default, get first active pricelist
+    const fallback = await db.select({
+      id: pricelists.id,
+      name: pricelists.name,
+      markupPercentage: pricelists.markupPercentage,
+    })
+      .from(pricelists)
+      .where(eq(pricelists.isActive, true))
+      .orderBy(pricelists.id)
+      .limit(1);
+    
+    return fallback.length > 0 ? {
+      ...fallback[0],
+      markupPercentage: parseFloat(fallback[0].markupPercentage || '0'),
+    } : null;
+  }
+
+  return {
+    ...result[0],
+    markupPercentage: parseFloat(result[0].markupPercentage || '0'),
+  };
+}
