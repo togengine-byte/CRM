@@ -76,9 +76,25 @@ export async function getProducts(filters?: {
       .where(eq(productSizes.productId, product.id))
       .orderBy(productSizes.displayOrder);
 
+      // Add quantities to each size
+      const sizesWithQuantities = await Promise.all(
+        sizes.map(async (size) => {
+          const quantities = await db.select({
+            id: sizeQuantities.id,
+            quantity: sizeQuantities.quantity,
+            price: sizeQuantities.price,
+            displayOrder: sizeQuantities.displayOrder,
+          })
+          .from(sizeQuantities)
+          .where(eq(sizeQuantities.sizeId, size.id))
+          .orderBy(sizeQuantities.displayOrder);
+          return { ...size, quantities };
+        })
+      );
+
       return {
         ...product,
-        sizes,
+        sizes: sizesWithQuantities,
         sizeCount: sizes.length,
       };
     })

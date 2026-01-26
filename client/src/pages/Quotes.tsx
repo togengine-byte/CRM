@@ -1082,8 +1082,12 @@ export default function Quotes() {
                           setSelectedSizeId(size.id);
                           setSelectedSizeQuantityId('');
                         }}
+                        className="flex-col h-auto py-2"
                       >
-                        {size.name}
+                        <span>{size.name}</span>
+                        {size.dimensions && (
+                          <span className="text-xs opacity-70">{size.dimensions}</span>
+                        )}
                       </Button>
                     ))}
                   </div>
@@ -1091,25 +1095,31 @@ export default function Quotes() {
               )}
 
               {/* Quantity Selection */}
-              {selectedSizeId && (
-                <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">כמות באריזה</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {(products || []).find((p: any) => p.id === selectedProductId)
-                      ?.sizes?.find((s: any) => s.id === selectedSizeId)
-                      ?.quantities?.map((sq: any) => (
-                        <Button
-                          key={sq.id}
-                          variant={selectedSizeQuantityId === sq.id.toString() ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => setSelectedSizeQuantityId(sq.id.toString())}
-                        >
-                          {sq.quantity} יח'
-                        </Button>
-                      ))}
+              {selectedSizeId && (() => {
+                const quantities = (products || []).find((p: any) => p.id === selectedProductId)
+                  ?.sizes?.find((s: any) => s.id === selectedSizeId)?.quantities || [];
+                return (
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">כמות באריזה</Label>
+                    {quantities.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {quantities.map((sq: any) => (
+                          <Button
+                            key={sq.id}
+                            variant={selectedSizeQuantityId === sq.id.toString() ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setSelectedSizeQuantityId(sq.id.toString())}
+                          >
+                            {sq.quantity} יח'
+                          </Button>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">אין כמויות מוגדרות לגודל זה</p>
+                    )}
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* Order Quantity & Notes */}
               {selectedSizeQuantityId && (
