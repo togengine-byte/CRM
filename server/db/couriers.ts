@@ -346,8 +346,8 @@ export async function getCourierReadyJobs() {
     LEFT JOIN users supplier ON sj."supplierId" = supplier.id
     LEFT JOIN users customer ON sj."customerId" = customer.id
     LEFT JOIN size_quantities sq ON sj."sizeQuantityId" = sq.id
-    LEFT JOIN product_sizes ps ON sq."sizeId" = ps.id
-    LEFT JOIN base_products bp ON ps."productId" = bp.id
+    LEFT JOIN product_sizes ps ON sq.size_id = ps.id
+    LEFT JOIN base_products bp ON ps.product_id = bp.id
     WHERE sj.status IN ('ready', 'picked_up', 'delivered')
     ORDER BY 
       CASE sj.status 

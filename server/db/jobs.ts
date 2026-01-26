@@ -304,8 +304,8 @@ export async function getSupplierCompletedJobs(supplierId: number) {
     LEFT JOIN quotes q ON sj."quoteId" = q.id
     LEFT JOIN users u ON q."customerId" = u.id
     LEFT JOIN size_quantities sq ON sj."sizeQuantityId" = sq.id
-    LEFT JOIN product_sizes ps ON sq."sizeId" = ps.id
-    LEFT JOIN base_products bp ON ps."productId" = bp.id
+    LEFT JOIN product_sizes ps ON sq.size_id = ps.id
+    LEFT JOIN base_products bp ON ps.product_id = bp.id
     WHERE sj."supplierId" = ${supplierId}
     AND sj.status IN ('ready', 'delivered', 'completed')
     ORDER BY sj."createdAt" DESC
@@ -611,8 +611,8 @@ export async function getSupplierJobsHistory(supplierId: number) {
     FROM supplier_jobs sj
     LEFT JOIN users customer ON sj."customerId" = customer.id
     LEFT JOIN size_quantities sq ON sj."sizeQuantityId" = sq.id
-    LEFT JOIN product_sizes ps ON sq."sizeId" = ps.id
-    LEFT JOIN base_products bp ON ps."productId" = bp.id
+    LEFT JOIN product_sizes ps ON sq.size_id = ps.id
+    LEFT JOIN base_products bp ON ps.product_id = bp.id
     WHERE sj."supplierId" = ${supplierId}
     ORDER BY sj.id DESC
   `);

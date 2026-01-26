@@ -396,8 +396,8 @@ export async function getProductAnalytics(productId?: number) {
       COALESCE(SUM(CAST(qi."priceAtTimeOfQuote" AS DECIMAL) * qi.quantity), 0) as total_revenue
     FROM quote_items qi
     INNER JOIN size_quantities sq ON qi."sizeQuantityId" = sq.id
-    INNER JOIN product_sizes ps ON sq."sizeId" = ps.id
-    INNER JOIN base_products bp ON ps."productId" = bp.id
+    INNER JOIN product_sizes ps ON sq.size_id = ps.id
+    INNER JOIN base_products bp ON ps.product_id = bp.id
     INNER JOIN quotes q ON qi."quoteId" = q.id
     WHERE q.status IN ('approved', 'in_production', 'ready', 'delivered')
     ${productId ? sql`AND bp.id = ${productId}` : sql``}

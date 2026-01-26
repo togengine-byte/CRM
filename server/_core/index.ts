@@ -104,7 +104,7 @@ async function seedSuppliersData(pool: any) {
       SELECT bp.id as product_id, bp.name as product_name, bp."categoryId", 
              ps.id as size_id, ps.name as size_name, ps."basePrice"
       FROM base_products bp
-      LEFT JOIN product_sizes ps ON ps."productId" = bp.id AND ps."isActive" = true
+      LEFT JOIN product_sizes ps ON ps.product_id = bp.id AND ps.is_active = true
       WHERE bp."isActive" = true
     `);
     
