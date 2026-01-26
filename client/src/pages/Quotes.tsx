@@ -113,7 +113,7 @@ export default function Quotes() {
     status: statusFilter === "all" ? undefined : statusFilter,
   });
 
-  const { data: quoteDetails } = trpc.quotes.getById.useQuery(
+  const { data: quoteDetails, refetch: refetchQuoteDetails } = trpc.quotes.getById.useQuery(
     { id: expandedQuoteId! },
     { enabled: !!expandedQuoteId }
   );
@@ -856,8 +856,10 @@ export default function Quotes() {
                                 quoteStatus={quote.status}
                                 onSupplierSelected={() => {
                                   refetch();
+                                  refetchQuoteDetails();
                                   utils.quotes.list.refetch();
                                   utils.quotes.getById.refetch();
+                                  setEditedPrices({}); // Clear edited prices to show new values from DB
                                 }}
                                 markupPercentage={pricingData?.pricelist?.markupPercentage || selectedPricelistId ? parseFloat(pricelists?.find((pl: any) => pl.id === selectedPricelistId)?.markupPercentage || '0') : 0}
                               />
@@ -1002,7 +1004,11 @@ export default function Quotes() {
                                 productName: item.productName || getSizeQuantityName(item.sizeQuantityId),
                               })) || []}
                               quoteStatus={quote.status}
-                              onSupplierSelected={() => refetch()}
+                              onSupplierSelected={() => {
+                                refetch();
+                                refetchQuoteDetails();
+                                setEditedPrices({}); // Clear edited prices to show new values from DB
+                              }}
                             />
                           )}
                           
@@ -2158,7 +2164,7 @@ function SupplierRecommendationsByItem({
               <p className="text-xs text-muted-foreground">{item.productName}</p>
             </div>
             <Badge variant="outline" className="text-xs">
-              {item.quantity} פריטים
+              {item.quantity} יח'
             </Badge>
           </div>
 
