@@ -8,6 +8,7 @@ import { sql } from "drizzle-orm";
 import { protectedProcedure, adminProcedure, router } from "../_core/trpc";
 import { getTopSupplierRecommendations, getEnhancedSupplierRecommendations } from '../supplierRecommendations';
 import { getRecommendationsByCategory, createSupplierJobsForCategory } from '../supplierRecommendationsByCategory';
+import { getRecommendationsByItem, selectSupplierForItem } from '../supplierRecommendationsByItem';
 import {
   getDb,
   getSuppliers,
@@ -460,5 +461,48 @@ export const suppliersRouter = router({
         message: "ספק בוטל בהצלחה",
         quoteReverted: allUnassigned
       };
+    }),
+
+  // Get supplier recommendations for each individual item (not grouped by category)
+  recommendationsByItem: protectedProcedure
+    .input(z.object({
+      quoteItems: z.array(z.object({
+        quoteItemId: z.number(),
+        sizeQuantityId: z.number(),
+        quantity: z.number(),
+        productName: z.string().optional(),
+      })),
+    }))
+    .query(async ({ ctx, input }) => {
+      if (!ctx.user) throw new Error("Not authenticated");
+      if (ctx.user.role !== 'admin' && ctx.user.role !== 'employee') {
+        throw new Error("Only employees can view supplier recommendations");
+      }
+      return await getRecommendationsByItem(input.quoteItems);
+    }),
+
+  // Select supplier for a single item (not entire category)
+  selectForItem: protectedProcedure
+    .input(z.object({
+      quoteId: z.number(),
+      quoteItemId: z.number(),
+      supplierId: z.number(),
+      pricePerUnit: z.number(),
+      deliveryDays: z.number(),
+      markupPercentage: z.number().default(0),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.user) throw new Error("Not authenticated");
+      if (ctx.user.role !== 'admin' && ctx.user.role !== 'employee') {
+        throw new Error("Only employees can select suppliers");
+      }
+      return await selectSupplierForItem(
+        input.quoteId,
+        input.quoteItemId,
+        input.supplierId,
+        input.pricePerUnit,
+        input.deliveryDays,
+        input.markupPercentage
+      );
     }),
 });

@@ -838,14 +838,14 @@ export default function Quotes() {
                             </div>
                           )}
 
-                          {/* Step 2: Supplier Selection (Algorithm) */}
+                          {/* Step 2: Supplier Selection (Algorithm) - Per Item */}
                           {quote.status === "draft" && (
                             <div className="p-3 bg-muted/30 rounded border">
                               <div className="flex items-center gap-2 mb-3">
                                 <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded">2</span>
-                                <p className="text-sm font-medium">בחר ספק (המלצת אלגוריתם)</p>
+                                <p className="text-sm font-medium">בחר ספק לכל פריט (המלצת אלגוריתם)</p>
                               </div>
-                              <SupplierRecommendationsByCategory 
+                              <SupplierRecommendationsByItem 
                                 quoteId={quote.id}
                                 quoteItems={quoteDetails.items?.map((item: any) => ({
                                   quoteItemId: item.id,
@@ -991,9 +991,9 @@ export default function Quotes() {
                             </div>
                           )}
 
-                          {/* Recommended Suppliers by Category - For non-draft statuses */}
+                          {/* Recommended Suppliers by Item - For non-draft statuses */}
                           {quote.status !== "draft" && (
-                            <SupplierRecommendationsByCategory 
+                            <SupplierRecommendationsByItem 
                               quoteId={quote.id}
                               quoteItems={quoteDetails.items?.map((item: any) => ({
                                 quoteItemId: item.id,
@@ -2030,6 +2030,194 @@ function SupplierRecommendationsByCategory({
                     <span className="text-xs text-muted-foreground">{supplier.avgDeliveryDays} ימים</span>
                     <span className="text-xs text-muted-foreground">{supplier.reliabilityPct}% אמינות</span>
                   </div>
+                  {index === 0 && (
+                    <Badge variant="outline" className="text-[10px] px-1 py-0 mt-1 bg-green-100 text-green-700 border-green-200">
+                      מומלץ
+                    </Badge>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+
+// ==================== NEW: Supplier Recommendations by Item ====================
+// Shows supplier recommendations for each individual item (not grouped by category)
+// Includes multi-item bonus indicator
+
+interface ItemRecommendation {
+  quoteItemId: number;
+  sizeQuantityId: number;
+  productName: string;
+  categoryName: string;
+  quantity: number;
+  suppliers: {
+    supplierId: number;
+    supplierName: string;
+    supplierCompany: string | null;
+    avgRating: number;
+    pricePerUnit: number;
+    deliveryDays: number;
+    reliabilityPct: number;
+    totalScore: number;
+    rank: number;
+    canFulfillOtherItems: number;
+    multiItemBonus: number;
+  }[];
+  selectedSupplierId?: number;
+}
+
+function SupplierRecommendationsByItem({ 
+  quoteId,
+  quoteItems,
+  quoteStatus,
+  onSupplierSelected,
+  markupPercentage = 0,
+}: { 
+  quoteId: number;
+  quoteItems: { quoteItemId: number; sizeQuantityId: number; quantity: number; productName: string }[];
+  quoteStatus: string;
+  onSupplierSelected: () => void;
+  markupPercentage?: number;
+}) {
+  const isDraftMode = quoteStatus === 'draft';
+  const canCreateJobs = quoteStatus === 'approved' || quoteStatus === 'in_production';
+  const [selectedSuppliers, setSelectedSuppliers] = useState<Record<number, number>>({});
+
+  const { data: recommendations, isLoading, refetch } = trpc.suppliers.recommendationsByItem.useQuery(
+    { quoteItems },
+    { enabled: quoteItems.length > 0 }
+  );
+
+  // Mutation for selecting supplier for a single item
+  const selectSupplierMutation = trpc.suppliers.selectForItem.useMutation({
+    onSuccess: (data) => {
+      toast.success(`ספק נבחר לפריט!`);
+      onSupplierSelected();
+      refetch();
+    },
+    onError: (error) => {
+      toast.error(`שגיאה בבחירת ספק: ${error.message}`);
+    },
+  });
+
+  const handleSelectSupplier = (item: ItemRecommendation, supplier: ItemRecommendation['suppliers'][0]) => {
+    setSelectedSuppliers(prev => ({ ...prev, [item.quoteItemId]: supplier.supplierId }));
+    
+    if (isDraftMode) {
+      selectSupplierMutation.mutate({
+        quoteId,
+        quoteItemId: item.quoteItemId,
+        supplierId: supplier.supplierId,
+        pricePerUnit: supplier.pricePerUnit,
+        deliveryDays: supplier.deliveryDays,
+        markupPercentage,
+      });
+    } else if (canCreateJobs) {
+      // TODO: Create job for single item
+      toast.info('יצירת עבודה לפריט בודד - בקרוב');
+    } else {
+      toast.info('לא ניתן להעביר לספק לפני אישור הלקוח');
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="p-3 bg-background rounded border">
+        <p className="text-sm text-muted-foreground mb-2">טוען ספקים מומלצים...</p>
+        <div className="space-y-2">
+          <div className="h-16 bg-muted animate-pulse rounded" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!recommendations || recommendations.length === 0) {
+    return (
+      <div className="p-3 bg-background rounded border">
+        <p className="text-sm text-muted-foreground">לא נמצאו ספקים מומלצים למוצרים בהצעה</p>
+      </div>
+    );
+  }
+
+  const isPending = selectSupplierMutation.isPending;
+
+  return (
+    <div className="space-y-3">
+      {(recommendations as ItemRecommendation[]).map((item) => (
+        <div key={item.quoteItemId} className="p-3 bg-background rounded border">
+          {/* Item Header */}
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <p className="font-medium text-sm">{item.categoryName}</p>
+              <p className="text-xs text-muted-foreground">{item.productName}</p>
+            </div>
+            <Badge variant="outline" className="text-xs">
+              {item.quantity} פריטים
+            </Badge>
+          </div>
+
+          {/* Selected supplier indicator */}
+          {selectedSuppliers[item.quoteItemId] && item.suppliers.some(s => s.supplierId === selectedSuppliers[item.quoteItemId]) && (
+            <div className="mb-2 p-2 bg-green-50 border border-green-200 rounded flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <span className="text-sm font-medium text-green-700">
+                  ספק נבחר: {item.suppliers.find(s => s.supplierId === selectedSuppliers[item.quoteItemId])?.supplierName}
+                </span>
+              </div>
+              <span className="text-sm text-green-600">
+                ₪{item.suppliers.find(s => s.supplierId === selectedSuppliers[item.quoteItemId])?.pricePerUnit.toLocaleString()}
+              </span>
+            </div>
+          )}
+
+          {/* Suppliers for this item - show up to 5 */}
+          {item.suppliers.length === 0 ? (
+            <p className="text-xs text-muted-foreground">אין ספקים זמינים לפריט זה</p>
+          ) : (
+            <div className="flex gap-2 flex-wrap">
+              {item.suppliers.slice(0, 5).map((supplier, index) => (
+                <button
+                  key={supplier.supplierId}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSelectSupplier(item, supplier);
+                  }}
+                  disabled={isPending}
+                  className={cn(
+                    "flex-1 min-w-[120px] max-w-[180px] p-2 rounded border text-right transition-all relative",
+                    !isPending && "hover:shadow-sm cursor-pointer",
+                    isPending && selectedSuppliers[item.quoteItemId] === supplier.supplierId && "opacity-70",
+                    isPending && selectedSuppliers[item.quoteItemId] !== supplier.supplierId && "opacity-50",
+                    index === 0 
+                      ? "bg-green-50 border-green-200 hover:border-green-300"
+                      : "bg-muted/50 hover:bg-muted"
+                  )}
+                >
+                  {isPending && selectedSuppliers[item.quoteItemId] === supplier.supplierId && (
+                    <Loader2 className="h-3 w-3 animate-spin absolute top-1 left-1" />
+                  )}
+                  <p className="font-medium text-sm truncate">{supplier.supplierName}</p>
+                  <div className="flex items-center justify-between mt-1">
+                    <span className="text-xs text-muted-foreground">⭐ {supplier.avgRating.toFixed(1)}</span>
+                    <span className="text-xs font-medium">₪{supplier.pricePerUnit.toLocaleString()}</span>
+                  </div>
+                  <div className="flex items-center justify-between mt-1">
+                    <span className="text-xs text-muted-foreground">{supplier.deliveryDays} ימים</span>
+                    <span className="text-xs text-muted-foreground">{supplier.reliabilityPct}% אמינות</span>
+                  </div>
+                  {/* Multi-item bonus indicator */}
+                  {supplier.multiItemBonus > 0 && (
+                    <Badge variant="outline" className="text-[10px] px-1 py-0 mt-1 bg-blue-100 text-blue-700 border-blue-200">
+                      +{supplier.multiItemBonus}% ({supplier.canFulfillOtherItems} מוצרים נוספים)
+                    </Badge>
+                  )}
                   {index === 0 && (
                     <Badge variant="outline" className="text-[10px] px-1 py-0 mt-1 bg-green-100 text-green-700 border-green-200">
                       מומלץ
