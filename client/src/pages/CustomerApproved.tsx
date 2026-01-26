@@ -605,94 +605,66 @@ export default function CustomerApproved() {
                   </div>
                 ) : allRecommendations.length > 0 ? (
                   <>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Award className="h-4 w-4 text-amber-600" />
-                      <span>ספקים מומלצים לפי ציון כולל (מחיר, דירוג, אמינות, מהירות)</span>
-                    </div>
-                    <div className="space-y-2 max-h-[40vh] overflow-y-auto">
-                      {allRecommendations.slice(0, 5).map((rec, index) => (
-                        <div
-                          key={rec.supplierId}
-                          onClick={() => handleSelectRecommendedSupplier(rec)}
-                          className={cn(
-                            "p-3 rounded-lg border-2 cursor-pointer transition-all",
-                            selectedSupplierId === rec.supplierId.toString()
-                              ? "border-amber-500 bg-amber-50"
-                              : "border-gray-200 hover:border-amber-300 hover:bg-amber-50/50"
-                          )}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              {/* Rank Badge */}
-                              <div className={cn(
-                                "w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm",
-                                index === 0 ? "bg-amber-500 text-white" :
-                                index === 1 ? "bg-gray-400 text-white" :
-                                index === 2 ? "bg-amber-700 text-white" :
-                                "bg-gray-200 text-gray-600"
-                              )}>
-                                {rec.rank}
-                              </div>
-                              
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <span className="font-semibold">
-                                    {rec.supplierName || rec.supplierCompany || `ספק #${rec.supplierId}`}
-                                  </span>
-                                  {index === 0 && (
-                                    <Badge className="bg-amber-100 text-amber-800 text-xs">
-                                      <Sparkles className="h-3 w-3 ml-1" />
-                                      מומלץ
-                                    </Badge>
-                                  )}
-                                </div>
-                                {rec.supplierCompany && rec.supplierName && (
-                                  <span className="text-sm text-muted-foreground">{rec.supplierCompany}</span>
-                                )}
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-6">
-                              {/* Score */}
-                              <div className="text-center">
-                                <div className={cn(
-                                  "text-lg font-bold",
-                                  getScoreColor(rec.scores?.totalScore || 0)
+                    <div className="text-xs text-muted-foreground mb-2">ספקים ממוינים לפי ציון כולל</div>
+                    <div className="border rounded-lg overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-2 py-1.5 text-right font-medium text-gray-600">#</th>
+                            <th className="px-2 py-1.5 text-right font-medium text-gray-600">ספק</th>
+                            <th className="px-2 py-1.5 text-center font-medium text-gray-600">ציון</th>
+                            <th className="px-2 py-1.5 text-center font-medium text-gray-600">אמינות</th>
+                            <th className="px-2 py-1.5 text-center font-medium text-gray-600">עבודות</th>
+                            <th className="px-2 py-1.5 text-center font-medium text-gray-600">עומס</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {allRecommendations.slice(0, 5).map((rec, index) => (
+                            <tr
+                              key={rec.supplierId}
+                              onClick={() => handleSelectRecommendedSupplier(rec)}
+                              className={cn(
+                                "cursor-pointer transition-all border-b last:border-b-0",
+                                selectedSupplierId === rec.supplierId.toString()
+                                  ? "bg-amber-100"
+                                  : "hover:bg-amber-50"
+                              )}
+                            >
+                              <td className="px-2 py-2">
+                                <span className={cn(
+                                  "inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold",
+                                  index === 0 ? "bg-amber-500 text-white" :
+                                  index === 1 ? "bg-gray-400 text-white" :
+                                  index === 2 ? "bg-amber-700 text-white" :
+                                  "bg-gray-200 text-gray-600"
                                 )}>
+                                  {rec.rank}
+                                </span>
+                              </td>
+                              <td className="px-2 py-2">
+                                <div className="flex items-center gap-1">
+                                  <span className="font-medium">{rec.supplierName || rec.supplierCompany || `ספק #${rec.supplierId}`}</span>
+                                  {index === 0 && <Sparkles className="h-3 w-3 text-amber-500" />}
+                                </div>
+                              </td>
+                              <td className="px-2 py-2 text-center">
+                                <span className={cn("font-bold", getScoreColor(rec.scores?.totalScore || 0))}>
                                   {Math.round(rec.scores?.totalScore || 0)}
-                                </div>
-                                <div className="text-xs text-muted-foreground">ציון</div>
-                              </div>
-
-                              {/* Promise Keeping - Reliability */}
-                              {rec.metrics?.promiseKeeping && (
-                                <div className="text-center">
-                                  <div className="font-medium text-green-600">
-                                    {Math.round(rec.metrics.promiseKeeping.percentage)}%
-                                  </div>
-                                  <div className="text-xs text-muted-foreground">אמינות</div>
-                                </div>
-                              )}
-
-                              {/* Completed Jobs */}
-                              {rec.metrics?.completedJobs !== undefined && (
-                                <div className="text-center">
-                                  <div className="font-medium">{rec.metrics.completedJobs}</div>
-                                  <div className="text-xs text-muted-foreground">עבודות</div>
-                                </div>
-                              )}
-
-                              {/* Current Load */}
-                              {rec.metrics?.currentLoad !== undefined && (
-                                <div className="text-center">
-                                  <div className="font-medium text-blue-600">{rec.metrics.currentLoad}</div>
-                                  <div className="text-xs text-muted-foreground">עומס</div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
+                                </span>
+                              </td>
+                              <td className="px-2 py-2 text-center text-green-600">
+                                {Math.round(rec.metrics?.promiseKeeping?.percentage || 0)}%
+                              </td>
+                              <td className="px-2 py-2 text-center">
+                                {rec.metrics?.completedJobs || 0}
+                              </td>
+                              <td className="px-2 py-2 text-center text-blue-600">
+                                {rec.metrics?.currentLoad || 0}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   </>
                 ) : (
