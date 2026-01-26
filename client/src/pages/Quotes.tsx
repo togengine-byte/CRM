@@ -496,6 +496,27 @@ export default function Quotes() {
           תמחור ושליחה
         </Button>
       );
+      // כפתור שליחה ישירה ללקוח (אם כבר יש מחירים)
+      buttons.push(
+        <Button
+          key="send-to-customer"
+          size="sm"
+          variant="outline"
+          className="text-blue-600 border-blue-200 hover:bg-blue-50"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (quote.finalValue && Number(quote.finalValue) > 0) {
+              sendToCustomerMutation.mutate({ quoteId: quote.id });
+            } else {
+              toast.error("לא ניתן לשלוח הצעה ללא מחירים. אנא תמחר קודם.");
+            }
+          }}
+          disabled={sendToCustomerMutation.isPending}
+        >
+          <Send className="ml-1 h-3 w-3" />
+          שלח ללקוח
+        </Button>
+      );
     }
 
     if (quote.status === "sent") {

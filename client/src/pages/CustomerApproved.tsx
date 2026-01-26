@@ -75,13 +75,34 @@ interface Quote {
 interface SupplierRecommendation {
   supplierId: number;
   supplierName: string;
-  supplierCompany?: string;
-  totalScore: number;
+  supplierCompany?: string | null;
+  supplierNumber?: number;
   rank: number;
-  avgRating?: number;
-  reliabilityPct?: number;
-  avgDeliveryDays?: number;
-  totalPrice?: number;
+  isNewSupplier?: boolean;
+  scores: {
+    baseScore: number;
+    priceScore: number;
+    promiseKeepingScore: number;
+    courierConfirmScore: number;
+    earlyFinishScore: number;
+    categoryExpertScore: number;
+    currentLoadScore: number;
+    consistencyScore: number;
+    cancellationScore: number;
+    totalScore: number;
+  };
+  metrics: {
+    completedJobs: number;
+    supplierPrice: number;
+    marketAveragePrice: number;
+    promiseKeeping: { totalJobs: number; onTimeJobs: number; percentage: number };
+    courierConfirm: { totalReadyJobs: number; confirmedJobs: number; percentage: number };
+    earlyFinish: { avgDaysEarly: number; totalJobs: number };
+    categoryExpertise: { jobsInCategory: number; totalJobs: number; percentage: number };
+    currentLoad: number;
+    consistency: { stdDev: number; avgDays: number; isConsistent: boolean };
+    cancellations: { totalJobs: number; cancelledJobs: number; percentage: number };
+  };
 }
 
 export default function CustomerApproved() {
@@ -636,37 +657,36 @@ export default function CustomerApproved() {
                               <div className="text-center">
                                 <div className={cn(
                                   "text-lg font-bold",
-                                  getScoreColor(rec.totalScore)
+                                  getScoreColor(rec.scores?.totalScore || 0)
                                 )}>
-                                  {Math.round(rec.totalScore)}
+                                  {Math.round(rec.scores?.totalScore || 0)}
                                 </div>
                                 <div className="text-xs text-muted-foreground">ציון</div>
                               </div>
 
-                              {/* Rating */}
-                              {rec.avgRating !== undefined && (
+                              {/* Promise Keeping - Reliability */}
+                              {rec.metrics?.promiseKeeping && (
                                 <div className="text-center">
-                                  <div className="flex items-center gap-1">
-                                    <Star className="h-4 w-4 text-amber-500 fill-amber-500" />
-                                    <span className="font-medium">{rec.avgRating.toFixed(1)}</span>
+                                  <div className="font-medium text-green-600">
+                                    {Math.round(rec.metrics.promiseKeeping.percentage)}%
                                   </div>
-                                  <div className="text-xs text-muted-foreground">דירוג</div>
-                                </div>
-                              )}
-
-                              {/* Reliability */}
-                              {rec.reliabilityPct !== undefined && (
-                                <div className="text-center">
-                                  <div className="font-medium text-green-600">{rec.reliabilityPct}%</div>
                                   <div className="text-xs text-muted-foreground">אמינות</div>
                                 </div>
                               )}
 
-                              {/* Delivery */}
-                              {rec.avgDeliveryDays !== undefined && (
+                              {/* Completed Jobs */}
+                              {rec.metrics?.completedJobs !== undefined && (
                                 <div className="text-center">
-                                  <div className="font-medium">{rec.avgDeliveryDays}</div>
-                                  <div className="text-xs text-muted-foreground">ימים</div>
+                                  <div className="font-medium">{rec.metrics.completedJobs}</div>
+                                  <div className="text-xs text-muted-foreground">עבודות</div>
+                                </div>
+                              )}
+
+                              {/* Current Load */}
+                              {rec.metrics?.currentLoad !== undefined && (
+                                <div className="text-center">
+                                  <div className="font-medium text-blue-600">{rec.metrics.currentLoad}</div>
+                                  <div className="text-xs text-muted-foreground">עומס</div>
                                 </div>
                               )}
                             </div>
