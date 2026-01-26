@@ -6,6 +6,8 @@
 
 import { FileValidationResult, FileWarning } from "./types";
 import { getFileValidationSettings } from "./settings";
+import { getDb, eq, desc } from "./connection";
+import { validationProfiles } from "../../drizzle/schema";
 
 // ==================== FILE VALIDATION ====================
 

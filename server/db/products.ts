@@ -36,16 +36,8 @@ export async function getProducts(filters?: {
   const db = await getDb();
   if (!db) return [];
 
-  const products = await db.select({
-    id: baseProducts.id,
-    name: baseProducts.name,
-    description: baseProducts.description,
-    category: baseProducts.category,
-    categoryId: baseProducts.categoryId,
-    isActive: baseProducts.isActive,
-    createdAt: baseProducts.createdAt,
-    updatedAt: baseProducts.updatedAt,
-  })
+  // Note: base_products uses camelCase column names in DB
+  const products = await db.select()
   .from(baseProducts)
   .orderBy(baseProducts.categoryId, baseProducts.name)
   .limit(filters?.limit || 200);

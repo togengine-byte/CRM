@@ -41,7 +41,7 @@ export const categories = pgTable("categories", {
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
-// Base products table
+// Base products table - column names match actual DB columns
 export const baseProducts = pgTable("base_products", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
