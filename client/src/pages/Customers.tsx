@@ -514,8 +514,10 @@ export default function Customers() {
                                     <SelectValue placeholder="בחר מחירון" />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="system-default">ברירת מחדל מערכת</SelectItem>
-                                    {pricelists?.map((pricelist: any) => (
+                                    <SelectItem value="system-default">
+                                      ברירת מחדל ({pricelists?.find((p: any) => p.isDefault)?.name || "מחירון בסיסי"} - {pricelists?.find((p: any) => p.isDefault)?.markupPercentage || 30}%)
+                                    </SelectItem>
+                                    {pricelists?.filter((p: any) => !p.isDefault).map((pricelist: any) => (
                                       <SelectItem key={pricelist.id} value={pricelist.id.toString()}>
                                         {pricelist.name} ({pricelist.markupPercentage}%)
                                       </SelectItem>
