@@ -161,6 +161,8 @@ export const quotes = pgTable("quotes", {
   totalSupplierCost: decimal("totalSupplierCost", { precision: 12, scale: 2 }),
   rejectionReason: text("rejectionReason"),
   dealRating: integer("dealRating"),
+  // האם להעביר אוטומטית לייצור לאחר אישור הלקוח
+  autoProduction: boolean("autoProduction").default(false),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });

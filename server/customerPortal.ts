@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { protectedProcedure, router } from "./_core/trpc";
 import { getDb } from "./db";
-import { quotes, quoteItems, quoteAttachments, sizeQuantities, productSizes, baseProducts, activityLog } from "../drizzle/schema";
+import { quotes, quoteItems, quoteAttachments, sizeQuantities, productSizes, baseProducts, activityLog, supplierJobs } from "../drizzle/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 
 /**
@@ -207,26 +207,92 @@ export const customerPortalRouter = router({
         throw new Error("Only quotes with 'sent' status can be approved");
       }
 
-      // Update quote status
-      await db
-        .update(quotes)
-        .set({ 
-          status: "approved",
-          updatedAt: new Date(),
+      // Get quote items to check if suppliers are assigned
+      const items = await db
+        .select({
+          id: quoteItems.id,
+          sizeQuantityId: quoteItems.sizeQuantityId,
+          quantity: quoteItems.quantity,
+          supplierId: quoteItems.supplierId,
+          supplierCost: quoteItems.supplierCost,
+          deliveryDays: quoteItems.deliveryDays,
         })
-        .where(eq(quotes.id, input.quoteId));
+        .from(quoteItems)
+        .where(eq(quoteItems.quoteId, input.quoteId));
 
-      // Log activity
-      await db.insert(activityLog).values({
-        userId: ctx.user.id,
-        actionType: "quote_approved",
-        entityType: "quote",
-        entityId: input.quoteId,
-        details: { approvedBy: "customer", customerId: ctx.user.id },
-        createdAt: new Date(),
-      });
+      // Check if all items have suppliers assigned AND autoProduction is enabled
+      const allItemsHaveSuppliers = items.every(item => item.supplierId !== null);
+      const shouldAutoProduction = quote.autoProduction && allItemsHaveSuppliers;
 
-      return { success: true };
+      if (shouldAutoProduction) {
+        // All items have suppliers - move to in_production and create supplier jobs
+        await db
+          .update(quotes)
+          .set({ 
+            status: "in_production",
+            updatedAt: new Date(),
+          })
+          .where(eq(quotes.id, input.quoteId));
+
+        // Create supplier jobs for each item
+        for (const item of items) {
+          if (item.supplierId) {
+            await db.insert(supplierJobs).values({
+              quoteId: input.quoteId,
+              quoteItemId: item.id,
+              supplierId: item.supplierId,
+              sizeQuantityId: item.sizeQuantityId,
+              quantity: item.quantity,
+              pricePerUnit: item.supplierCost?.toString() || "0",
+              promisedDeliveryDays: item.deliveryDays || 3,
+              status: "pending",
+            });
+          }
+        }
+
+        // Log activity
+        await db.insert(activityLog).values({
+          userId: ctx.user.id,
+          actionType: "quote_approved_auto_production",
+          entityType: "quote",
+          entityId: input.quoteId,
+          details: { 
+            approvedBy: "customer", 
+            customerId: ctx.user.id,
+            autoMovedToProduction: true,
+            supplierJobsCreated: items.length,
+          },
+          createdAt: new Date(),
+        });
+
+        return { success: true, status: "in_production", autoProduction: true };
+      } else {
+        // Some items don't have suppliers - mark as approved (pending supplier selection)
+        await db
+          .update(quotes)
+          .set({ 
+            status: "approved",
+            updatedAt: new Date(),
+          })
+          .where(eq(quotes.id, input.quoteId));
+
+        // Log activity
+        await db.insert(activityLog).values({
+          userId: ctx.user.id,
+          actionType: "quote_approved_pending_supplier",
+          entityType: "quote",
+          entityId: input.quoteId,
+          details: { 
+            approvedBy: "customer", 
+            customerId: ctx.user.id,
+            pendingSupplierSelection: true,
+            itemsWithoutSupplier: items.filter(i => !i.supplierId).length,
+          },
+          createdAt: new Date(),
+        });
+
+        return { success: true, status: "approved", pendingSupplierSelection: true };
+      }
     }),
 
   // ==================== REJECT QUOTE ====================

@@ -20,6 +20,8 @@ import CustomerPortal from "./pages/CustomerPortal";
 import CourierPortal from "./pages/CourierPortal";
 import CustomerSignup from "./pages/CustomerSignup";
 import AdminSetup from "./pages/AdminSetup";
+import CustomerApproved from "./pages/CustomerApproved";
+import CustomerPortalPreview from "./pages/CustomerPortalPreview";
 
 /**
  * Router Component
@@ -85,6 +87,15 @@ function Router() {
         </ProtectedRoute>
       </Route>
       
+      {/* Customer Approved - הצעות שאושרו על ידי הלקוח - זמין לאדמין ועובדים */}
+      <Route path="/customer-approved">
+        <ProtectedRoute requiredRole={['admin', 'employee']}>
+          <DashboardLayout>
+            <CustomerApproved />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
+      
       {/* Jobs - עבודות בביצוע - זמין לאדמין ועובדים */}
       <Route path="/jobs">
         <ProtectedRoute requiredRole={['admin', 'employee']}>
@@ -117,6 +128,15 @@ function Router() {
         <ProtectedRoute requiredRole="admin">
           <DashboardLayout>
             <Settings />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
+      
+      {/* Customer Portal Preview - תצוגה מקדימה של פורטל לקוחות - זמין לאדמין בלבד */}
+      <Route path="/customer-portal-preview">
+        <ProtectedRoute requiredRole="admin">
+          <DashboardLayout>
+            <CustomerPortalPreview />
           </DashboardLayout>
         </ProtectedRoute>
       </Route>

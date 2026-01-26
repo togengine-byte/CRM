@@ -1911,6 +1911,32 @@ export default function Settings() {
                     </Button>
                   </CardContent>
                 </Card>
+                {/* תצוגה מקדימה פורטל לקוחות */}
+                <Card className="border-2 hover:border-blue-300 transition-colors border-dashed">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-blue-100 rounded-lg">
+                        <Eye className="h-6 w-6 text-blue-600" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg">תצוגה מקדימה - לקוחות</CardTitle>
+                        <CardDescription>ראה מה הלקוח רואה</CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      צפה בפורטל הלקוחות מנקודת המבט של המנהל. בחר לקוח וראה את ההצעות שלו.
+                    </p>
+                    <Button 
+                      className="w-full bg-blue-600 hover:bg-blue-700" 
+                      onClick={() => setLocation('/customer-portal-preview')}
+                    >
+                      <Eye className="ml-2 h-4 w-4" />
+                      צפה כמנהל
+                    </Button>
+                  </CardContent>
+                </Card>
               </div>
 
               <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">

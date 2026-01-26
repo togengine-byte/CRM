@@ -39,6 +39,7 @@ export async function getQuotes(filters?: {
     finalValue: quotes.finalValue,
     rejectionReason: quotes.rejectionReason,
     dealRating: quotes.dealRating,
+    autoProduction: quotes.autoProduction,
     createdAt: quotes.createdAt,
     updatedAt: quotes.updatedAt,
     customerName: users.name,
@@ -77,6 +78,7 @@ export async function getQuoteById(quoteId: number) {
     finalValue: quotes.finalValue,
     rejectionReason: quotes.rejectionReason,
     dealRating: quotes.dealRating,
+    autoProduction: quotes.autoProduction,
     createdAt: quotes.createdAt,
     updatedAt: quotes.updatedAt,
   })

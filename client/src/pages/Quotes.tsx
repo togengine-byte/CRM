@@ -53,7 +53,9 @@ import {
   Loader2,
   Save,
   RotateCcw,
+  Zap,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
 type QuoteStatus = "draft" | "sent" | "approved" | "rejected" | "superseded" | "in_production" | "ready";
@@ -220,6 +222,21 @@ export default function Quotes() {
     },
     onError: (error) => {
       toast.error(`שגיאה בביטול הספק: ${error.message}`);
+    },
+  });
+
+  // Auto production toggle mutation
+  const setAutoProductionMutation = trpc.quotes.setAutoProduction.useMutation({
+    onSuccess: (data) => {
+      toast.success(data.autoProduction 
+        ? "העברה אוטומטית לייצור הופעלה" 
+        : "העברה אוטומטית לייצור כבויה"
+      );
+      refetch();
+      utils.quotes.getById.refetch();
+    },
+    onError: (error) => {
+      toast.error(`שגיאה בעדכון הגדרה: ${error.message}`);
     },
   });
 
@@ -766,6 +783,29 @@ export default function Quotes() {
                             })) || []}
                             onSupplierSelected={() => refetch()}
                           />
+
+                          {/* Auto Production Toggle - Show only for draft/sent status */}
+                          {(quote.status === "draft" || quote.status === "sent") && (
+                            <div className="flex items-center justify-between p-3 bg-amber-50 rounded border border-amber-200">
+                              <div className="flex items-center gap-2">
+                                <Zap className="h-4 w-4 text-amber-600" />
+                                <div>
+                                  <p className="text-sm font-medium text-amber-800">העבר לייצור אוטומטית לאחר אישור לקוח</p>
+                                  <p className="text-xs text-amber-600">אם מופעל ויש ספק מוקצה, ההצעה תעבור ישירות לספק אחרי אישור הלקוח</p>
+                                </div>
+                              </div>
+                              <Switch
+                                checked={quote.autoProduction || false}
+                                onCheckedChange={(checked) => {
+                                  setAutoProductionMutation.mutate({
+                                    quoteId: quote.id,
+                                    autoProduction: checked,
+                                  });
+                                }}
+                                disabled={setAutoProductionMutation.isPending}
+                              />
+                            </div>
+                          )}
 
                           {/* Action Buttons */}
                           <div className="flex flex-wrap gap-2 pt-3 border-t">

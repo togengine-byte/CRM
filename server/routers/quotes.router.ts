@@ -194,4 +194,28 @@ export const quotesRouter = router({
       
       return { success: true };
     }),
+
+  // Toggle auto production setting for a quote
+  setAutoProduction: protectedProcedure
+    .input(z.object({
+      quoteId: z.number(),
+      autoProduction: z.boolean(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.user) throw new Error("Not authenticated");
+      if (ctx.user.role !== 'admin' && ctx.user.role !== 'employee') {
+        throw new Error("Only employees can update auto production setting");
+      }
+      
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+      
+      await db.execute(sql`
+        UPDATE quotes 
+        SET "autoProduction" = ${input.autoProduction}, "updatedAt" = NOW() 
+        WHERE id = ${input.quoteId}
+      `);
+      
+      return { success: true, autoProduction: input.autoProduction };
+    }),
 });
