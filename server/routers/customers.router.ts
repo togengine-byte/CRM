@@ -81,7 +81,7 @@ export const customersRouter = router({
       phone: z.string().optional(),
       companyName: z.string().optional(),
       address: z.string().optional(),
-      billingEmail: z.string().email().optional(),
+      billingEmail: z.string().email().optional().or(z.literal('')),
       status: z.enum(['pending_approval', 'active', 'rejected', 'deactivated']).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
