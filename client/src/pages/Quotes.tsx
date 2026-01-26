@@ -814,7 +814,6 @@ export default function Quotes() {
                                     onValueChange={(value) => {
                                       const id = parseInt(value);
                                       setSelectedPricelistId(id);
-                                      setPricingQuoteId(quote.id);
                                       changePricelistMutation.mutate({ quoteId: quote.id, pricelistId: id });
                                     }}
                                   >
