@@ -45,6 +45,7 @@ export const quotesRouter = router({
 
   request: protectedProcedure
     .input(z.object({
+      customerId: z.number().optional(), // Admin/Employee can specify customer
       items: z.array(z.object({
         sizeQuantityId: z.number(),
         quantity: z.number(),
@@ -57,8 +58,15 @@ export const quotesRouter = router({
       if (ctx.user.role !== 'customer' && ctx.user.role !== 'admin' && ctx.user.role !== 'employee') {
         throw new Error("Only customers can request quotes. Suppliers and couriers are not authorized.");
       }
+      
+      // Admin/Employee can create quote for a specific customer
+      let customerId = ctx.user.id;
+      if ((ctx.user.role === 'admin' || ctx.user.role === 'employee') && input.customerId) {
+        customerId = input.customerId;
+      }
+      
       return await createQuoteRequest({
-        customerId: ctx.user.id,
+        customerId,
         items: input.items || [],
       });
     }),

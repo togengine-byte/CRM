@@ -54,6 +54,7 @@ import {
   Save,
   RotateCcw,
   Zap,
+  Users,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
@@ -92,6 +93,7 @@ export default function Quotes() {
   const [createForm, setCreateForm] = useState({
     notes: "",
     items: [] as QuoteItem[],
+    customerId: null as number | null,
   });
   const [selectedSizeQuantityId, setSelectedSizeQuantityId] = useState<string>("");
   const [itemQuantity, setItemQuantity] = useState<number>(1);
@@ -114,13 +116,16 @@ export default function Quotes() {
   );
 
   const { data: products } = trpc.products.list.useQuery({});
+  
+  // Get customers list for selection
+  const { data: customers } = trpc.customers.list.useQuery({});
 
   const createMutation = trpc.quotes.request.useMutation({
     onSuccess: () => {
-      toast.success("בקשת הצעת מחיר נשלחה בהצלחה");
+      toast.success("הצעת מחיר נוצרה בהצלחה");
       refetch();
       setIsCreateDialogOpen(false);
-      setCreateForm({ notes: "", items: [] });
+      setCreateForm({ notes: "", items: [], customerId: null });
     },
     onError: (error) => {
       toast.error(`שגיאה ביצירת הצעת מחיר: ${error.message}`);
@@ -335,7 +340,12 @@ export default function Quotes() {
       toast.error("יש להוסיף לפחות פריט אחד");
       return;
     }
+    if (!createForm.customerId) {
+      toast.error("יש לבחור לקוח");
+      return;
+    }
     createMutation.mutate({
+      customerId: createForm.customerId,
       items: createForm.items,
     });
   };
@@ -963,6 +973,29 @@ export default function Quotes() {
             <DialogDescription>הוסף פריטים ליצירת הצעת מחיר</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
+            {/* Customer Selection */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                לקוח
+              </Label>
+              <Select 
+                value={createForm.customerId?.toString() || ""} 
+                onValueChange={(value) => setCreateForm({ ...createForm, customerId: parseInt(value) })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="בחר לקוח" />
+                </SelectTrigger>
+                <SelectContent>
+                  {customers?.filter((c: any) => c.status === 'active').map((customer: any) => (
+                    <SelectItem key={customer.id} value={customer.id.toString()}>
+                      {customer.name} {customer.companyName ? `(${customer.companyName})` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Add Item Section */}
             <div className="space-y-4 p-4 border rounded-lg">
               <h4 className="font-medium">הוסף פריט</h4>
