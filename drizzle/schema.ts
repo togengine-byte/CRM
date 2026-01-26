@@ -24,6 +24,7 @@ export const users = pgTable("users", {
   supplierNumber: integer("supplierNumber"),
   totalRatingPoints: integer("totalRatingPoints").default(0),
   ratedDealsCount: integer("ratedDealsCount").default(0),
+  pricelistId: integer("pricelistId"), // Default pricelist for this customer
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),

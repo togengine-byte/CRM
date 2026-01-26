@@ -198,6 +198,22 @@ export async function getCustomerDefaultPricelist(customerId: number) {
   const db = await getDb();
   if (!db) return null;
 
+  // First check if customer has pricelistId set directly on user record
+  const [customer] = await db.select({
+    pricelistId: users.pricelistId,
+  })
+    .from(users)
+    .where(eq(users.id, customerId))
+    .limit(1);
+
+  if (customer?.pricelistId) {
+    const pricelist = await getPricelistById(customer.pricelistId);
+    if (pricelist && pricelist.isActive) {
+      return pricelist;
+    }
+  }
+
+  // Fallback to customerPricelists table (legacy)
   const [customerPricelist] = await db.select({
     pricelist: pricelists,
   })
@@ -213,6 +229,7 @@ export async function getCustomerDefaultPricelist(customerId: number) {
     return customerPricelist.pricelist;
   }
 
+  // Fallback to system default pricelist
   const [defaultPricelist] = await db.select()
     .from(pricelists)
     .where(and(
@@ -298,6 +315,11 @@ export async function recalculateQuoteTotals(quoteId: number) {
     const supplierCost = parseFloat(item.supplierCost?.toString() || '0');
     const customerPrice = parseFloat(item.priceAtTimeOfQuote?.toString() || '0');
     
+    // Note: priceAtTimeOfQuote and supplierCost are already the total price for the item
+    // (price per sizeQuantity package, not per unit), so we don't multiply by quantity
+    // The quantity field represents how many of these packages were ordered
+    // For most cases quantity=1 (one package), but if customer orders multiple packages
+    // then we need to multiply
     totalSupplierCost += supplierCost * item.quantity;
     totalCustomerPrice += customerPrice * item.quantity;
   }
@@ -338,14 +360,15 @@ export async function changeQuotePricelist(quoteId: number, pricelistId: number)
 
   const markupPercentage = parseFloat(pricelist.markupPercentage?.toString() || '0');
 
-  const items = await db.select()
+  // Update prices for non-manual items
+  const nonManualItems = await db.select()
     .from(quoteItems)
     .where(and(
       eq(quoteItems.quoteId, quoteId),
       eq(quoteItems.isManualPrice, false)
     ));
 
-  for (const item of items) {
+  for (const item of nonManualItems) {
     const supplierCost = parseFloat(item.supplierCost?.toString() || '0');
     const newPrice = calculateCustomerPrice(supplierCost, markupPercentage);
 
@@ -361,7 +384,65 @@ export async function changeQuotePricelist(quoteId: number, pricelistId: number)
     })
     .where(eq(quotes.id, quoteId));
 
-  const totals = await recalculateQuoteTotals(quoteId);
+  // Get all items with full details (same as autoPopulate)
+  const itemsWithDetails = await db.select({
+    itemId: quoteItems.id,
+    sizeQuantityId: quoteItems.sizeQuantityId,
+    quantity: quoteItems.quantity,
+    priceAtTimeOfQuote: quoteItems.priceAtTimeOfQuote,
+    supplierCost: quoteItems.supplierCost,
+    supplierId: quoteItems.supplierId,
+    isManualPrice: quoteItems.isManualPrice,
+    deliveryDays: quoteItems.deliveryDays,
+    productName: baseProducts.name,
+    sizeName: productSizes.name,
+    sizeQuantity: sizeQuantities.quantity,
+    supplierName: users.name,
+  })
+    .from(quoteItems)
+    .leftJoin(sizeQuantities, eq(quoteItems.sizeQuantityId, sizeQuantities.id))
+    .leftJoin(productSizes, eq(sizeQuantities.sizeId, productSizes.id))
+    .leftJoin(baseProducts, eq(productSizes.productId, baseProducts.id))
+    .leftJoin(users, eq(quoteItems.supplierId, users.id))
+    .where(eq(quoteItems.quoteId, quoteId));
+
+  let totalSupplierCost = 0;
+  let totalCustomerPrice = 0;
+  const processedItems = [];
+
+  for (const item of itemsWithDetails) {
+    const supplierCost = parseFloat(item.supplierCost?.toString() || '0');
+    const customerPrice = parseFloat(item.priceAtTimeOfQuote?.toString() || '0');
+    
+    totalSupplierCost += supplierCost * item.quantity;
+    totalCustomerPrice += customerPrice * item.quantity;
+    
+    processedItems.push({
+      itemId: item.itemId,
+      sizeQuantityId: item.sizeQuantityId,
+      quantity: item.quantity,
+      productName: item.productName || `פריט #${item.sizeQuantityId}`,
+      sizeName: item.sizeName ? `${item.sizeName} (${item.sizeQuantity} יח')` : '',
+      supplierId: item.supplierId,
+      supplierName: item.supplierName || 'לא נבחר',
+      supplierCost: supplierCost,
+      customerPrice: customerPrice,
+      isManualPrice: item.isManualPrice || false,
+      deliveryDays: item.deliveryDays,
+    });
+  }
+
+  // Update quote totals
+  await db.update(quotes)
+    .set({
+      totalSupplierCost: totalSupplierCost.toString(),
+      finalValue: totalCustomerPrice.toString(),
+    })
+    .where(eq(quotes.id, quoteId));
+
+  const profitPercentage = totalSupplierCost > 0 
+    ? Math.round(((totalCustomerPrice - totalSupplierCost) / totalSupplierCost) * 100) 
+    : 0;
 
   await logActivity(null, "quote_pricelist_changed", { 
     quoteId, 
@@ -377,7 +458,13 @@ export async function changeQuotePricelist(quoteId: number, pricelistId: number)
       name: pricelist.name,
       markupPercentage,
     },
-    totals,
+    items: processedItems,
+    totals: {
+      supplierCost: totalSupplierCost,
+      customerPrice: totalCustomerPrice,
+      profit: totalCustomerPrice - totalSupplierCost,
+      profitPercentage,
+    },
   };
 }
 

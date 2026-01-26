@@ -224,6 +224,22 @@ export async function removePricelistFromCustomer(customerId: number, pricelistI
   return { success: true };
 }
 
+/**
+ * Set customer's default pricelist (stored in users.pricelistId)
+ */
+export async function setCustomerDefaultPricelist(customerId: number, pricelistId: number | null) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(users)
+    .set({ pricelistId })
+    .where(eq(users.id, customerId));
+
+  await logActivity(null, "customer_pricelist_updated", { customerId, pricelistId });
+
+  return { success: true };
+}
+
 // ==================== CUSTOMER STATISTICS ====================
 
 /**

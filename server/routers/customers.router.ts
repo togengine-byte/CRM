@@ -15,6 +15,7 @@ import {
   getCustomerPricelists,
   assignPricelistToCustomer,
   removePricelistFromCustomer,
+  setCustomerDefaultPricelist,
   getCustomerStats,
 } from "../db";
 
@@ -117,6 +118,15 @@ export const customersRouter = router({
     }))
     .mutation(async ({ input }) => {
       return await removePricelistFromCustomer(input.customerId, input.pricelistId);
+    }),
+
+  setDefaultPricelist: adminProcedure
+    .input(z.object({
+      customerId: z.number(),
+      pricelistId: z.number().nullable(),
+    }))
+    .mutation(async ({ input }) => {
+      return await setCustomerDefaultPricelist(input.customerId, input.pricelistId);
     }),
 
   createWithQuote: publicProcedure

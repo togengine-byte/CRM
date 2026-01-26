@@ -69,6 +69,7 @@ export {
   getCustomerPricelists,
   assignPricelistToCustomer,
   removePricelistFromCustomer,
+  setCustomerDefaultPricelist,
   getCustomerStats,
   createCustomerSignupRequest,
   getCustomerSignupRequests,
