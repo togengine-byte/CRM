@@ -828,6 +828,41 @@ export default function Quotes() {
                             </div>
                           )}
 
+                          {/* Send to Customer Button - Prominent */}
+                          {quote.status === "draft" && (
+                            <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200">
+                              <div className="flex items-center gap-2">
+                                <Send className="h-4 w-4 text-blue-600" />
+                                <div>
+                                  <p className="text-sm font-medium text-blue-800">שלח הצעה ללקוח</p>
+                                  <p className="text-xs text-blue-600">הלקוח יקבל את ההצעה לאישור</p>
+                                </div>
+                              </div>
+                              <Button
+                                size="sm"
+                                className="bg-blue-600 hover:bg-blue-700"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (quote.finalValue && Number(quote.finalValue) > 0) {
+                                    sendToCustomerMutation.mutate({ quoteId: quote.id });
+                                  } else {
+                                    toast.error("לא ניתן לשלוח הצעה ללא מחירים. אנא תמחר קודם.");
+                                  }
+                                }}
+                                disabled={sendToCustomerMutation.isPending || !quote.finalValue || Number(quote.finalValue) <= 0}
+                              >
+                                {sendToCustomerMutation.isPending ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <>
+                                    <Send className="h-4 w-4 ml-1" />
+                                    שלח ללקוח
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          )}
+
                           {/* Action Buttons */}
                           <div className="flex flex-wrap gap-2 pt-3 border-t">
                             {getActionButtons(quote)}
