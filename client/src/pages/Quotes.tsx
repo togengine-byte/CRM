@@ -779,13 +779,15 @@ export default function Quotes() {
                             </div>
                           </div>
 
-                          {/* Pricing Section - Inline */}
+                          {/* Step 1: Pricelist Selection */}
                           {quote.status === "draft" && (
-                            <div className="space-y-4">
+                            <div className="p-3 bg-muted/30 rounded border">
                               <div className="flex items-center justify-between">
-                                <p className="text-sm font-medium">תמחור</p>
                                 <div className="flex items-center gap-2">
-                                  <Label className="text-sm text-muted-foreground">מחירון:</Label>
+                                  <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded">1</span>
+                                  <p className="text-sm font-medium">בחר מחירון</p>
+                                </div>
+                                <div className="flex items-center gap-2">
                                   <Select
                                     value={pricingQuoteId === quote.id ? (selectedPricelistId?.toString() || '') : ''}
                                     onValueChange={(value) => {
@@ -816,10 +818,39 @@ export default function Quotes() {
                             </div>
                           )}
 
-                          {/* Items with Pricing */}
+                          {/* Step 2: Supplier Selection (Algorithm) */}
+                          {quote.status === "draft" && (
+                            <div className="p-3 bg-muted/30 rounded border">
+                              <div className="flex items-center gap-2 mb-3">
+                                <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded">2</span>
+                                <p className="text-sm font-medium">בחר ספק (המלצת אלגוריתם)</p>
+                              </div>
+                              <SupplierRecommendationsByCategory 
+                                quoteId={quote.id}
+                                quoteItems={quoteDetails.items?.map((item: any) => ({
+                                  quoteItemId: item.id,
+                                  sizeQuantityId: item.sizeQuantityId,
+                                  quantity: item.quantity,
+                                  productName: item.productName || getSizeQuantityName(item.sizeQuantityId),
+                                })) || []}
+                                quoteStatus="approved"
+                                onSupplierSelected={() => refetch()}
+                              />
+                            </div>
+                          )}
+
+                          {/* Step 3: Items with Manual Price Editing */}
                           {quoteDetails.items && quoteDetails.items.length > 0 && (
-                            <div>
-                              <p className="text-sm text-muted-foreground mb-2">פריטים ({quoteDetails.items.length})</p>
+                            <div className={quote.status === "draft" ? "p-3 bg-muted/30 rounded border" : ""}>
+                              {quote.status === "draft" && (
+                                <div className="flex items-center gap-2 mb-3">
+                                  <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded">3</span>
+                                  <p className="text-sm font-medium">עריכת מחירים (אופציונלי)</p>
+                                </div>
+                              )}
+                              {quote.status !== "draft" && (
+                                <p className="text-sm text-muted-foreground mb-2">פריטים ({quoteDetails.items.length})</p>
+                              )}
                               <div className="space-y-2">
                                 {quoteDetails.items.map((item: any, index: number) => {
                                   const fullName = item.productName || getSizeQuantityName(item.sizeQuantityId);
@@ -930,21 +961,23 @@ export default function Quotes() {
                             </div>
                           )}
 
-                          {/* Recommended Suppliers by Category */}
-                          <SupplierRecommendationsByCategory 
-                            quoteId={quote.id}
-                            quoteItems={quoteDetails.items?.map((item: any) => ({
-                              quoteItemId: item.id,
-                              sizeQuantityId: item.sizeQuantityId,
-                              quantity: item.quantity,
-                              productName: item.productName || getSizeQuantityName(item.sizeQuantityId),
-                            })) || []}
-                            quoteStatus={quote.status}
-                            onSupplierSelected={() => refetch()}
-                          />
+                          {/* Recommended Suppliers by Category - For non-draft statuses */}
+                          {quote.status !== "draft" && (
+                            <SupplierRecommendationsByCategory 
+                              quoteId={quote.id}
+                              quoteItems={quoteDetails.items?.map((item: any) => ({
+                                quoteItemId: item.id,
+                                sizeQuantityId: item.sizeQuantityId,
+                                quantity: item.quantity,
+                                productName: item.productName || getSizeQuantityName(item.sizeQuantityId),
+                              })) || []}
+                              quoteStatus={quote.status}
+                              onSupplierSelected={() => refetch()}
+                            />
+                          )}
                           
-                          {/* Show message if suppliers cannot be assigned yet */}
-                          {(quote.status === 'draft' || quote.status === 'sent') && (
+                          {/* Show message if suppliers cannot be assigned yet - only for sent status */}
+                          {quote.status === 'sent' && (
                             <p className="text-xs text-muted-foreground mt-2">
                               * ניתן להעביר לספק רק לאחר אישור הלקוח
                             </p>
