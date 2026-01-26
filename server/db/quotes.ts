@@ -37,6 +37,7 @@ export async function getQuotes(filters?: {
     version: quotes.version,
     parentQuoteId: quotes.parentQuoteId,
     finalValue: quotes.finalValue,
+    totalSupplierCost: quotes.totalSupplierCost,
     rejectionReason: quotes.rejectionReason,
     dealRating: quotes.dealRating,
     autoProduction: quotes.autoProduction,
@@ -97,8 +98,11 @@ export async function getQuoteById(quoteId: number) {
     supplierId: quoteItems.supplierId,
     supplierCost: quoteItems.supplierCost,
     deliveryDays: quoteItems.deliveryDays,
+    supplierName: users.name,
+    supplierCompany: users.companyName,
   })
   .from(quoteItems)
+  .leftJoin(users, eq(quoteItems.supplierId, users.id))
   .where(eq(quoteItems.quoteId, quoteId));
 
   const attachments = await db.select()

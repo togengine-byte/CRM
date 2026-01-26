@@ -21,6 +21,8 @@ import CourierPortal from "./pages/CourierPortal";
 import CustomerSignup from "./pages/CustomerSignup";
 import AdminSetup from "./pages/AdminSetup";
 import CustomerApproved from "./pages/CustomerApproved";
+import PendingApproval from "./pages/PendingApproval";
+import ReadyForPickup from "./pages/ReadyForPickup";
 import CustomerPortalPreview from "./pages/CustomerPortalPreview";
 
 /**
@@ -87,6 +89,15 @@ function Router() {
         </ProtectedRoute>
       </Route>
       
+      {/* Pending Approval - הצעות שנשלחו ללקוח וממתינות לאישור - זמין לאדמין ועובדים */}
+      <Route path="/pending-approval">
+        <ProtectedRoute requiredRole={['admin', 'employee']}>
+          <DashboardLayout>
+            <PendingApproval />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
+      
       {/* Customer Approved - הצעות שאושרו על ידי הלקוח - זמין לאדמין ועובדים */}
       <Route path="/customer-approved">
         <ProtectedRoute requiredRole={['admin', 'employee']}>
@@ -101,6 +112,24 @@ function Router() {
         <ProtectedRoute requiredRole={['admin', 'employee']}>
           <DashboardLayout>
             <Jobs />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
+      
+      {/* Ready for Pickup - הזמנות מוכנות לאיסוף - זמין לאדמין ועובדים */}
+      <Route path="/ready-for-pickup">
+        <ProtectedRoute requiredRole={['admin', 'employee']}>
+          <DashboardLayout>
+            <ReadyForPickup />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
+      
+      {/* Customers - ניהול לקוחות - זמין לאדמין ועובדים */}
+      <Route path="/customers">
+        <ProtectedRoute requiredRole={['admin', 'employee']}>
+          <DashboardLayout>
+            <Customers />
           </DashboardLayout>
         </ProtectedRoute>
       </Route>

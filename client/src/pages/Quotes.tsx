@@ -844,6 +844,7 @@ export default function Quotes() {
                                 quoteStatus={quote.status}
                                 onSupplierSelected={() => {
                                   refetch();
+                                  utils.quotes.list.refetch();
                                   utils.quotes.getById.refetch();
                                 }}
                                 markupPercentage={pricingData?.pricelist?.markupPercentage || selectedPricelistId ? parseFloat(pricelists?.find((pl: any) => pl.id === selectedPricelistId)?.markupPercentage || '0') : 0}
@@ -886,6 +887,11 @@ export default function Quotes() {
                                           <span className="text-xs text-muted-foreground">
                                             (עלות ספק: ₪{Number(item.supplierCost).toLocaleString()})
                                           </span>
+                                        )}
+                                        {(item.supplierName || item.supplierCompany) && (
+                                          <Badge variant="outline" className="text-xs bg-blue-50 border-blue-200">
+                                            {item.supplierCompany || item.supplierName}
+                                          </Badge>
                                         )}
                                       </div>
                                       <div className="flex items-center gap-2">
@@ -1867,7 +1873,7 @@ function SupplierRecommendationsByCategory({
 }) {
   // In draft mode, clicking supplier just updates prices (no job creation)
   // After approval, clicking supplier creates jobs
-  const isDraftMode = quoteStatus === 'draft' || quoteStatus === 'sent';
+  const isDraftMode = quoteStatus === 'draft';
   const canCreateJobs = quoteStatus === 'approved' || quoteStatus === 'in_production';
   const [selectedSupplier, setSelectedSupplier] = useState<number | null>(null);
 
@@ -1901,8 +1907,9 @@ function SupplierRecommendationsByCategory({
   const handleSelectSupplier = (category: CategoryRecommendation, supplier: CategoryRecommendation['suppliers'][0]) => {
     setSelectedSupplier(supplier.supplierId);
     
+    // Draft mode - just update prices, no job creation
     if (isDraftMode) {
-      // Draft mode - just update prices, no job creation
+      console.log('[Draft Mode] Selecting supplier for pricing:', { quoteId, supplierId: supplier.supplierId, markupPercentage });
       selectSupplierMutation.mutate({
         quoteId,
         supplierId: supplier.supplierId,
@@ -1911,11 +1918,15 @@ function SupplierRecommendationsByCategory({
       });
     } else if (canCreateJobs) {
       // After approval - create supplier jobs
+      console.log('[Production Mode] Assigning supplier to category:', { quoteId, supplierId: supplier.supplierId });
       assignMutation.mutate({
         quoteId,
         supplierId: supplier.supplierId,
         items: supplier.canFulfill,
       });
+    } else {
+      // For sent status - show message that we can't assign yet
+      toast.info('לא ניתן להעביר לספק לפני אישור הלקוח');
     }
   };
 
@@ -1956,6 +1967,21 @@ function SupplierRecommendationsByCategory({
               {category.items.length} פריטים
             </Badge>
           </div>
+
+          {/* Selected supplier indicator */}
+          {selectedSupplier && category.suppliers.some(s => s.supplierId === selectedSupplier) && (
+            <div className="mb-2 p-2 bg-green-50 border border-green-200 rounded flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <span className="text-sm font-medium text-green-700">
+                  ספק נבחר: {category.suppliers.find(s => s.supplierId === selectedSupplier)?.supplierName}
+                </span>
+              </div>
+              <span className="text-sm text-green-600">
+                ₪{category.suppliers.find(s => s.supplierId === selectedSupplier)?.totalPrice.toLocaleString()}
+              </span>
+            </div>
+          )}
 
           {/* Suppliers for this category - show up to 5 */}
           {category.suppliers.length === 0 ? (
