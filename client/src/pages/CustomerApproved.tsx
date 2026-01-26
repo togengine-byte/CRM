@@ -39,6 +39,11 @@ import {
   DollarSign,
   Clock,
   Send,
+  Sparkles,
+  Star,
+  Zap,
+  TrendingUp,
+  Award,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -67,12 +72,28 @@ interface Quote {
   items?: QuoteItem[];
 }
 
+interface SupplierRecommendation {
+  supplierId: number;
+  supplierName: string;
+  supplierCompany?: string;
+  totalScore: number;
+  rank: number;
+  avgRating?: number;
+  reliabilityPct?: number;
+  avgDeliveryDays?: number;
+  totalPrice?: number;
+}
+
 export default function CustomerApproved() {
   const [expandedQuoteId, setExpandedQuoteId] = useState<number | null>(null);
   const [isSupplierDialogOpen, setIsSupplierDialogOpen] = useState(false);
   const [selectedQuoteId, setSelectedQuoteId] = useState<number | null>(null);
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>("");
+  const [isLoadingRecommendation, setIsLoadingRecommendation] = useState(false);
+  const [recommendedSupplier, setRecommendedSupplier] = useState<SupplierRecommendation | null>(null);
+  const [allRecommendations, setAllRecommendations] = useState<SupplierRecommendation[]>([]);
+  const [showRecommendations, setShowRecommendations] = useState(false);
 
   const utils = trpc.useUtils();
 
@@ -89,6 +110,12 @@ export default function CustomerApproved() {
   // Get suppliers list
   const { data: suppliers } = trpc.suppliers.list.useQuery({});
 
+  // Get supplier recommendations
+  const getRecommendationsMutation = trpc.suppliers.allRecommendations.useQuery(
+    {},
+    { enabled: false }
+  );
+
   // Assign supplier mutation
   const assignSupplierMutation = trpc.quotes.assignSupplier.useMutation({
     onSuccess: () => {
@@ -97,6 +124,9 @@ export default function CustomerApproved() {
       utils.quotes.getById.refetch();
       setIsSupplierDialogOpen(false);
       setSelectedSupplierId("");
+      setRecommendedSupplier(null);
+      setAllRecommendations([]);
+      setShowRecommendations(false);
     },
     onError: (error) => {
       toast.error(`שגיאה בהקצאת ספק: ${error.message}`);
@@ -126,6 +156,35 @@ export default function CustomerApproved() {
   const handleOpenSupplierDialog = (quoteId: number) => {
     setSelectedQuoteId(quoteId);
     setIsSupplierDialogOpen(true);
+    setRecommendedSupplier(null);
+    setAllRecommendations([]);
+    setShowRecommendations(false);
+    setSelectedSupplierId("");
+  };
+
+  const handleGetRecommendation = async () => {
+    setIsLoadingRecommendation(true);
+    setShowRecommendations(true);
+    try {
+      const result = await utils.suppliers.allRecommendations.fetch({});
+      if (result && result.length > 0) {
+        setAllRecommendations(result);
+        setRecommendedSupplier(result[0]);
+        setSelectedSupplierId(result[0].supplierId.toString());
+        toast.success(`נמצא ספק מומלץ: ${result[0].supplierName || result[0].supplierCompany}`);
+      } else {
+        toast.error("לא נמצאו ספקים מומלצים");
+      }
+    } catch (error) {
+      toast.error("שגיאה בקבלת המלצות");
+    } finally {
+      setIsLoadingRecommendation(false);
+    }
+  };
+
+  const handleSelectRecommendedSupplier = (supplier: SupplierRecommendation) => {
+    setRecommendedSupplier(supplier);
+    setSelectedSupplierId(supplier.supplierId.toString());
   };
 
   const handleAssignSupplier = () => {
@@ -148,6 +207,18 @@ export default function CustomerApproved() {
   const allItemsHaveSuppliers = (items: QuoteItem[] | undefined) => {
     if (!items || items.length === 0) return false;
     return items.every(item => item.supplierId !== null);
+  };
+
+  const getScoreColor = (score: number) => {
+    if (score >= 80) return "text-green-600";
+    if (score >= 60) return "text-amber-600";
+    return "text-red-600";
+  };
+
+  const getScoreBg = (score: number) => {
+    if (score >= 80) return "bg-green-100";
+    if (score >= 60) return "bg-amber-100";
+    return "bg-red-100";
   };
 
   return (
@@ -426,30 +497,194 @@ export default function CustomerApproved() {
 
       {/* Supplier Selection Dialog */}
       <Dialog open={isSupplierDialogOpen} onOpenChange={setIsSupplierDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>בחירת ספק</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Truck className="h-5 w-5" />
+              בחירת ספק להצעה #{selectedQuoteId}
+            </DialogTitle>
             <DialogDescription>
-              בחר ספק עבור הצעה #{selectedQuoteId}. הספק יקבל את העבודה לאחר השליחה.
+              בחר ספק ידנית או קבל המלצה מהמערכת על סמך דירוג, מחיר וזמן אספקה
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <Select value={selectedSupplierId} onValueChange={setSelectedSupplierId}>
-              <SelectTrigger>
-                <SelectValue placeholder="בחר ספק" />
-              </SelectTrigger>
-              <SelectContent>
-                {suppliers?.map((supplier: any) => (
-                  <SelectItem key={supplier.id} value={supplier.id.toString()}>
-                    <div className="flex items-center gap-2">
-                      <Truck className="h-4 w-4" />
-                      {supplier.name} {supplier.companyName && `- ${supplier.companyName}`}
+          
+          <div className="py-4 space-y-6">
+            {/* Two Options */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Manual Selection */}
+              <Card className={cn(
+                "cursor-pointer transition-all border-2",
+                !showRecommendations ? "border-purple-500 bg-purple-50/50" : "border-transparent hover:border-gray-300"
+              )}
+              onClick={() => setShowRecommendations(false)}
+              >
+                <CardContent className="pt-4">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 rounded-full bg-purple-100">
+                      <Truck className="h-5 w-5 text-purple-600" />
                     </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                    <div>
+                      <h3 className="font-semibold">בחירה ידנית</h3>
+                      <p className="text-sm text-muted-foreground">בחר ספק מהרשימה</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* System Recommendation */}
+              <Card className={cn(
+                "cursor-pointer transition-all border-2",
+                showRecommendations ? "border-amber-500 bg-amber-50/50" : "border-transparent hover:border-gray-300"
+              )}
+              onClick={handleGetRecommendation}
+              >
+                <CardContent className="pt-4">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 rounded-full bg-amber-100">
+                      <Sparkles className="h-5 w-5 text-amber-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold">המלצת מערכת</h3>
+                      <p className="text-sm text-muted-foreground">הספק הטוב ביותר לפי האלגוריתם</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Manual Selection Dropdown */}
+            {!showRecommendations && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">בחר ספק:</label>
+                <Select value={selectedSupplierId} onValueChange={setSelectedSupplierId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="בחר ספק מהרשימה" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {suppliers?.map((supplier: any) => (
+                      <SelectItem key={supplier.id} value={supplier.id.toString()}>
+                        <div className="flex items-center gap-2">
+                          <Truck className="h-4 w-4" />
+                          {supplier.name} {supplier.companyName && `- ${supplier.companyName}`}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* System Recommendations */}
+            {showRecommendations && (
+              <div className="space-y-4">
+                {isLoadingRecommendation ? (
+                  <div className="flex items-center justify-center py-8">
+                    <RefreshCw className="h-6 w-6 animate-spin text-amber-600" />
+                    <span className="mr-2 text-muted-foreground">מחשב המלצות...</span>
+                  </div>
+                ) : allRecommendations.length > 0 ? (
+                  <>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Award className="h-4 w-4 text-amber-600" />
+                      <span>ספקים מומלצים לפי ציון כולל (מחיר, דירוג, אמינות, מהירות)</span>
+                    </div>
+                    <div className="space-y-2">
+                      {allRecommendations.slice(0, 5).map((rec, index) => (
+                        <div
+                          key={rec.supplierId}
+                          onClick={() => handleSelectRecommendedSupplier(rec)}
+                          className={cn(
+                            "p-4 rounded-lg border-2 cursor-pointer transition-all",
+                            selectedSupplierId === rec.supplierId.toString()
+                              ? "border-amber-500 bg-amber-50"
+                              : "border-gray-200 hover:border-amber-300 hover:bg-amber-50/50"
+                          )}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              {/* Rank Badge */}
+                              <div className={cn(
+                                "w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm",
+                                index === 0 ? "bg-amber-500 text-white" :
+                                index === 1 ? "bg-gray-400 text-white" :
+                                index === 2 ? "bg-amber-700 text-white" :
+                                "bg-gray-200 text-gray-600"
+                              )}>
+                                {rec.rank}
+                              </div>
+                              
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-semibold">
+                                    {rec.supplierName || rec.supplierCompany || `ספק #${rec.supplierId}`}
+                                  </span>
+                                  {index === 0 && (
+                                    <Badge className="bg-amber-100 text-amber-800 text-xs">
+                                      <Sparkles className="h-3 w-3 ml-1" />
+                                      מומלץ
+                                    </Badge>
+                                  )}
+                                </div>
+                                {rec.supplierCompany && rec.supplierName && (
+                                  <span className="text-sm text-muted-foreground">{rec.supplierCompany}</span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-6">
+                              {/* Score */}
+                              <div className="text-center">
+                                <div className={cn(
+                                  "text-lg font-bold",
+                                  getScoreColor(rec.totalScore)
+                                )}>
+                                  {Math.round(rec.totalScore)}
+                                </div>
+                                <div className="text-xs text-muted-foreground">ציון</div>
+                              </div>
+
+                              {/* Rating */}
+                              {rec.avgRating !== undefined && (
+                                <div className="text-center">
+                                  <div className="flex items-center gap-1">
+                                    <Star className="h-4 w-4 text-amber-500 fill-amber-500" />
+                                    <span className="font-medium">{rec.avgRating.toFixed(1)}</span>
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">דירוג</div>
+                                </div>
+                              )}
+
+                              {/* Reliability */}
+                              {rec.reliabilityPct !== undefined && (
+                                <div className="text-center">
+                                  <div className="font-medium text-green-600">{rec.reliabilityPct}%</div>
+                                  <div className="text-xs text-muted-foreground">אמינות</div>
+                                </div>
+                              )}
+
+                              {/* Delivery */}
+                              {rec.avgDeliveryDays !== undefined && (
+                                <div className="text-center">
+                                  <div className="font-medium">{rec.avgDeliveryDays}</div>
+                                  <div className="text-xs text-muted-foreground">ימים</div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Sparkles className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p>לחץ על "המלצת מערכת" לקבלת המלצות</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsSupplierDialogOpen(false)}>
               ביטול
