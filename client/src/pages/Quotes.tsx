@@ -191,6 +191,19 @@ export default function Quotes() {
     }
   }, [defaultPricelist, selectedPricelistId]);
 
+  // Load pricelist when quote is expanded
+  useEffect(() => {
+    if (quoteDetails && expandedQuoteId) {
+      // If quote has a pricelist, use it
+      if (quoteDetails.pricelistId) {
+        setSelectedPricelistId(quoteDetails.pricelistId);
+      } else if (defaultPricelist) {
+        // Otherwise use default pricelist
+        setSelectedPricelistId(defaultPricelist.id);
+      }
+    }
+  }, [quoteDetails, expandedQuoteId, defaultPricelist]);
+
   const autoPopulateMutation = trpc.quotePricing.autoPopulate.useMutation({
     onSuccess: (data) => {
       setPricingData(data);
@@ -797,7 +810,7 @@ export default function Quotes() {
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <Select
-                                    value={pricingQuoteId === quote.id ? (selectedPricelistId?.toString() || '') : ''}
+                                    value={expandedQuoteId === quote.id ? (selectedPricelistId?.toString() || '') : ''}
                                     onValueChange={(value) => {
                                       const id = parseInt(value);
                                       setSelectedPricelistId(id);
@@ -816,9 +829,9 @@ export default function Quotes() {
                                       ))}
                                     </SelectContent>
                                   </Select>
-                                  {pricingData?.pricelist && pricingQuoteId === quote.id && (
+                                  {selectedPricelistId && expandedQuoteId === quote.id && (
                                     <Badge variant="secondary" className="text-xs">
-                                      רווח: {pricingData.pricelist.markupPercentage}%
+                                      רווח: {pricelists?.find((pl: any) => pl.id === selectedPricelistId)?.markupPercentage || 0}%
                                     </Badge>
                                   )}
                                 </div>

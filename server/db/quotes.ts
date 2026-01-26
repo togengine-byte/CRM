@@ -76,6 +76,7 @@ export async function getQuoteById(quoteId: number) {
     status: quotes.status,
     version: quotes.version,
     parentQuoteId: quotes.parentQuoteId,
+    pricelistId: quotes.pricelistId,
     finalValue: quotes.finalValue,
     rejectionReason: quotes.rejectionReason,
     dealRating: quotes.dealRating,
