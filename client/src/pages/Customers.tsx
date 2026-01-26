@@ -502,11 +502,11 @@ export default function Customers() {
                               <div>
                                 <p className="text-sm text-muted-foreground">מחירון ברירת מחדל</p>
                                 <Select
-                                  value={(customerDetails as any).pricelistId?.toString() || ""}
+                                  value={(customerDetails as any).pricelistId?.toString() || "system-default"}
                                   onValueChange={(value) => {
                                     setDefaultPricelistMutation.mutate({
                                       customerId: customerDetails.id,
-                                      pricelistId: value ? parseInt(value) : null,
+                                      pricelistId: value === "system-default" ? null : parseInt(value),
                                     });
                                   }}
                                 >
@@ -514,7 +514,7 @@ export default function Customers() {
                                     <SelectValue placeholder="בחר מחירון" />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="">ברירת מחדל מערכת</SelectItem>
+                                    <SelectItem value="system-default">ברירת מחדל מערכת</SelectItem>
                                     {pricelists?.map((pricelist: any) => (
                                       <SelectItem key={pricelist.id} value={pricelist.id.toString()}>
                                         {pricelist.name} ({pricelist.markupPercentage}%)
