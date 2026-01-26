@@ -197,10 +197,10 @@ export default function Quotes() {
 
   const changePricelistMutation = trpc.quotePricing.changePricelist.useMutation({
     onSuccess: (data) => {
-      if (pricingQuoteId) {
-        autoPopulateMutation.mutate({ quoteId: pricingQuoteId, pricelistId: data.pricelist.id });
-      }
       toast.success(`מחירון שונה ל-${data.pricelist.name}`);
+      setPricingData(data);
+      refetch();
+      utils.quotes.getById.refetch();
     },
     onError: (error) => {
       toast.error(`שגיאה בשינוי מחירון: ${error.message}`);
@@ -391,6 +391,17 @@ export default function Quotes() {
         itemId,
         customerPrice: edited.customerPrice,
         isManualPrice: true,
+      }, {
+        onSuccess: () => {
+          toast.success("מחיר נשמר בהצלחה");
+          refetch();
+          utils.quotes.getById.refetch();
+          setEditedPrices(prev => {
+            const newPrices = { ...prev };
+            delete newPrices[itemId];
+            return newPrices;
+          });
+        }
       });
     }
   };
@@ -400,11 +411,17 @@ export default function Quotes() {
     updateItemMutation.mutate({
       itemId,
       isManualPrice: false,
-    });
-    setEditedPrices(prev => {
-      const newPrices = { ...prev };
-      delete newPrices[itemId];
-      return newPrices;
+    }, {
+      onSuccess: () => {
+        toast.success("מחיר הוחזר לאוטומטי");
+        refetch();
+        utils.quotes.getById.refetch();
+        setEditedPrices(prev => {
+          const newPrices = { ...prev };
+          delete newPrices[itemId];
+          return newPrices;
+        });
+      }
     });
   };
 
@@ -499,40 +516,21 @@ export default function Quotes() {
     const buttons: React.ReactNode[] = [];
 
     if (quote.status === "draft") {
+      // כפתורי התמחור ושליחה עכשיו בתוך הפאנל המורחב
+      // כפתור גרסה חדשה בלבד
       buttons.push(
         <Button
-          key="pricing"
+          key="revise"
           size="sm"
           variant="outline"
-          className="text-green-600 border-green-200 hover:bg-green-50"
           onClick={(e) => {
             e.stopPropagation();
-            handleOpenPricingEditor(quote.id);
+            handleCreateRevision(quote.id);
           }}
+          disabled={reviseMutation.isPending}
         >
-          <Calculator className="ml-1 h-3 w-3" />
-          תמחור ושליחה
-        </Button>
-      );
-      // כפתור שליחה ישירה ללקוח (אם כבר יש מחירים)
-      buttons.push(
-        <Button
-          key="send-to-customer"
-          size="sm"
-          variant="outline"
-          className="text-blue-600 border-blue-200 hover:bg-blue-50"
-          onClick={(e) => {
-            e.stopPropagation();
-            if (quote.finalValue && Number(quote.finalValue) > 0) {
-              sendToCustomerMutation.mutate({ quoteId: quote.id });
-            } else {
-              toast.error("לא ניתן לשלוח הצעה ללא מחירים. אנא תמחר קודם.");
-            }
-          }}
-          disabled={sendToCustomerMutation.isPending}
-        >
-          <Send className="ml-1 h-3 w-3" />
-          שלח ללקוח
+          <Copy className="ml-1 h-3 w-3" />
+          גרסה חדשה
         </Button>
       );
     }
@@ -781,7 +779,44 @@ export default function Quotes() {
                             </div>
                           </div>
 
-                          {/* Items - Compact */}
+                          {/* Pricing Section - Inline */}
+                          {quote.status === "draft" && (
+                            <div className="space-y-4">
+                              <div className="flex items-center justify-between">
+                                <p className="text-sm font-medium">תמחור</p>
+                                <div className="flex items-center gap-2">
+                                  <Label className="text-sm text-muted-foreground">מחירון:</Label>
+                                  <Select
+                                    value={pricingQuoteId === quote.id ? (selectedPricelistId?.toString() || '') : ''}
+                                    onValueChange={(value) => {
+                                      const id = parseInt(value);
+                                      setSelectedPricelistId(id);
+                                      setPricingQuoteId(quote.id);
+                                      changePricelistMutation.mutate({ quoteId: quote.id, pricelistId: id });
+                                    }}
+                                  >
+                                    <SelectTrigger className="w-[180px] h-8">
+                                      <SelectValue placeholder="בחר מחירון" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {pricelists?.map((pl: any) => (
+                                        <SelectItem key={pl.id} value={pl.id.toString()}>
+                                          {pl.name} ({parseFloat(pl.markupPercentage || 0).toFixed(0)}%)
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  {pricingData?.pricelist && pricingQuoteId === quote.id && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      רווח: {pricingData.pricelist.markupPercentage}%
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Items with Pricing */}
                           {quoteDetails.items && quoteDetails.items.length > 0 && (
                             <div>
                               <p className="text-sm text-muted-foreground mb-2">פריטים ({quoteDetails.items.length})</p>
@@ -791,23 +826,107 @@ export default function Quotes() {
                                   const parts = fullName.split(' - ');
                                   const productName = parts[0] || fullName;
                                   const sizeName = parts[1] || '';
+                                  const editedPrice = editedPrices[item.id];
+                                  const currentPrice = editedPrice?.customerPrice ?? Number(item.priceAtTimeOfQuote || 0);
+                                  const isEdited = !!editedPrice;
+                                  
                                   return (
-                                    <div key={index} className="flex items-center justify-between p-3 bg-background rounded border">
+                                    <div key={index} className={cn(
+                                      "flex items-center justify-between p-3 bg-background rounded border",
+                                      item.isManualPrice && "border-yellow-300 bg-yellow-50/50"
+                                    )}>
                                       <div className="flex items-center gap-3">
                                         <span className="font-medium">{productName}</span>
                                         {sizeName && <Badge variant="outline" className="text-xs">{sizeName}</Badge>}
                                         <span className="text-muted-foreground">× {item.quantity}</span>
+                                        {item.supplierCost && (
+                                          <span className="text-xs text-muted-foreground">
+                                            (עלות ספק: ₪{Number(item.supplierCost).toLocaleString()})
+                                          </span>
+                                        )}
                                       </div>
                                       <div className="flex items-center gap-2">
-                                        <span className="font-medium">{item.priceAtTimeOfQuote ? `₪${Number(item.priceAtTimeOfQuote).toLocaleString()}` : '-'}</span>
-                                        <Button variant="ghost" size="sm" onClick={(e) => e.stopPropagation()}>
-                                          <Pencil className="h-3 w-3" />
-                                        </Button>
+                                        {quote.status === "draft" ? (
+                                          <>
+                                            <Input
+                                              type="number"
+                                              min="0"
+                                              step="0.01"
+                                              value={currentPrice}
+                                              onChange={(e) => {
+                                                e.stopPropagation();
+                                                handlePriceEdit(item.id, parseFloat(e.target.value) || 0);
+                                              }}
+                                              onClick={(e) => e.stopPropagation()}
+                                              className={cn(
+                                                "w-24 h-8 text-right",
+                                                item.isManualPrice && "border-yellow-400 bg-yellow-50",
+                                                isEdited && "border-blue-400 bg-blue-50"
+                                              )}
+                                            />
+                                            {isEdited && (
+                                              <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                className="h-8 w-8 p-0"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleSavePrice(item.id);
+                                                }}
+                                                disabled={updateItemMutation.isPending}
+                                              >
+                                                <Save className="h-3 w-3 text-green-600" />
+                                              </Button>
+                                            )}
+                                            {item.isManualPrice && (
+                                              <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                className="h-8 w-8 p-0"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleResetPrice(item.id);
+                                                }}
+                                                disabled={updateItemMutation.isPending}
+                                                title="החזר למחיר אוטומטי"
+                                              >
+                                                <RotateCcw className="h-3 w-3 text-gray-500" />
+                                              </Button>
+                                            )}
+                                          </>
+                                        ) : (
+                                          <span className="font-medium">{item.priceAtTimeOfQuote ? `₪${Number(item.priceAtTimeOfQuote).toLocaleString()}` : '-'}</span>
+                                        )}
+                                        {item.isManualPrice && (
+                                          <Badge variant="outline" className="text-[10px] bg-yellow-100 border-yellow-300">
+                                            ידני
+                                          </Badge>
+                                        )}
                                       </div>
                                     </div>
                                   );
                                 })}
                               </div>
+                              
+                              {/* Totals - Show when in draft */}
+                              {quote.status === "draft" && (
+                                <div className="flex items-center justify-end gap-6 mt-3 pt-3 border-t">
+                                  <div className="text-sm">
+                                    <span className="text-muted-foreground">עלות ספקים: </span>
+                                    <span className="font-medium">₪{Number(quote.totalSupplierCost || 0).toLocaleString()}</span>
+                                  </div>
+                                  <div className="text-sm">
+                                    <span className="text-muted-foreground">מחיר ללקוח: </span>
+                                    <span className="font-bold text-green-600">₪{Number(quote.finalValue || 0).toLocaleString()}</span>
+                                  </div>
+                                  <div className="text-sm">
+                                    <span className="text-muted-foreground">רווח: </span>
+                                    <span className="font-medium text-blue-600">
+                                      ₪{(Number(quote.finalValue || 0) - Number(quote.totalSupplierCost || 0)).toLocaleString()}
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )}
 
@@ -820,8 +939,16 @@ export default function Quotes() {
                               quantity: item.quantity,
                               productName: item.productName || getSizeQuantityName(item.sizeQuantityId),
                             })) || []}
+                            quoteStatus={quote.status}
                             onSupplierSelected={() => refetch()}
                           />
+                          
+                          {/* Show message if suppliers cannot be assigned yet */}
+                          {(quote.status === 'draft' || quote.status === 'sent') && (
+                            <p className="text-xs text-muted-foreground mt-2">
+                              * ניתן להעביר לספק רק לאחר אישור הלקוח
+                            </p>
+                          )}
 
                           {/* Auto Production Toggle - Show only for draft/sent status */}
                           {(quote.status === "draft" || quote.status === "sent") && (
@@ -1683,12 +1810,16 @@ interface ConfirmSupplierData {
 function SupplierRecommendationsByCategory({ 
   quoteId,
   quoteItems,
+  quoteStatus,
   onSupplierSelected 
 }: { 
   quoteId: number;
   quoteItems: { quoteItemId: number; sizeQuantityId: number; quantity: number; productName: string }[];
+  quoteStatus: string;
   onSupplierSelected: () => void;
 }) {
+  // Only allow assigning suppliers after customer approval
+  const canAssignSupplier = quoteStatus === 'approved' || quoteStatus === 'in_production';
   const [confirmData, setConfirmData] = useState<ConfirmSupplierData | null>(null);
 
   const { data: recommendations, isLoading } = trpc.suppliers.recommendationsByCategory.useQuery(
@@ -1764,18 +1895,23 @@ function SupplierRecommendationsByCategory({
                     key={supplier.supplierId}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setConfirmData({
-                        categoryId: category.categoryId,
-                        categoryName: category.categoryName,
-                        supplier,
-                        items: category.items,
-                      });
+                      if (canAssignSupplier) {
+                        setConfirmData({
+                          categoryId: category.categoryId,
+                          categoryName: category.categoryName,
+                          supplier,
+                          items: category.items,
+                        });
+                      }
                     }}
+                    disabled={!canAssignSupplier}
                     className={cn(
-                      "flex-1 p-2 rounded border text-right transition-all hover:shadow-sm",
+                      "flex-1 p-2 rounded border text-right transition-all",
+                      canAssignSupplier && "hover:shadow-sm",
+                      !canAssignSupplier && "opacity-60 cursor-not-allowed",
                       index === 0 
-                        ? "bg-green-50 border-green-200 hover:border-green-300" 
-                        : "bg-muted/50 hover:bg-muted"
+                        ? "bg-green-50 border-green-200" + (canAssignSupplier ? " hover:border-green-300" : "")
+                        : "bg-muted/50" + (canAssignSupplier ? " hover:bg-muted" : "")
                     )}
                   >
                     <p className="font-medium text-sm truncate">{supplier.supplierName}</p>
