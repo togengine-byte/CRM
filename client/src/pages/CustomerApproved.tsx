@@ -396,24 +396,201 @@ export default function CustomerApproved() {
                               {/* Actions Section - Inline */}
                               <div className="border-t pt-4 space-y-4">
                                 {hasAllSuppliers ? (
-                                  /* All suppliers assigned - Show "Send to Production" button */
-                                  <div className="flex items-center gap-4">
-                                    <Button
-                                      size="lg"
-                                      className="bg-green-600 hover:bg-green-700"
-                                      onClick={() => handleMoveToProduction(quote.id)}
-                                      disabled={moveToProductionMutation.isPending}
-                                    >
-                                      {moveToProductionMutation.isPending ? (
-                                        <RefreshCw className="h-4 w-4 ml-2 animate-spin" />
-                                      ) : (
-                                        <Factory className="h-4 w-4 ml-2" />
-                                      )}
-                                      העבר לייצור
-                                    </Button>
-                                    <span className="text-sm text-muted-foreground">
-                                      כל הפריטים כבר משויכים לספק - ניתן להעביר ישירות לייצור
-                                    </span>
+                                  /* All suppliers assigned - Show "Send to Production" button + option to change supplier */
+                                  <div className="space-y-4">
+                                    <div className="flex items-center gap-4">
+                                      <Button
+                                        size="lg"
+                                        className="bg-green-600 hover:bg-green-700"
+                                        onClick={() => handleMoveToProduction(quote.id)}
+                                        disabled={moveToProductionMutation.isPending}
+                                      >
+                                        {moveToProductionMutation.isPending ? (
+                                          <RefreshCw className="h-4 w-4 ml-2 animate-spin" />
+                                        ) : (
+                                          <Factory className="h-4 w-4 ml-2" />
+                                        )}
+                                        העבר לייצור
+                                      </Button>
+                                      <span className="text-sm text-muted-foreground">
+                                        כל הפריטים כבר משוייכים לספק - ניתן להעביר ישירות לייצור
+                                      </span>
+                                    </div>
+                                    
+                                    {/* Option to change supplier */}
+                                    <details className="group">
+                                      <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground flex items-center gap-2">
+                                        <ChevronDown className="h-4 w-4 group-open:rotate-180 transition-transform" />
+                                        רוצה להחליף ספק?
+                                      </summary>
+                                      <div className="mt-4 space-y-4 pr-6">
+                                        <p className="text-sm font-medium">בחר ספק חדש לכל הפריטים:</p>
+                                        
+                                        {/* Two Options - Inline */}
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                          {/* Manual Selection */}
+                                          <Card 
+                                            className={cn(
+                                              "cursor-pointer transition-all border-2",
+                                              !showRecs ? "border-purple-500 bg-purple-50/50" : "border-transparent hover:border-gray-300"
+                                            )}
+                                            onClick={() => setShowRecommendationsByQuote(prev => ({ ...prev, [quote.id]: false }))}
+                                          >
+                                            <CardContent className="pt-4">
+                                              <div className="flex items-center gap-3">
+                                                <div className="p-2 rounded-full bg-purple-100">
+                                                  <Truck className="h-5 w-5 text-purple-600" />
+                                                </div>
+                                                <div>
+                                                  <h3 className="font-semibold">בחירה ידנית</h3>
+                                                  <p className="text-sm text-muted-foreground">בחר ספק מהרשימה</p>
+                                                </div>
+                                              </div>
+                                            </CardContent>
+                                          </Card>
+
+                                          {/* System Recommendation */}
+                                          <Card 
+                                            className={cn(
+                                              "cursor-pointer transition-all border-2",
+                                              showRecs ? "border-amber-500 bg-amber-50/50" : "border-transparent hover:border-gray-300"
+                                            )}
+                                            onClick={() => handleGetRecommendations(quote.id)}
+                                          >
+                                            <CardContent className="pt-4">
+                                              <div className="flex items-center gap-3">
+                                                <div className="p-2 rounded-full bg-amber-100">
+                                                  <Sparkles className="h-5 w-5 text-amber-600" />
+                                                </div>
+                                                <div>
+                                                  <h3 className="font-semibold">המלצת מערכת</h3>
+                                                  <p className="text-sm text-muted-foreground">הספק הטוב ביותר לפי האלגוריתם</p>
+                                                </div>
+                                              </div>
+                                            </CardContent>
+                                          </Card>
+                                        </div>
+
+                                        {/* Manual Selection Dropdown */}
+                                        {!showRecs && (
+                                          <div className="space-y-2">
+                                            <Select 
+                                              value={selectedSupplier} 
+                                              onValueChange={(value) => setSelectedSupplierByQuote(prev => ({ ...prev, [quote.id]: value }))}
+                                            >
+                                              <SelectTrigger className="w-full md:w-80">
+                                                <SelectValue placeholder="בחר ספק מהרשימה" />
+                                              </SelectTrigger>
+                                              <SelectContent>
+                                                {suppliers?.map((supplier: any) => (
+                                                  <SelectItem key={supplier.id} value={supplier.id.toString()}>
+                                                    <div className="flex items-center gap-2">
+                                                      <Truck className="h-4 w-4" />
+                                                      {supplier.name} {supplier.companyName && `- ${supplier.companyName}`}
+                                                    </div>
+                                                  </SelectItem>
+                                                ))}
+                                              </SelectContent>
+                                            </Select>
+                                          </div>
+                                        )}
+
+                                        {/* System Recommendations Table */}
+                                        {showRecs && (
+                                          <div className="space-y-2">
+                                            {isLoadingRecs ? (
+                                              <div className="flex items-center justify-center py-4">
+                                                <RefreshCw className="h-5 w-5 animate-spin text-amber-600" />
+                                                <span className="mr-2 text-muted-foreground">מחשב המלצות...</span>
+                                              </div>
+                                            ) : recommendations.length > 0 ? (
+                                              <div className="border rounded-lg overflow-hidden">
+                                                <table className="w-full text-sm">
+                                                  <thead className="bg-gray-50">
+                                                    <tr>
+                                                      <th className="px-3 py-2 text-right font-medium text-gray-600">#</th>
+                                                      <th className="px-3 py-2 text-right font-medium text-gray-600">ספק</th>
+                                                      <th className="px-3 py-2 text-center font-medium text-gray-600">ציון</th>
+                                                      <th className="px-3 py-2 text-center font-medium text-gray-600">אמינות</th>
+                                                      <th className="px-3 py-2 text-center font-medium text-gray-600">עבודות</th>
+                                                      <th className="px-3 py-2 text-center font-medium text-gray-600">עומס</th>
+                                                    </tr>
+                                                  </thead>
+                                                  <tbody>
+                                                    {recommendations.slice(0, 5).map((rec, index) => (
+                                                      <tr
+                                                        key={rec.supplierId}
+                                                        onClick={() => setSelectedSupplierByQuote(prev => ({ ...prev, [quote.id]: rec.supplierId.toString() }))}
+                                                        className={cn(
+                                                          "cursor-pointer transition-all border-b last:border-b-0",
+                                                          selectedSupplier === rec.supplierId.toString()
+                                                            ? "bg-amber-100"
+                                                            : "hover:bg-amber-50"
+                                                        )}
+                                                      >
+                                                        <td className="px-3 py-2">
+                                                          <span className={cn(
+                                                            "inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold",
+                                                            index === 0 ? "bg-amber-500 text-white" :
+                                                            index === 1 ? "bg-gray-400 text-white" :
+                                                            index === 2 ? "bg-amber-700 text-white" :
+                                                            "bg-gray-200 text-gray-600"
+                                                          )}>
+                                                            {rec.rank}
+                                                          </span>
+                                                        </td>
+                                                        <td className="px-3 py-2">
+                                                          <div className="flex items-center gap-1">
+                                                            <span className="font-medium">{rec.supplierName || rec.supplierCompany || `ספק #${rec.supplierId}`}</span>
+                                                            {index === 0 && <Sparkles className="h-3 w-3 text-amber-500" />}
+                                                          </div>
+                                                        </td>
+                                                        <td className="px-3 py-2 text-center">
+                                                          <span className={cn("font-bold", getScoreColor(rec.scores?.totalScore || 0))}>
+                                                            {Math.round(rec.scores?.totalScore || 0)}
+                                                          </span>
+                                                        </td>
+                                                        <td className="px-3 py-2 text-center text-green-600">
+                                                          {Math.round(rec.metrics?.promiseKeeping?.percentage || 0)}%
+                                                        </td>
+                                                        <td className="px-3 py-2 text-center">
+                                                          {rec.metrics?.completedJobs || 0}
+                                                        </td>
+                                                        <td className="px-3 py-2 text-center text-blue-600">
+                                                          {rec.metrics?.currentLoad || 0}
+                                                        </td>
+                                                      </tr>
+                                                    ))}
+                                                  </tbody>
+                                                </table>
+                                              </div>
+                                            ) : (
+                                              <div className="text-center py-4 text-muted-foreground">
+                                                <Sparkles className="h-6 w-6 mx-auto mb-2 opacity-50" />
+                                                <p>לחץ על "המלצת מערכת" לקבלת המלצות</p>
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
+
+                                        {/* Assign Button */}
+                                        {selectedSupplier && (
+                                          <Button
+                                            size="lg"
+                                            className="bg-purple-600 hover:bg-purple-700"
+                                            onClick={() => handleAssignSupplier(quote.id)}
+                                            disabled={assignSupplierMutation.isPending}
+                                          >
+                                            {assignSupplierMutation.isPending ? (
+                                              <RefreshCw className="h-4 w-4 ml-2 animate-spin" />
+                                            ) : (
+                                              <Send className="h-4 w-4 ml-2" />
+                                            )}
+                                            החלף ספק והעבר לייצור
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </details>
                                   </div>
                                 ) : (
                                   /* Need to select supplier - Show inline selection */

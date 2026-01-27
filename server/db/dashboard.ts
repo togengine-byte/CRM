@@ -221,25 +221,32 @@ export async function getActiveJobs() {
       sj.id,
       sj."quoteId",
       sj."supplierId",
-      sj."customerId",
+      COALESCE(sj."customerId", q."customerId") as "customerId",
       sj."sizeQuantityId",
       sj.quantity,
       sj."pricePerUnit",
       sj.status,
       sj."supplierMarkedReady",
       sj."supplierReadyAt",
+      sj."promisedDeliveryDays",
       sj."createdAt",
       sj."fileValidationWarnings",
       supplier.name as "supplierName",
       supplier."companyName" as "supplierCompany",
-      customer.name as "customerName",
-      customer."companyName" as "customerCompany",
+      supplier.phone as "supplierPhone",
+      COALESCE(customer.name, q_customer.name) as "customerName",
+      COALESCE(customer."companyName", q_customer."companyName") as "customerCompany",
+      COALESCE(customer.phone, q_customer.phone) as "customerPhone",
+      COALESCE(customer.email, q_customer.email) as "customerEmail",
       ps.name as "sizeName",
       ps.dimensions as "dimensions",
-      bp.name as "productName"
+      bp.name as "productName",
+      q."totalPrice" as "quoteTotal"
     FROM supplier_jobs sj
+    LEFT JOIN quotes q ON sj."quoteId" = q.id
     LEFT JOIN users supplier ON sj."supplierId" = supplier.id
     LEFT JOIN users customer ON sj."customerId" = customer.id
+    LEFT JOIN users q_customer ON q."customerId" = q_customer.id
     LEFT JOIN size_quantities sq ON sj."sizeQuantityId" = sq.id
     LEFT JOIN product_sizes ps ON sq.size_id = ps.id
     LEFT JOIN base_products bp ON ps.product_id = bp.id
@@ -258,15 +265,20 @@ export async function getActiveJobs() {
     status: row.status,
     supplierMarkedReady: row.supplierMarkedReady,
     supplierReadyAt: row.supplierReadyAt,
+    promisedDeliveryDays: row.promisedDeliveryDays,
     createdAt: row.createdAt,
     fileValidationWarnings: row.fileValidationWarnings,
     supplierName: row.supplierName,
     supplierCompany: row.supplierCompany,
+    supplierPhone: row.supplierPhone,
     customerName: row.customerName,
     customerCompany: row.customerCompany,
+    customerPhone: row.customerPhone,
+    customerEmail: row.customerEmail,
     sizeName: row.sizeName,
     dimensions: row.dimensions,
     productName: row.productName,
+    quoteTotal: row.quoteTotal,
   }));
 }
 

@@ -164,6 +164,12 @@ export const quotesRouter = router({
       const db = await getDb();
       if (!db) throw new Error("Database not available");
       
+      // Get quote with customerId
+      const quoteResult = await db.execute(sql`
+        SELECT "customerId" FROM quotes WHERE id = ${input.quoteId}
+      `);
+      const customerId = (quoteResult.rows[0] as any)?.customerId;
+
       // Get quote items
       const quoteItemsResult = await db.execute(sql`
         SELECT id, "sizeQuantityId", quantity FROM quote_items WHERE "quoteId" = ${input.quoteId}
@@ -199,10 +205,10 @@ export const quotesRouter = router({
         // Create supplier job for this item
         await db.execute(sql`
           INSERT INTO supplier_jobs (
-            "quoteId", "quoteItemId", "supplierId", "sizeQuantityId", 
+            "quoteId", "quoteItemId", "supplierId", "customerId", "sizeQuantityId", 
             quantity, "pricePerUnit", "promisedDeliveryDays", status, "createdAt", "updatedAt"
           ) VALUES (
-            ${input.quoteId}, ${typedItem.id}, ${input.supplierId}, ${typedItem.sizeQuantityId},
+            ${input.quoteId}, ${typedItem.id}, ${input.supplierId}, ${customerId}, ${typedItem.sizeQuantityId},
             ${typedItem.quantity}, ${pricePerUnit}, ${deliveryDays}, 'pending', NOW(), NOW()
           )
         `);

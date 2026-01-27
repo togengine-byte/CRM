@@ -68,11 +68,23 @@ interface Job {
   id: number;
   quoteId: number;
   customerName: string;
+  customerCompany?: string;
+  customerPhone?: string;
+  customerEmail?: string;
   supplierName: string;
+  supplierCompany?: string;
+  supplierPhone?: string;
   productName: string;
+  sizeName?: string;
+  dimensions?: string;
+  quantity?: number;
+  pricePerUnit?: string;
+  promisedDeliveryDays?: number;
+  quoteTotal?: string;
   status: string;
   createdAt: string;
   expectedReadyAt?: string;
+  supplierReadyAt?: string;
   readyAt?: string;
   pickedUpAt?: string;
   deliveredAt?: string;
@@ -351,28 +363,100 @@ export default function Jobs() {
                       <TableRow className="bg-muted/30 hover:bg-muted/30">
                         <TableCell colSpan={6}>
                           <div className="p-6 space-y-6">
-                            {/* Details Grid */}
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                              <div>
-                                <p className="text-sm text-muted-foreground">לקוח</p>
-                                <p className="font-medium flex items-center gap-2">
-                                  <User className="h-4 w-4 text-muted-foreground" />
-                                  {jobDetails.customerName || "-"}
-                                </p>
+                            {/* Customer & Supplier Info */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              {/* Customer Info */}
+                              <div className="p-4 rounded-lg bg-blue-50 border border-blue-100">
+                                <h4 className="font-semibold text-blue-800 mb-3 flex items-center gap-2">
+                                  <User className="h-4 w-4" />
+                                  פרטי לקוח
+                                </h4>
+                                <div className="grid grid-cols-2 gap-3 text-sm">
+                                  <div>
+                                    <p className="text-muted-foreground">שם</p>
+                                    <p className="font-medium">{jobDetails.customerName || "-"}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">חברה</p>
+                                    <p className="font-medium">{jobDetails.customerCompany || "-"}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">טלפון</p>
+                                    <p className="font-medium">{jobDetails.customerPhone || "-"}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">אימייל</p>
+                                    <p className="font-medium text-xs">{jobDetails.customerEmail || "-"}</p>
+                                  </div>
+                                </div>
                               </div>
-                              <div>
-                                <p className="text-sm text-muted-foreground">ספק</p>
-                                <p className="font-medium flex items-center gap-2">
-                                  <Building2 className="h-4 w-4 text-muted-foreground" />
-                                  {jobDetails.supplierName || "-"}
-                                </p>
+                              
+                              {/* Supplier Info */}
+                              <div className="p-4 rounded-lg bg-green-50 border border-green-100">
+                                <h4 className="font-semibold text-green-800 mb-3 flex items-center gap-2">
+                                  <Building2 className="h-4 w-4" />
+                                  פרטי ספק
+                                </h4>
+                                <div className="grid grid-cols-2 gap-3 text-sm">
+                                  <div>
+                                    <p className="text-muted-foreground">שם</p>
+                                    <p className="font-medium">{jobDetails.supplierName || "-"}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">חברה</p>
+                                    <p className="font-medium">{jobDetails.supplierCompany || "-"}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">טלפון</p>
+                                    <p className="font-medium">{jobDetails.supplierPhone || "-"}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-muted-foreground">ימי אספקה</p>
+                                    <p className="font-medium">{jobDetails.promisedDeliveryDays || "-"} ימים</p>
+                                  </div>
+                                </div>
                               </div>
+                            </div>
+
+                            {/* Product & Order Details */}
+                            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                               <div>
                                 <p className="text-sm text-muted-foreground">מוצר</p>
                                 <p className="font-medium flex items-center gap-2">
                                   <Package className="h-4 w-4 text-muted-foreground" />
                                   {jobDetails.productName || "-"}
                                 </p>
+                              </div>
+                              <div>
+                                <p className="text-sm text-muted-foreground">גודל</p>
+                                <p className="font-medium">{jobDetails.sizeName || "-"}</p>
+                                {jobDetails.dimensions && (
+                                  <p className="text-xs text-muted-foreground">{jobDetails.dimensions}</p>
+                                )}
+                              </div>
+                              <div>
+                                <p className="text-sm text-muted-foreground">כמות</p>
+                                <p className="font-medium text-lg">{jobDetails.quantity || "-"}</p>
+                              </div>
+                              <div>
+                                <p className="text-sm text-muted-foreground">מחיר ליחידה</p>
+                                <p className="font-medium text-lg text-green-600">
+                                  {jobDetails.pricePerUnit ? `₪${parseFloat(jobDetails.pricePerUnit).toFixed(2)}` : "-"}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-sm text-muted-foreground">סה״כ הצעה</p>
+                                <p className="font-medium text-lg text-primary">
+                                  {jobDetails.quoteTotal ? `₪${parseFloat(jobDetails.quoteTotal).toFixed(2)}` : "-"}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Status & Dates */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t">
+                              <div>
+                                <p className="text-sm text-muted-foreground">מס׳ הצעת מחיר</p>
+                                <p className="font-medium">{jobDetails.quoteId}</p>
                               </div>
                               <div>
                                 <p className="text-sm text-muted-foreground">תאריך יצירה</p>
@@ -385,10 +469,6 @@ export default function Jobs() {
                                 <p className="text-sm text-muted-foreground">סטטוס נוכחי</p>
                                 <div className="mt-1">{getStatusBadge(jobDetails.status)}</div>
                               </div>
-                              <div>
-                                <p className="text-sm text-muted-foreground">מס׳ הצעת מחיר</p>
-                                <p className="font-medium">{jobDetails.quoteId}</p>
-                              </div>
                               {jobDetails.supplierReadyAt && (
                                 <div>
                                   <p className="text-sm text-muted-foreground">מוכן בתאריך</p>
@@ -397,11 +477,11 @@ export default function Jobs() {
                                   </p>
                                 </div>
                               )}
-                              {(jobDetails as any).deliveredAt && (
+                              {jobDetails.deliveredAt && (
                                 <div>
                                   <p className="text-sm text-muted-foreground">נמסר בתאריך</p>
                                   <p className="font-medium">
-                                    {new Date((jobDetails as any).deliveredAt).toLocaleDateString("he-IL")}
+                                    {new Date(jobDetails.deliveredAt).toLocaleDateString("he-IL")}
                                   </p>
                                 </div>
                               )}

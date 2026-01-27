@@ -401,6 +401,12 @@ export async function updateQuoteStatus(quoteId: number, status: string, employe
 
   // If moving to in_production, create supplier_jobs for items with suppliers
   if (status === 'in_production') {
+    // Get customerId from quote
+    const quoteResult = await db.execute(sql`
+      SELECT "customerId" FROM quotes WHERE id = ${quoteId}
+    `);
+    const customerId = (quoteResult.rows[0] as any)?.customerId;
+
     // Get quote items with suppliers
     const items = await db.execute(sql`
       SELECT id, "sizeQuantityId", quantity, "supplierId", "supplierCost", "deliveryDays"
@@ -418,10 +424,10 @@ export async function updateQuoteStatus(quoteId: number, status: string, employe
       if (existingJob.rows.length === 0) {
         await db.execute(sql`
           INSERT INTO supplier_jobs (
-            "quoteId", "quoteItemId", "supplierId", "sizeQuantityId",
+            "quoteId", "quoteItemId", "supplierId", "customerId", "sizeQuantityId",
             quantity, "pricePerUnit", "promisedDeliveryDays", status, "createdAt", "updatedAt"
           ) VALUES (
-            ${quoteId}, ${item.id}, ${item.supplierId}, ${item.sizeQuantityId},
+            ${quoteId}, ${item.id}, ${item.supplierId}, ${customerId}, ${item.sizeQuantityId},
             ${item.quantity}, ${item.supplierCost || '0'}, ${item.deliveryDays || 3}, 'pending', NOW(), NOW()
           )
         `);
