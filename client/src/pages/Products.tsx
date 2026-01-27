@@ -2,24 +2,8 @@ import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -47,6 +31,23 @@ import {
   Sparkles,
   DollarSign,
 } from "lucide-react";
+import {
+  ProductDialog,
+  SizeDialog,
+  QuantityDialog,
+  AddonDialog,
+} from "@/components/products";
+import type {
+  Category,
+  Product,
+  ProductSize,
+  SizeQuantity,
+  ProductAddon,
+  ProductFormData,
+  SizeFormData,
+  QuantityFormData,
+  AddonFormData,
+} from "@/types/products";
 
 // Icon mapping for categories
 const categoryIcons: Record<string, any> = {
@@ -57,67 +58,7 @@ const categoryIcons: Record<string, any> = {
   'Flame': Flame,
 };
 
-interface Category {
-  id: number;
-  name: string;
-  description: string | null;
-  icon: string | null;
-  displayOrder: number | null;
-  isActive?: boolean | null;
-  createdAt?: Date;
-  updatedAt?: Date;
-}
-
-interface SizeQuantity {
-  id: number;
-  sizeId: number;
-  quantity: number;
-  price: string;
-  displayOrder: number | null;
-  isActive: boolean | null;
-  createdAt?: Date | null;
-}
-
-interface ProductSize {
-  id: number;
-  productId: number;
-  name: string;
-  dimensions: string | null;
-  basePrice: string;
-  displayOrder: number | null;
-  isActive: boolean | null;
-  createdAt?: Date | null;
-  updatedAt?: Date | null;
-  quantities?: SizeQuantity[];
-}
-
-interface ProductAddon {
-  id: number;
-  productId: number | null;
-  categoryId: number | null;
-  name: string;
-  description: string | null;
-  priceType: string;
-  price: string;
-  isActive: boolean | null;
-  createdAt?: Date | null;
-  updatedAt?: Date | null;
-}
-
-interface Product {
-  id: number;
-  name: string;
-  description: string | null;
-  categoryId: number | null;
-  imageUrl: string | null;
-  allowCustomQuantity: boolean | null;
-  isActive: boolean | null;
-  createdAt?: Date;
-  updatedAt?: Date;
-  sizes: ProductSize[];
-  addons?: ProductAddon[];
-  quantities?: SizeQuantity[];
-}
+// Types imported from @/types/products
 
 export default function Products() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
@@ -137,27 +78,27 @@ export default function Products() {
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
 
   // Form states
-  const [productForm, setProductForm] = useState({
+  const [productForm, setProductForm] = useState<ProductFormData>({
     name: "",
     description: "",
-    categoryId: null as number | null,
+    categoryId: null,
     allowCustomQuantity: true,
   });
 
-  const [sizeForm, setSizeForm] = useState({
+  const [sizeForm, setSizeForm] = useState<SizeFormData>({
     name: "",
     dimensions: "",
   });
 
-  const [quantityForm, setQuantityForm] = useState({
+  const [quantityForm, setQuantityForm] = useState<QuantityFormData>({
     quantity: "",
     price: "",
   });
 
-  const [addonForm, setAddonForm] = useState({
+  const [addonForm, setAddonForm] = useState<AddonFormData>({
     name: "",
     description: "",
-    priceType: "fixed" as "fixed" | "percentage" | "per_unit",
+    priceType: "fixed",
     price: "",
   });
 
@@ -900,191 +841,45 @@ export default function Products() {
       )}
 
       {/* Product Dialog */}
-      <Dialog open={isProductDialogOpen} onOpenChange={setIsProductDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{isEditMode ? "עריכת מוצר" : "מוצר חדש"}</DialogTitle>
-            <DialogDescription>
-              {isEditMode ? "ערוך את פרטי המוצר" : "הוסף מוצר חדש לקטלוג"}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>שם המוצר *</Label>
-              <Input
-                value={productForm.name}
-                onChange={(e) => setProductForm(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="לדוגמה: כרטיסי ביקור"
-              />
-            </div>
-            <div>
-              <Label>תיאור</Label>
-              <Input
-                value={productForm.description}
-                onChange={(e) => setProductForm(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="תיאור קצר של המוצר"
-              />
-            </div>
-            <div>
-              <Label>קטגוריה</Label>
-              <Select
-                value={productForm.categoryId?.toString() || ""}
-                onValueChange={(value) => setProductForm(prev => ({ ...prev, categoryId: parseInt(value) }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="בחר קטגוריה" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((cat: Category) => (
-                    <SelectItem key={cat.id} value={cat.id.toString()}>
-                      {cat.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsProductDialogOpen(false)}>ביטול</Button>
-            <Button onClick={handleProductSubmit}>
-              {isEditMode ? "עדכן" : "צור"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ProductDialog
+        isOpen={isProductDialogOpen}
+        onClose={() => setIsProductDialogOpen(false)}
+        onSubmit={handleProductSubmit}
+        isEditMode={isEditMode}
+        formData={productForm}
+        setFormData={setProductForm}
+        categories={categories}
+      />
 
       {/* Size Dialog */}
-      <Dialog open={isSizeDialogOpen} onOpenChange={setIsSizeDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{isEditMode ? "עריכת גודל" : "גודל חדש"}</DialogTitle>
-            <DialogDescription>
-              הגדר את שם הגודל והמידות
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>שם הגודל *</Label>
-              <Input
-                value={sizeForm.name}
-                onChange={(e) => setSizeForm(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="לדוגמה: A4, סטנדרט 9x5"
-              />
-            </div>
-            <div>
-              <Label>מידות (אופציונלי)</Label>
-              <Input
-                value={sizeForm.dimensions}
-                onChange={(e) => setSizeForm(prev => ({ ...prev, dimensions: e.target.value }))}
-                placeholder="לדוגמה: 21x29.7 ס״מ"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsSizeDialogOpen(false)}>ביטול</Button>
-            <Button onClick={handleSizeSubmit}>
-              {isEditMode ? "עדכן" : "צור"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <SizeDialog
+        isOpen={isSizeDialogOpen}
+        onClose={() => setIsSizeDialogOpen(false)}
+        onSubmit={handleSizeSubmit}
+        isEditMode={isEditMode}
+        formData={sizeForm}
+        setFormData={setSizeForm}
+      />
 
       {/* Quantity Dialog */}
-      <Dialog open={isQuantityDialogOpen} onOpenChange={setIsQuantityDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{isEditMode ? "עריכת כמות" : "כמות חדשה"}</DialogTitle>
-            <DialogDescription>
-              הגדר כמות ומחיר ספציפי לגודל זה
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>כמות *</Label>
-              <Input
-                type="number"
-                value={quantityForm.quantity}
-                onChange={(e) => setQuantityForm(prev => ({ ...prev, quantity: e.target.value }))}
-                placeholder="לדוגמה: 100, 250, 500"
-              />
-            </div>
-            <div>
-              <Label>מחיר (₪) *</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={quantityForm.price}
-                onChange={(e) => setQuantityForm(prev => ({ ...prev, price: e.target.value }))}
-                placeholder="לדוגמה: 150.00"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsQuantityDialogOpen(false)}>ביטול</Button>
-            <Button onClick={handleQuantitySubmit}>
-              {isEditMode ? "עדכן" : "צור"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <QuantityDialog
+        isOpen={isQuantityDialogOpen}
+        onClose={() => setIsQuantityDialogOpen(false)}
+        onSubmit={handleQuantitySubmit}
+        isEditMode={isEditMode}
+        formData={quantityForm}
+        setFormData={setQuantityForm}
+      />
 
       {/* Addon Dialog */}
-      <Dialog open={isAddonDialogOpen} onOpenChange={setIsAddonDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{isEditMode ? "עריכת תוספת" : "תוספת חדשה"}</DialogTitle>
-            <DialogDescription>
-              הגדר תוספת למוצר (למינציה, הבלטה וכו')
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>שם התוספת *</Label>
-              <Input
-                value={addonForm.name}
-                onChange={(e) => setAddonForm(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="לדוגמה: למינציה מט"
-              />
-            </div>
-            <div>
-              <Label>סוג תמחור</Label>
-              <Select
-                value={addonForm.priceType}
-                onValueChange={(value: "fixed" | "percentage" | "per_unit") => 
-                  setAddonForm(prev => ({ ...prev, priceType: value }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="fixed">סכום קבוע (₪)</SelectItem>
-                  <SelectItem value="percentage">אחוז מהמחיר (%)</SelectItem>
-                  <SelectItem value="per_unit">מחיר ליחידה (₪)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>
-                {addonForm.priceType === "percentage" ? "אחוז" : "מחיר (₪)"} *
-              </Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={addonForm.price}
-                onChange={(e) => setAddonForm(prev => ({ ...prev, price: e.target.value }))}
-                placeholder={addonForm.priceType === "percentage" ? "לדוגמה: 50" : "לדוגמה: 40.00"}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddonDialogOpen(false)}>ביטול</Button>
-            <Button onClick={handleAddonSubmit}>
-              {isEditMode ? "עדכן" : "צור"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <AddonDialog
+        isOpen={isAddonDialogOpen}
+        onClose={() => setIsAddonDialogOpen(false)}
+        onSubmit={handleAddonSubmit}
+        isEditMode={isEditMode}
+        formData={addonForm}
+        setFormData={setAddonForm}
+      />
     </div>
   );
 }
