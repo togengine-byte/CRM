@@ -71,18 +71,34 @@ interface Job {
   customerCompany?: string;
   customerPhone?: string;
   customerEmail?: string;
+  customerAddress?: string;
   supplierName: string;
   supplierCompany?: string;
   supplierPhone?: string;
+  supplierEmail?: string;
+  supplierAddress?: string;
   productName: string;
+  productDescription?: string;
+  productCategory?: string;
   sizeName?: string;
   dimensions?: string;
+  sizeBasePrice?: string;
+  sizeQuantityPrice?: string;
+  sizeQuantityAmount?: number;
   quantity?: number;
   pricePerUnit?: string;
+  totalJobPrice?: string;
   promisedDeliveryDays?: number;
   quoteTotal?: string;
+  quoteFinalValue?: string;
+  quoteStatus?: string;
   status: string;
+  isAccepted?: boolean;
+  acceptedAt?: string;
+  isCancelled?: boolean;
+  cancelledReason?: string;
   createdAt: string;
+  updatedAt?: string;
   expectedReadyAt?: string;
   supplierReadyAt?: string;
   readyAt?: string;
@@ -419,72 +435,100 @@ export default function Jobs() {
                             </div>
 
                             {/* Product & Order Details */}
-                            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                              <div>
-                                <p className="text-sm text-muted-foreground">מוצר</p>
-                                <p className="font-medium flex items-center gap-2">
-                                  <Package className="h-4 w-4 text-muted-foreground" />
-                                  {jobDetails.productName || "-"}
-                                </p>
+                            <div className="p-4 rounded-lg bg-purple-50 border border-purple-100">
+                              <h4 className="font-semibold text-purple-800 mb-3 flex items-center gap-2">
+                                <Package className="h-4 w-4" />
+                                פרטי מוצר והזמנה
+                              </h4>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div>
+                                  <p className="text-sm text-muted-foreground">מוצר</p>
+                                  <p className="font-medium">{jobDetails.productName || "-"}</p>
+                                  {jobDetails.productCategory && (
+                                    <p className="text-xs text-muted-foreground">קטגוריה: {jobDetails.productCategory}</p>
+                                  )}
+                                </div>
+                                <div>
+                                  <p className="text-sm text-muted-foreground">גודל</p>
+                                  <p className="font-medium">{jobDetails.sizeName || "-"}</p>
+                                  {jobDetails.dimensions && (
+                                    <p className="text-xs text-muted-foreground">מידות: {jobDetails.dimensions}</p>
+                                  )}
+                                </div>
+                                <div>
+                                  <p className="text-sm text-muted-foreground">כמות</p>
+                                  <p className="font-medium text-xl text-purple-700">{jobDetails.quantity || "-"}</p>
+                                </div>
+                                <div>
+                                  <p className="text-sm text-muted-foreground">מחיר ליחידה</p>
+                                  <p className="font-medium text-lg text-green-600">
+                                    {jobDetails.pricePerUnit ? `₪${parseFloat(jobDetails.pricePerUnit).toFixed(2)}` : "-"}
+                                  </p>
+                                </div>
                               </div>
-                              <div>
-                                <p className="text-sm text-muted-foreground">גודל</p>
-                                <p className="font-medium">{jobDetails.sizeName || "-"}</p>
-                                {jobDetails.dimensions && (
-                                  <p className="text-xs text-muted-foreground">{jobDetails.dimensions}</p>
-                                )}
-                              </div>
-                              <div>
-                                <p className="text-sm text-muted-foreground">כמות</p>
-                                <p className="font-medium text-lg">{jobDetails.quantity || "-"}</p>
-                              </div>
-                              <div>
-                                <p className="text-sm text-muted-foreground">מחיר ליחידה</p>
-                                <p className="font-medium text-lg text-green-600">
-                                  {jobDetails.pricePerUnit ? `₪${parseFloat(jobDetails.pricePerUnit).toFixed(2)}` : "-"}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-sm text-muted-foreground">סה״כ הצעה</p>
-                                <p className="font-medium text-lg text-primary">
-                                  {jobDetails.quoteTotal ? `₪${parseFloat(jobDetails.quoteTotal).toFixed(2)}` : "-"}
-                                </p>
+                              
+                              {/* Pricing Summary */}
+                              <div className="mt-4 pt-4 border-t border-purple-200 grid grid-cols-2 md:grid-cols-3 gap-4">
+                                <div>
+                                  <p className="text-sm text-muted-foreground">סה״כ עבודה זו</p>
+                                  <p className="font-bold text-xl text-green-600">
+                                    {jobDetails.totalJobPrice ? `₪${parseFloat(jobDetails.totalJobPrice).toFixed(2)}` : 
+                                     (jobDetails.quantity && jobDetails.pricePerUnit ? 
+                                       `₪${(jobDetails.quantity * parseFloat(jobDetails.pricePerUnit)).toFixed(2)}` : "-")}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-sm text-muted-foreground">סה״כ הצעת מחיר</p>
+                                  <p className="font-medium text-lg text-primary">
+                                    {jobDetails.quoteFinalValue ? `₪${parseFloat(jobDetails.quoteFinalValue).toFixed(2)}` : 
+                                     (jobDetails.quoteTotal ? `₪${parseFloat(jobDetails.quoteTotal).toFixed(2)}` : "-")}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-sm text-muted-foreground">מס׳ הצעת מחיר</p>
+                                  <p className="font-medium">{jobDetails.quoteId}</p>
+                                </div>
                               </div>
                             </div>
 
                             {/* Status & Dates */}
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t">
-                              <div>
-                                <p className="text-sm text-muted-foreground">מס׳ הצעת מחיר</p>
-                                <p className="font-medium">{jobDetails.quoteId}</p>
-                              </div>
-                              <div>
-                                <p className="text-sm text-muted-foreground">תאריך יצירה</p>
-                                <p className="font-medium flex items-center gap-2">
-                                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                                  {new Date(jobDetails.createdAt).toLocaleDateString("he-IL")}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-sm text-muted-foreground">סטטוס נוכחי</p>
-                                <div className="mt-1">{getStatusBadge(jobDetails.status)}</div>
-                              </div>
-                              {jobDetails.supplierReadyAt && (
+                            <div className="p-4 rounded-lg bg-gray-50 border border-gray-200">
+                              <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                                <Calendar className="h-4 w-4" />
+                                סטטוס ותאריכים
+                              </h4>
+                              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                                 <div>
-                                  <p className="text-sm text-muted-foreground">מוכן בתאריך</p>
+                                  <p className="text-sm text-muted-foreground">סטטוס נוכחי</p>
+                                  <div className="mt-1">{getStatusBadge(jobDetails.status)}</div>
+                                </div>
+                                <div>
+                                  <p className="text-sm text-muted-foreground">תאריך יצירה</p>
                                   <p className="font-medium">
-                                    {new Date(jobDetails.supplierReadyAt).toLocaleDateString("he-IL")}
+                                    {new Date(jobDetails.createdAt).toLocaleDateString("he-IL")}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-sm text-muted-foreground">ימי אספקה מובטחים</p>
+                                  <p className="font-medium">{jobDetails.promisedDeliveryDays || "-"} ימים</p>
+                                </div>
+                                {jobDetails.supplierReadyAt && (
+                                  <div>
+                                    <p className="text-sm text-muted-foreground">מוכן בתאריך</p>
+                                    <p className="font-medium text-green-600">
+                                      {new Date(jobDetails.supplierReadyAt).toLocaleDateString("he-IL")}
+                                    </p>
+                                  </div>
+                                )}
+                                {jobDetails.deliveredAt && (
+                                  <div>
+                                    <p className="text-sm text-muted-foreground">נמסר בתאריך</p>
+                                    <p className="font-medium text-teal-600">
+                                      {new Date(jobDetails.deliveredAt).toLocaleDateString("he-IL")}
                                   </p>
                                 </div>
                               )}
-                              {jobDetails.deliveredAt && (
-                                <div>
-                                  <p className="text-sm text-muted-foreground">נמסר בתאריך</p>
-                                  <p className="font-medium">
-                                    {new Date(jobDetails.deliveredAt).toLocaleDateString("he-IL")}
-                                  </p>
-                                </div>
-                              )}
+                              </div>
                             </div>
 
                             {/* File Validation Warnings */}
