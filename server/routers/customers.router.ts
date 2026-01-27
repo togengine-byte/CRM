@@ -129,6 +129,24 @@ export const customersRouter = router({
       return await setCustomerDefaultPricelist(input.customerId, input.pricelistId);
     }),
 
+  create: protectedProcedure
+    .input(z.object({
+      name: z.string().min(1),
+      email: z.string().email(),
+      phone: z.string().min(1),
+      companyName: z.string().optional(),
+      address: z.string().optional(),
+      billingEmail: z.string().email().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.user) throw new Error("Not authenticated");
+      if (ctx.user.role !== 'admin' && ctx.user.role !== 'employee') {
+        throw new Error("Only employees can create customers");
+      }
+      const { createCustomer } = await import("../db/customers");
+      return await createCustomer(input);
+    }),
+
   createWithQuote: publicProcedure
     .input(z.object({
       customerInfo: z.object({

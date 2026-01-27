@@ -92,6 +92,15 @@ export default function Customers() {
     address: "",
     billingEmail: "",
   });
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [createForm, setCreateForm] = useState<CustomerFormData>({
+    name: "",
+    email: "",
+    phone: "",
+    companyName: "",
+    address: "",
+    billingEmail: "",
+  });
 
   const utils = trpc.useUtils();
 
@@ -177,6 +186,26 @@ export default function Customers() {
     },
   });
 
+  const createMutation = trpc.customers.create.useMutation({
+    onSuccess: () => {
+      toast.success("הלקוח נוצר בהצלחה");
+      refetch();
+      utils.customers.stats.refetch();
+      setIsCreateDialogOpen(false);
+      setCreateForm({
+        name: "",
+        email: "",
+        phone: "",
+        companyName: "",
+        address: "",
+        billingEmail: "",
+      });
+    },
+    onError: (error) => {
+      toast.error(`שגיאה ביצירת הלקוח: ${error.message}`);
+    },
+  });
+
   const handleApprove = (customerId: number) => {
     approveMutation.mutate({ customerId });
   };
@@ -222,6 +251,21 @@ export default function Customers() {
     }
   };
 
+  const handleCreateCustomer = () => {
+    if (!createForm.name || !createForm.email || !createForm.phone) {
+      toast.error("נא למלא שם, אימייל וטלפון");
+      return;
+    }
+    createMutation.mutate({
+      name: createForm.name,
+      email: createForm.email,
+      phone: createForm.phone,
+      companyName: createForm.companyName || undefined,
+      address: createForm.address || undefined,
+      billingEmail: createForm.billingEmail || undefined,
+    });
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "active":
@@ -264,6 +308,10 @@ export default function Customers() {
           <h1 className="text-2xl font-bold tracking-tight">לקוחות</h1>
           <p className="text-muted-foreground">ניהול לקוחות ואישור בקשות הרשמה</p>
         </div>
+        <Button onClick={() => setIsCreateDialogOpen(true)}>
+          <Users className="ml-2 h-4 w-4" />
+          לקוח חדש
+        </Button>
       </div>
 
       {/* Stats Cards */}
@@ -642,6 +690,82 @@ export default function Customers() {
               disabled={rejectMutation.isPending}
             >
               {rejectMutation.isPending ? "דוחה..." : "דחייה"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Customer Dialog */}
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>לקוח חדש</DialogTitle>
+            <DialogDescription>הוסף לקוח חדש למערכת</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="create-name">שם מלא *</Label>
+              <Input
+                id="create-name"
+                value={createForm.name}
+                onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
+                placeholder="שם הלקוח"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="create-email">אימייל *</Label>
+              <Input
+                id="create-email"
+                type="email"
+                value={createForm.email}
+                onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
+                placeholder="email@example.com"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="create-phone">טלפון *</Label>
+              <Input
+                id="create-phone"
+                value={createForm.phone}
+                onChange={(e) => setCreateForm({ ...createForm, phone: e.target.value })}
+                placeholder="050-0000000"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="create-company">שם חברה</Label>
+              <Input
+                id="create-company"
+                value={createForm.companyName}
+                onChange={(e) => setCreateForm({ ...createForm, companyName: e.target.value })}
+                placeholder="שם החברה"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="create-address">כתובת</Label>
+              <Input
+                id="create-address"
+                value={createForm.address}
+                onChange={(e) => setCreateForm({ ...createForm, address: e.target.value })}
+                placeholder="כתובת מלאה"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="create-billing-email">אימייל לחשבוניות</Label>
+              <Input
+                id="create-billing-email"
+                type="email"
+                value={createForm.billingEmail}
+                onChange={(e) => setCreateForm({ ...createForm, billingEmail: e.target.value })}
+                placeholder="billing@example.com"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+              ביטול
+            </Button>
+            <Button onClick={handleCreateCustomer} disabled={createMutation.isPending}>
+              {createMutation.isPending ? "יוצר..." : "צור לקוח"}
             </Button>
           </DialogFooter>
         </DialogContent>

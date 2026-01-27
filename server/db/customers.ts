@@ -270,6 +270,49 @@ export async function getCustomerStats() {
   return stats;
 }
 
+// ==================== CREATE CUSTOMER ====================
+
+/**
+ * Create a new customer directly (by employee/admin)
+ */
+export async function createCustomer(data: {
+  name: string;
+  email: string;
+  phone: string;
+  companyName?: string;
+  address?: string;
+  billingEmail?: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Check if email already exists
+  const existing = await db.select().from(users).where(eq(users.email, data.email));
+  if (existing.length > 0) {
+    throw new Error("לקוח עם כתובת אימייל זו כבר קיים במערכת");
+  }
+
+  const [result] = await db.insert(users).values({
+    name: data.name,
+    email: data.email,
+    phone: data.phone,
+    companyName: data.companyName || null,
+    address: data.address || null,
+    billingEmail: data.billingEmail || null,
+    role: 'customer',
+    status: 'active', // Created by employee = already approved
+    openId: `manual_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+  }).returning();
+
+  await logActivity(null, 'customer_created', {
+    customerId: result.id,
+    name: data.name,
+    email: data.email,
+  });
+
+  return result;
+}
+
 // ==================== CUSTOMER SIGNUP REQUESTS ====================
 
 /**
