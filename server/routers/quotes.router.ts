@@ -184,15 +184,28 @@ export const quotesRouter = router({
       const pricePerUnit = (supplierPrice.rows?.[0] as { pricePerUnit?: number })?.pricePerUnit || 100;
       const deliveryDays = (supplierPrice.rows?.[0] as { deliveryDays?: number })?.deliveryDays || 3;
       
-      // Assign supplier to all quote items
+      // Assign supplier to all quote items and create supplier jobs
       for (const item of quoteItemsResult.rows) {
         const typedItem = item as { id: number; sizeQuantityId: number; quantity: number };
+        
+        // Update quote item with supplier info
         await assignSupplierToQuoteItem(
           typedItem.id,
           input.supplierId,
           Number(pricePerUnit),
           Number(deliveryDays)
         );
+        
+        // Create supplier job for this item
+        await db.execute(sql`
+          INSERT INTO supplier_jobs (
+            "quoteId", "quoteItemId", "supplierId", "sizeQuantityId", 
+            quantity, "pricePerUnit", "promisedDeliveryDays", status, "createdAt", "updatedAt"
+          ) VALUES (
+            ${input.quoteId}, ${typedItem.id}, ${input.supplierId}, ${typedItem.sizeQuantityId},
+            ${typedItem.quantity}, ${pricePerUnit}, ${deliveryDays}, 'pending', NOW(), NOW()
+          )
+        `);
       }
       
       // Update quote status to in_production
