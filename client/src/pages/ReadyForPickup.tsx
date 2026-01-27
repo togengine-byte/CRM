@@ -212,7 +212,7 @@ export default function ReadyForPickup() {
                             e.stopPropagation();
                             handleMarkDelivered(quote.id);
                           }}
-                          disabled={markDeliveredMutation.isPending}
+                          disabled={false}
                         >
                           <Truck className="h-4 w-4 ml-1" />
                           סמן כנמסר
