@@ -854,12 +854,14 @@ export default function Quotes() {
                                   productName: item.productName || getSizeQuantityName(item.sizeQuantityId),
                                 })) || []}
                                 quoteStatus={quote.status}
-                                onSupplierSelected={() => {
-                                  refetch();
-                                  refetchQuoteDetails();
-                                  utils.quotes.list.refetch();
-                                  utils.quotes.getById.refetch();
-                                  setEditedPrices({}); // Clear edited prices to show new values from DB
+                                onSupplierSelected={async () => {
+                                  // Clear edited prices first to show new values from DB
+                                  setEditedPrices({});
+                                  // Invalidate and refetch all quote data
+                                  await utils.quotes.getById.invalidate({ id: quote.id });
+                                  await utils.quotes.list.invalidate();
+                                  await refetch();
+                                  await refetchQuoteDetails();
                                 }}
                                 markupPercentage={pricingData?.pricelist?.markupPercentage || selectedPricelistId ? parseFloat(pricelists?.find((pl: any) => pl.id === selectedPricelistId)?.markupPercentage || '0') : 0}
                               />
@@ -1004,10 +1006,14 @@ export default function Quotes() {
                                 productName: item.productName || getSizeQuantityName(item.sizeQuantityId),
                               })) || []}
                               quoteStatus={quote.status}
-                              onSupplierSelected={() => {
-                                refetch();
-                                refetchQuoteDetails();
-                                setEditedPrices({}); // Clear edited prices to show new values from DB
+                              onSupplierSelected={async () => {
+                                // Clear edited prices first to show new values from DB
+                                setEditedPrices({});
+                                // Invalidate and refetch all quote data
+                                await utils.quotes.getById.invalidate({ id: quote.id });
+                                await utils.quotes.list.invalidate();
+                                await refetch();
+                                await refetchQuoteDetails();
                               }}
                             />
                           )}
@@ -1484,10 +1490,12 @@ export default function Quotes() {
           setSelectedQuoteForSupplier(null);
         }}
         quoteId={selectedQuoteForSupplier}
-        onSupplierSelected={() => {
+        onSupplierSelected={async () => {
           setShowSupplierModal(false);
           setSelectedQuoteForSupplier(null);
-          refetch();
+          // Invalidate and refetch all quote data
+          await utils.quotes.list.invalidate();
+          await refetch();
         }}
       />
 

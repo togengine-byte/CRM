@@ -315,7 +315,6 @@ export async function selectSupplierForItem(
           "supplierCost" = ${supplierCost.toString()},
           "priceAtTimeOfQuote" = ${customerPrice.toString()},
           "deliveryDays" = ${deliveryDays},
-          "supplierName" = ${supplierName},
           "isManualPrice" = false
       WHERE id = ${quoteItemId}
     `);

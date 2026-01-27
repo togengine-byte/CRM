@@ -95,6 +95,7 @@ export async function getQuoteById(quoteId: number) {
     sizeQuantityId: quoteItems.sizeQuantityId,
     quantity: quoteItems.quantity,
     priceAtTimeOfQuote: quoteItems.priceAtTimeOfQuote,
+    isManualPrice: quoteItems.isManualPrice,
     isUpsell: quoteItems.isUpsell,
     supplierId: quoteItems.supplierId,
     supplierCost: quoteItems.supplierCost,
