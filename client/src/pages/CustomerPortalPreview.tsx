@@ -111,6 +111,31 @@ export default function CustomerPortalPreview() {
     { enabled: !!selectedQuoteId && isDetailsOpen }
   );
 
+  // Mutations for approve/reject
+  const approveMutation = trpc.customerPortal.approveQuote.useMutation({
+    onSuccess: () => {
+      toast.success("הצעת המחיר אושרה בהצלחה!");
+      refetch();
+      utils.quotes.list.invalidate();
+    },
+    onError: (error) => {
+      toast.error(`שגיאה באישור ההצעה: ${error.message}`);
+    },
+  });
+
+  const rejectMutation = trpc.customerPortal.rejectQuote.useMutation({
+    onSuccess: () => {
+      toast.success("הצעת המחיר נדחתה");
+      refetch();
+      utils.quotes.list.invalidate();
+      setIsRejectDialogOpen(false);
+      setRejectReason("");
+    },
+    onError: (error) => {
+      toast.error(`שגיאה בדחיית ההצעה: ${error.message}`);
+    },
+  });
+
   // Calculate stats for selected customer
   const stats = {
     total: quotes.length,
@@ -148,17 +173,17 @@ export default function CustomerPortalPreview() {
 
   const canApproveOrReject = (status: QuoteStatus) => status === "sent";
 
-  // Simulate customer approve action
-  const handleSimulateApprove = (quoteId: number) => {
-    toast.success(`סימולציה: הצעה #${quoteId} אושרה על ידי הלקוח`);
-    // In real scenario, this would call customerPortal.approveQuote
+  // Approve quote action
+  const handleApprove = (quoteId: number) => {
+    approveMutation.mutate({ quoteId });
   };
 
-  // Simulate customer reject action
-  const handleSimulateReject = (quoteId: number) => {
-    toast.info(`סימולציה: הצעה #${quoteId} נדחתה על ידי הלקוח`);
-    setIsRejectDialogOpen(false);
-    setRejectReason("");
+  // Reject quote action
+  const handleReject = (quoteId: number) => {
+    rejectMutation.mutate({
+      quoteId,
+      reason: rejectReason || undefined,
+    });
   };
 
   return (
@@ -367,7 +392,7 @@ export default function CustomerPortalPreview() {
                                 variant="ghost"
                                 size="sm"
                                 className="text-green-600 hover:text-green-700"
-                                onClick={() => handleSimulateApprove(quote.id)}
+                                onClick={() => handleApprove(quote.id)}
                               >
                                 <CheckCircle className="h-4 w-4 ml-1" />
                                 אשר
@@ -492,7 +517,7 @@ export default function CustomerPortalPreview() {
                 <div className="flex gap-3 pt-4">
                   <Button
                     className="flex-1 bg-green-600 hover:bg-green-700"
-                    onClick={() => handleSimulateApprove(selectedQuoteId!)}
+                    onClick={() => handleApprove(selectedQuoteId!)}
                   >
                     <CheckCircle className="h-4 w-4 ml-2" />
                     אשר הצעה
@@ -537,7 +562,7 @@ export default function CustomerPortalPreview() {
             </Button>
             <Button
               variant="destructive"
-              onClick={() => handleSimulateReject(selectedQuoteId!)}
+              onClick={() => handleReject(selectedQuoteId!)}
             >
               <XCircle className="h-4 w-4 ml-2" />
               דחה הצעה
