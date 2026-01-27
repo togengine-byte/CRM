@@ -1313,6 +1313,7 @@ function StaffManagementSettings() {
 // ==================== MAIN SETTINGS COMPONENT ====================
 export default function Settings() {
   const { user } = useAuthContext();
+  const [, setLocation] = useLocation();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingProfile, setEditingProfile] = useState<any>(null);
   
