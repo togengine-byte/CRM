@@ -439,6 +439,7 @@ export const supplierPortalRouter = router({
         LEFT JOIN base_products bp ON ps.product_id = bp.id
         WHERE sj."supplierId" = ${targetSupplierId}
           AND sj.status = 'pending'
+          AND (sj."isCancelled" = false OR sj."isCancelled" IS NULL)
         ORDER BY sj."createdAt" DESC
       `);
 
@@ -487,6 +488,8 @@ export const supplierPortalRouter = router({
           sj."promisedDeliveryDays",
           sj."acceptedAt",
           sj."createdAt",
+          sj.status,
+          sj."supplierMarkedReady",
           customer.name as "customerName",
           customer."companyName" as "customerCompany",
           ps.name as "sizeName",
@@ -499,7 +502,7 @@ export const supplierPortalRouter = router({
         LEFT JOIN product_sizes ps ON sq.size_id = ps.id
         LEFT JOIN base_products bp ON ps.product_id = bp.id
         WHERE sj."supplierId" = ${targetSupplierId}
-          AND sj.status = 'accepted'
+          AND sj.status IN ('accepted', 'ready')
           AND sj."isCancelled" = false
         ORDER BY sj."acceptedAt" DESC
       `);
@@ -523,6 +526,8 @@ export const supplierPortalRouter = router({
             promisedDeliveryDays: row.promisedDeliveryDays,
             acceptedAt: row.acceptedAt,
             createdAt: row.createdAt,
+            status: row.status,
+            isReady: row.status === 'ready' || row.supplierMarkedReady === true,
             customerName: row.customerName || 'לקוח לא מזוהה',
             customerCompany: row.customerCompany,
             productName: row.productName || 'מוצר',
@@ -719,6 +724,78 @@ export const supplierPortalRouter = router({
         customerName: row.customerName || 'לקוח לא מזוהה',
         customerCompany: row.customerCompany,
         productName: row.productName ? `${row.productName} - ${row.sizeName}` : 'מוצר',
+      }));
+    }),
+
+  // ==================== COLLECTED JOBS (עבודות שנאספו) ====================
+  collectedJobs: protectedProcedure
+    .input(z.object({ 
+      supplierId: z.number().optional(),
+      limit: z.number().optional()
+    }).optional())
+    .query(async ({ ctx, input }) => {
+      if (!ctx.user) throw new Error("Not authenticated");
+      if (ctx.user.role !== "supplier" && ctx.user.role !== "admin" && ctx.user.role !== "employee") {
+        throw new Error("Only suppliers can access supplier portal");
+      }
+
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+
+      const isAdminOrEmployee = ctx.user.role === "admin" || ctx.user.role === "employee";
+      const targetSupplierId = isAdminOrEmployee && input?.supplierId ? input.supplierId : ctx.user.id;
+      const limit = input?.limit || 100;
+
+      // Get collected/picked up jobs
+      const result = await db.execute(sql`
+        SELECT 
+          sj.id,
+          sj."quoteId",
+          sj."quoteItemId",
+          sj.quantity,
+          sj."pricePerUnit",
+          sj.status,
+          sj."supplierRating",
+          sj."supplierReadyAt",
+          sj."acceptedAt",
+          sj."createdAt",
+          sj."updatedAt",
+          customer.name as "customerName",
+          customer."companyName" as "customerCompany",
+          ps.name as "sizeName",
+          ps.dimensions as "dimensions",
+          bp.name as "productName",
+          bp.id as "productId"
+        FROM supplier_jobs sj
+        LEFT JOIN users customer ON sj."customerId" = customer.id
+        LEFT JOIN size_quantities sq ON sj."sizeQuantityId" = sq.id
+        LEFT JOIN product_sizes ps ON sq.size_id = ps.id
+        LEFT JOIN base_products bp ON ps.product_id = bp.id
+        WHERE sj."supplierId" = ${targetSupplierId}
+          AND sj.status IN ('picked_up', 'delivered')
+          AND sj."isCancelled" = false
+        ORDER BY sj."updatedAt" DESC
+        LIMIT ${limit}
+      `);
+
+      return result.rows.map((row: any) => ({
+        id: row.id,
+        quoteId: row.quoteId,
+        quoteItemId: row.quoteItemId,
+        quantity: row.quantity,
+        pricePerUnit: parseFloat(row.pricePerUnit),
+        status: row.status,
+        rating: row.supplierRating ? parseFloat(row.supplierRating) : null,
+        readyAt: row.supplierReadyAt,
+        acceptedAt: row.acceptedAt,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        customerName: row.customerName || 'לקוח לא מזוהה',
+        customerCompany: row.customerCompany,
+        productName: row.productName || 'מוצר',
+        sizeName: row.sizeName,
+        dimensions: row.dimensions,
+        productId: row.productId,
       }));
     }),
 

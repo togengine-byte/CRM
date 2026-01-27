@@ -85,6 +85,8 @@ interface ActiveJob {
   promisedDeliveryDays: number;
   acceptedAt: string;
   createdAt: string;
+  status: string;
+  isReady: boolean;
   customerName: string;
   customerCompany: string | null;
   productName: string;
@@ -97,6 +99,26 @@ interface ActiveJob {
     fileUrl: string;
     uploadedAt: string;
   }>;
+}
+
+interface CollectedJob {
+  id: number;
+  quoteId: number;
+  quoteItemId: number;
+  quantity: number;
+  pricePerUnit: number;
+  status: string;
+  rating: number | null;
+  readyAt: string | null;
+  acceptedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  customerName: string;
+  customerCompany: string | null;
+  productName: string;
+  sizeName: string | null;
+  dimensions: string | null;
+  productId: number;
 }
 
 interface JobHistory {
@@ -665,6 +687,95 @@ function HistoryTab({ supplierId }: { supplierId: number }) {
   );
 }
 
+// Collected Jobs Tab Component (עבודות שנאספו)
+function CollectedJobsTab({ supplierId }: { supplierId: number }) {
+  const { data: jobs = [], isLoading } = trpc.supplierPortal.collectedJobs.useQuery(
+    { supplierId, limit: 100 },
+    { enabled: !!supplierId }
+  );
+
+  if (isLoading) {
+    return <div className="p-8 text-center text-slate-400">טוען עבודות שנאספו...</div>;
+  }
+
+  if (jobs.length === 0) {
+    return (
+      <Card>
+        <CardContent className="p-8 text-center text-slate-400">
+          <Truck className="h-12 w-12 mx-auto mb-3 text-slate-300" />
+          <p>אין עבודות שנאספו</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'picked_up':
+        return <Badge className="bg-blue-100 text-blue-700">נאסף</Badge>;
+      case 'delivered':
+        return <Badge className="bg-purple-100 text-purple-700">נמסר</Badge>;
+      default:
+        return <Badge variant="secondary">{status}</Badge>;
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold flex items-center gap-2">
+        <Truck className="h-5 w-5 text-blue-500" />
+        עבודות שנאספו ({jobs.length})
+      </h3>
+
+      <Card>
+        <CardContent className="p-0">
+          <div className="divide-y">
+            {jobs.map((job: CollectedJob) => (
+              <div key={job.id} className="p-4 hover:bg-slate-50">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      {getStatusBadge(job.status)}
+                      <span className="text-sm text-slate-500">הזמנה #{job.quoteId}</span>
+                      {job.rating && (
+                        <span className="flex items-center gap-1 text-yellow-600">
+                          <Star className="h-4 w-4 fill-yellow-500" />
+                          {job.rating}
+                        </span>
+                      )}
+                    </div>
+                    <p className="font-medium">
+                      {job.productName}
+                      {job.sizeName && <span className="text-slate-500"> - {job.sizeName}</span>}
+                      {job.dimensions && <span className="text-slate-400 text-sm"> ({job.dimensions})</span>}
+                    </p>
+                    <p className="text-sm text-slate-500">
+                      {job.customerName}
+                      {job.customerCompany && <span> • {job.customerCompany}</span>}
+                      {' '}• כמות: {job.quantity}
+                    </p>
+                  </div>
+                  <div className="text-left">
+                    <p className="font-semibold">₪{(job.quantity * job.pricePerUnit).toFixed(2)}</p>
+                    <p className="text-sm text-slate-500">
+                      {new Date(job.updatedAt).toLocaleDateString('he-IL')}
+                    </p>
+                    {job.readyAt && (
+                      <p className="text-xs text-slate-400">
+                        מוכן: {new Date(job.readyAt).toLocaleDateString('he-IL')}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 // Pricelist Tab Component (existing functionality)
 function PricelistTab({ supplierId }: { supplierId: number }) {
   const [page, setPage] = useState(1);
@@ -967,7 +1078,7 @@ function SupplierPortalView({ supplier, onBack }: { supplier: Supplier; onBack: 
 
       {/* Main Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-5 mb-6">
+        <TabsList className="grid w-full grid-cols-6 mb-6">
           <TabsTrigger value="dashboard" className="gap-2">
             <BarChart3 className="h-4 w-4" />
             דשבורד
@@ -983,6 +1094,10 @@ function SupplierPortalView({ supplier, onBack }: { supplier: Supplier; onBack: 
           <TabsTrigger value="pricelist" className="gap-2">
             <DollarSign className="h-4 w-4" />
             מחירון
+          </TabsTrigger>
+          <TabsTrigger value="collected" className="gap-2">
+            <Truck className="h-4 w-4" />
+            נאספו
           </TabsTrigger>
           <TabsTrigger value="history" className="gap-2">
             <FileText className="h-4 w-4" />
@@ -1004,6 +1119,10 @@ function SupplierPortalView({ supplier, onBack }: { supplier: Supplier; onBack: 
 
         <TabsContent value="pricelist">
           <PricelistTab supplierId={supplier.id} />
+        </TabsContent>
+
+        <TabsContent value="collected">
+          <CollectedJobsTab supplierId={supplier.id} />
         </TabsContent>
 
         <TabsContent value="history">
