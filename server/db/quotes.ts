@@ -20,6 +20,7 @@ import { CreateQuoteRequest, UpdateQuoteRequest, ReviseQuoteRequest } from "./ty
 
 /**
  * Get all quotes with optional filters
+ * Includes items with supplierId for checking supplier assignment status
  */
 export async function getQuotes(filters?: {
   status?: string;
@@ -59,7 +60,26 @@ export async function getQuotes(filters?: {
     filtered = filtered.filter(q => q.customerId === filters.customerId);
   }
 
-  return filtered;
+  // Fetch items for each quote to check supplier assignment
+  const quotesWithItems = await Promise.all(
+    filtered.map(async (quote) => {
+      const items = await db.select({
+        id: quoteItems.id,
+        sizeQuantityId: quoteItems.sizeQuantityId,
+        quantity: quoteItems.quantity,
+        priceAtTimeOfQuote: quoteItems.priceAtTimeOfQuote,
+        supplierId: quoteItems.supplierId,
+        supplierCost: quoteItems.supplierCost,
+        deliveryDays: quoteItems.deliveryDays,
+      })
+      .from(quoteItems)
+      .where(eq(quoteItems.quoteId, quote.id));
+      
+      return { ...quote, items };
+    })
+  );
+
+  return quotesWithItems;
 }
 
 /**
