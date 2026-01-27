@@ -254,8 +254,8 @@ export async function getActiveJobs() {
       bp.name as "productName",
       bp.description as "productDescription",
       bp.category as "productCategory",
-      q."totalPrice" as "quoteTotal",
-      q."finalValue" as "quoteFinalValue",
+      q."finalValue" as "quoteTotal",
+      q."totalSupplierCost" as "totalSupplierCost",
       q.status as "quoteStatus",
       (sj.quantity * sj."pricePerUnit") as "totalJobPrice"
     FROM supplier_jobs sj
@@ -308,7 +308,7 @@ export async function getActiveJobs() {
     productDescription: row.productDescription,
     productCategory: row.productCategory,
     quoteTotal: row.quoteTotal,
-    quoteFinalValue: row.quoteFinalValue,
+    totalSupplierCost: row.totalSupplierCost,
     quoteStatus: row.quoteStatus,
     totalJobPrice: row.totalJobPrice,
   }));
