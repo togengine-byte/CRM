@@ -4,7 +4,6 @@
  * Handles sending emails using Gmail SMTP with App Password
  */
 
-import * as nodemailer from 'nodemailer';
 import { getGmailSettingsInternal } from './settings';
 import { logActivity } from './activity';
 
@@ -22,6 +21,19 @@ export interface SendEmailResult {
 }
 
 /**
+ * Get nodemailer dynamically to avoid build issues
+ */
+async function getNodemailer() {
+  try {
+    const nodemailer = await import('nodemailer');
+    return nodemailer.default || nodemailer;
+  } catch (error) {
+    console.error('[Email] Failed to load nodemailer:', error);
+    return null;
+  }
+}
+
+/**
  * Send email using configured Gmail settings
  */
 export async function sendEmail(params: SendEmailParams, userId?: number): Promise<SendEmailResult> {
@@ -34,6 +46,14 @@ export async function sendEmail(params: SendEmailParams, userId?: number): Promi
       return {
         success: false,
         error: 'הגדרות Gmail לא הוגדרו. יש להגדיר מייל וסיסמת אפליקציה בהגדרות כלליות.',
+      };
+    }
+    
+    const nodemailer = await getNodemailer();
+    if (!nodemailer) {
+      return {
+        success: false,
+        error: 'שגיאה בטעינת מודול המייל',
       };
     }
     
@@ -96,6 +116,14 @@ export async function testGmailConnection(): Promise<{ success: boolean; error?:
       return {
         success: false,
         error: 'הגדרות Gmail לא הוגדרו',
+      };
+    }
+    
+    const nodemailer = await getNodemailer();
+    if (!nodemailer) {
+      return {
+        success: false,
+        error: 'שגיאה בטעינת מודול המייל',
       };
     }
     
