@@ -179,22 +179,29 @@ export const customerPortalRouter = router({
     .input(z.object({ quoteId: z.number() }))
     .mutation(async ({ ctx, input }) => {
       if (!ctx.user) throw new Error("Not authenticated");
-      if (ctx.user.role !== "customer") {
-        throw new Error("Only customers can approve quotes");
+      
+      // Allow both customers and admins to approve quotes
+      const isAdmin = ctx.user.role === "admin" || ctx.user.role === "employee";
+      const isCustomer = ctx.user.role === "customer";
+      
+      if (!isAdmin && !isCustomer) {
+        throw new Error("Only customers or admins can approve quotes");
       }
 
       const db = await getDb();
       if (!db) throw new Error("Database not available");
 
-      // Verify quote belongs to customer and is in 'sent' status
+      // For customers, verify quote belongs to them. For admins, just get the quote.
       const quoteResult = await db
         .select()
         .from(quotes)
         .where(
-          and(
-            eq(quotes.id, input.quoteId),
-            eq(quotes.customerId, ctx.user.id)
-          )
+          isCustomer
+            ? and(
+                eq(quotes.id, input.quoteId),
+                eq(quotes.customerId, ctx.user.id)
+              )
+            : eq(quotes.id, input.quoteId)
         );
 
       if (quoteResult.length === 0) {
@@ -303,22 +310,29 @@ export const customerPortalRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       if (!ctx.user) throw new Error("Not authenticated");
-      if (ctx.user.role !== "customer") {
-        throw new Error("Only customers can reject quotes");
+      
+      // Allow both customers and admins to reject quotes
+      const isAdmin = ctx.user.role === "admin" || ctx.user.role === "employee";
+      const isCustomer = ctx.user.role === "customer";
+      
+      if (!isAdmin && !isCustomer) {
+        throw new Error("Only customers or admins can reject quotes");
       }
 
       const db = await getDb();
       if (!db) throw new Error("Database not available");
 
-      // Verify quote belongs to customer and is in 'sent' status
+      // For customers, verify quote belongs to them. For admins, just get the quote.
       const quoteResult = await db
         .select()
         .from(quotes)
         .where(
-          and(
-            eq(quotes.id, input.quoteId),
-            eq(quotes.customerId, ctx.user.id)
-          )
+          isCustomer
+            ? and(
+                eq(quotes.id, input.quoteId),
+                eq(quotes.customerId, ctx.user.id)
+              )
+            : eq(quotes.id, input.quoteId)
         );
 
       if (quoteResult.length === 0) {
