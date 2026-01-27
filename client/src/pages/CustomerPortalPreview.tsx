@@ -101,7 +101,7 @@ export default function CustomerPortalPreview() {
   const { data: allQuotes = [], isLoading, refetch } = trpc.quotes.list.useQuery({});
 
   // Filter quotes by selected customer
-  const quotes = selectedCustomerId 
+  const quotes = selectedCustomerId && selectedCustomerId !== 'all'
     ? allQuotes.filter((q: any) => q.customerId === parseInt(selectedCustomerId))
     : allQuotes;
 
@@ -193,7 +193,7 @@ export default function CustomerPortalPreview() {
               <SelectValue placeholder="בחר לקוח..." />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">כל הלקוחות</SelectItem>
+              <SelectItem value="all">כל הלקוחות</SelectItem>
               {customers?.map((customer: any) => (
                 <SelectItem key={customer.id} value={customer.id.toString()}>
                   {customer.name} {customer.companyName && `(${customer.companyName})`}
@@ -209,7 +209,7 @@ export default function CustomerPortalPreview() {
         <div>
           <h1 className="text-2xl font-bold">הצעות המחיר שלי</h1>
           <p className="text-muted-foreground">
-            {selectedCustomerId 
+            {selectedCustomerId && selectedCustomerId !== 'all'
               ? `צפייה בהצעות של: ${customers?.find((c: any) => c.id === parseInt(selectedCustomerId))?.name || 'לקוח'}`
               : 'צפה ונהל את הצעות המחיר שלך'
             }
@@ -318,7 +318,7 @@ export default function CustomerPortalPreview() {
               <FileText className="h-12 w-12 text-muted-foreground/50 mb-4" />
               <h3 className="text-lg font-medium">אין הצעות מחיר</h3>
               <p className="text-muted-foreground mt-1">
-                {selectedCustomerId ? 'ללקוח זה אין הצעות מחיר' : 'עדיין לא נוצרו הצעות מחיר'}
+                {selectedCustomerId && selectedCustomerId !== 'all' ? 'ללקוח זה אין הצעות מחיר' : 'עדיין לא נוצרו הצעות מחיר'}
               </p>
             </div>
           ) : (
@@ -326,7 +326,7 @@ export default function CustomerPortalPreview() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="text-right">מספר הצעה</TableHead>
-                  {!selectedCustomerId && <TableHead className="text-right">לקוח</TableHead>}
+                  {(!selectedCustomerId || selectedCustomerId === 'all') && <TableHead className="text-right">לקוח</TableHead>}
                   <TableHead className="text-right">גרסה</TableHead>
                   <TableHead className="text-right">סכום</TableHead>
                   <TableHead className="text-right">סטטוס</TableHead>
@@ -342,7 +342,7 @@ export default function CustomerPortalPreview() {
                   .map((quote: any) => (
                     <TableRow key={quote.id}>
                       <TableCell className="font-medium">{quote.id}</TableCell>
-                      {!selectedCustomerId && <TableCell>{quote.customerName || '-'}</TableCell>}
+                      {(!selectedCustomerId || selectedCustomerId === 'all') && <TableCell>{quote.customerName || '-'}</TableCell>}
                       <TableCell>v{quote.version}</TableCell>
                       <TableCell>
                         {quote.finalValue ? `₪${parseFloat(quote.finalValue).toLocaleString()}` : "-"}
