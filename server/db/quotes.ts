@@ -373,13 +373,44 @@ export async function reviseQuote(data: ReviseQuoteRequest) {
 
 /**
  * Update quote status
+ * When moving to in_production, creates supplier_jobs for items with assigned suppliers
  */
 export async function updateQuoteStatus(quoteId: number, status: string, employeeId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
+  // If moving to in_production, create supplier_jobs for items with suppliers
+  if (status === 'in_production') {
+    // Get quote items with suppliers
+    const items = await db.execute(sql`
+      SELECT id, "sizeQuantityId", quantity, "supplierId", "supplierCost", "deliveryDays"
+      FROM quote_items
+      WHERE "quoteId" = ${quoteId} AND "supplierId" IS NOT NULL
+    `);
+
+    // Create supplier_jobs for each item with a supplier
+    for (const item of items.rows as any[]) {
+      // Check if supplier_job already exists for this quote_item
+      const existingJob = await db.execute(sql`
+        SELECT id FROM supplier_jobs WHERE "quoteItemId" = ${item.id} LIMIT 1
+      `);
+
+      if (existingJob.rows.length === 0) {
+        await db.execute(sql`
+          INSERT INTO supplier_jobs (
+            "quoteId", "quoteItemId", "supplierId", "sizeQuantityId",
+            quantity, "pricePerUnit", "promisedDeliveryDays", status, "createdAt", "updatedAt"
+          ) VALUES (
+            ${quoteId}, ${item.id}, ${item.supplierId}, ${item.sizeQuantityId},
+            ${item.quantity}, ${item.supplierCost || '0'}, ${item.deliveryDays || 3}, 'pending', NOW(), NOW()
+          )
+        `);
+      }
+    }
+  }
+
   await db.update(quotes)
-    .set({ status: status as any })
+    .set({ status: status as any, updatedAt: new Date() })
     .where(eq(quotes.id, quoteId));
 
   await db.insert(activityLog).values({
