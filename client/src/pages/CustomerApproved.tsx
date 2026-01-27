@@ -379,7 +379,9 @@ export default function CustomerApproved() {
                                           {item.supplierId ? (
                                             <Badge className="bg-green-100 text-green-800">
                                               <Truck className="h-3 w-3 ml-1" />
-                                              ספק #{item.supplierId}
+                                              {suppliers?.find((s: any) => s.id === item.supplierId)?.name || 
+                                               suppliers?.find((s: any) => s.id === item.supplierId)?.companyName || 
+                                               `ספק #${item.supplierId}`}
                                             </Badge>
                                           ) : (
                                             <Badge variant="outline" className="text-amber-600 border-amber-300">
