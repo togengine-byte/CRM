@@ -5,7 +5,7 @@
 
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
-import { getActiveJobs, getJobsReadyForPickup, updateJobStatus } from "../db";
+import { getActiveJobs, getJobsReadyForPickup, updateJobStatus, sendJobStatusEmail, getSupplierJobById } from "../db";
 
 export const jobsRouter = router({
   // Get all active jobs
@@ -30,8 +30,22 @@ export const jobsRouter = router({
       
       // Send email notification if requested
       if (input.notifyCustomer) {
-        // TODO: Implement email sending when Gmail API key is configured
-        console.log(`[Email] Would send status update email for job ${input.jobId} to customer`);
+        try {
+          // Get job details for email
+          const job = await getSupplierJobById(input.jobId);
+          if (job && job.customer?.email) {
+            await sendJobStatusEmail(
+              job.customer.email,
+              job.customer.name || 'לקוח יקר',
+              input.jobId,
+              job.productName || 'מוצר',
+              input.status,
+              ctx.user?.id
+            );
+          }
+        } catch (error) {
+          console.error(`[Email] Failed to send status update email for job ${input.jobId}:`, error);
+        }
       }
       
       return result;

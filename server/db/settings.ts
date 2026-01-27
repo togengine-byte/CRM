@@ -279,3 +279,84 @@ export async function setEmailOnStatusChangeSetting(value: EmailOnStatusChangeSe
 
   return { success: true };
 }
+
+
+// ==================== GMAIL SETTINGS ====================
+
+export interface GmailSettings {
+  email: string;
+  appPassword: string;
+  isConfigured: boolean;
+}
+
+/**
+ * Get Gmail settings (returns masked password for display)
+ */
+export async function getGmailSettings(): Promise<{ email: string; isConfigured: boolean; maskedPassword: string }> {
+  const settings = await getSystemSetting('gmail_settings') as GmailSettings | null;
+  
+  if (!settings || !settings.email || !settings.appPassword) {
+    return {
+      email: '',
+      isConfigured: false,
+      maskedPassword: '',
+    };
+  }
+  
+  return {
+    email: settings.email,
+    isConfigured: true,
+    maskedPassword: '●'.repeat(16), // Always show 16 dots for security
+  };
+}
+
+/**
+ * Get Gmail settings with full password (for internal use only - sending emails)
+ */
+export async function getGmailSettingsInternal(): Promise<GmailSettings | null> {
+  const settings = await getSystemSetting('gmail_settings') as GmailSettings | null;
+  
+  if (!settings || !settings.email || !settings.appPassword) {
+    return null;
+  }
+  
+  return settings;
+}
+
+/**
+ * Set Gmail settings
+ */
+export async function setGmailSettings(email: string, appPassword: string, userId: number): Promise<{ success: boolean }> {
+  // Validate email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    throw new Error("כתובת מייל לא תקינה");
+  }
+  
+  // Validate app password (should be 16 characters without spaces)
+  const cleanPassword = appPassword.replace(/\s/g, '');
+  if (cleanPassword.length !== 16) {
+    throw new Error("App Password חייב להיות 16 תווים");
+  }
+  
+  const settings: GmailSettings = {
+    email: email.toLowerCase().trim(),
+    appPassword: cleanPassword,
+    isConfigured: true,
+  };
+  
+  await setSystemSetting('gmail_settings', settings, userId);
+  
+  await logActivity(userId, "gmail_settings_updated", { email: settings.email });
+  
+  return { success: true };
+}
+
+/**
+ * Clear Gmail settings
+ */
+export async function clearGmailSettings(userId: number): Promise<{ success: boolean }> {
+  await setSystemSetting('gmail_settings', { email: '', appPassword: '', isConfigured: false }, userId);
+  await logActivity(userId, "gmail_settings_cleared", {});
+  return { success: true };
+}

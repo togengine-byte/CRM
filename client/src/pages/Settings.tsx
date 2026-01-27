@@ -23,6 +23,7 @@ import {
   StaffManagementSettings,
   ValidationProfilesSettings,
   PortalsSettings,
+  GmailSettings,
 } from "@/components/settings";
 
 export default function Settings() {
@@ -99,29 +100,9 @@ export default function Settings() {
           <ValidationProfilesSettings />
         </TabsContent>
 
-        {/* General Tab */}
-        <TabsContent value="general">
-          <Card>
-            <CardHeader>
-              <CardTitle>הגדרות כלליות</CardTitle>
-              <CardDescription>הגדרות בסיסיות של המערכת</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-3">
-                <label htmlFor="googleApiKey" className="text-sm font-medium">Google API Key</label>
-                <p className="text-sm text-gray-600">מפתח API של Google לשליחת מיילים</p>
-                <Input
-                  id="googleApiKey"
-                  type="password"
-                  placeholder="הזן את ה-API Key שלך"
-                  defaultValue=""
-                  className="font-mono text-xs"
-                />
-                <p className="text-xs text-gray-500">המפתח מאוחסן בצורה מאובטחת</p>
-                <Button className="w-full">שמור מפתח</Button>
-              </div>
-            </CardContent>
-          </Card>
+        {/* General Tab - Gmail Settings */}
+        <TabsContent value="general" className="space-y-6">
+          <GmailSettings />
         </TabsContent>
 
         {/* Security Tab */}

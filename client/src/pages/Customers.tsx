@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { SendEmailDialog } from "@/components/SendEmailDialog";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -63,6 +64,7 @@ import {
   MapPin,
   FileText,
   Tag,
+  Send,
 } from "lucide-react";
 
 type CustomerStatus = "pending_approval" | "active" | "rejected" | "deactivated";
@@ -93,6 +95,8 @@ export default function Customers() {
     billingEmail: "",
   });
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
+  const [emailRecipient, setEmailRecipient] = useState<{ email: string; name: string }>({ email: '', name: '' });
   const [createForm, setCreateForm] = useState<CustomerFormData>({
     name: "",
     email: "",
@@ -506,7 +510,21 @@ export default function Customers() {
                               </div>
                               <div>
                                 <p className="text-sm text-muted-foreground">אימייל</p>
-                                <p className="font-medium">{customerDetails.email || "-"}</p>
+                                <div className="flex items-center gap-2">
+                                  <p className="font-medium">{customerDetails.email || "-"}</p>
+                                  {customerDetails.email && (
+                                    <button
+                                      onClick={() => {
+                                        setEmailRecipient({ email: customerDetails.email!, name: customerDetails.name || '' });
+                                        setIsEmailDialogOpen(true);
+                                      }}
+                                      className="text-blue-600 hover:text-blue-700"
+                                      title="שלח מייל"
+                                    >
+                                      <Send className="h-4 w-4" />
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                               <div>
                                 <p className="text-sm text-muted-foreground">אימייל לחשבונית</p>
@@ -770,6 +788,14 @@ export default function Customers() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Send Email Dialog */}
+      <SendEmailDialog
+        open={isEmailDialogOpen}
+        onOpenChange={setIsEmailDialogOpen}
+        customerEmail={emailRecipient.email}
+        customerName={emailRecipient.name}
+      />
     </div>
   );
 }

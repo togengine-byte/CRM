@@ -206,7 +206,20 @@ export {
   setNotificationSettings,
   getEmailOnStatusChangeSetting,
   setEmailOnStatusChangeSetting,
+  // Gmail settings
+  getGmailSettings,
+  getGmailSettingsInternal,
+  setGmailSettings,
+  clearGmailSettings,
 } from "./settings";
+
+// ==================== EMAIL ====================
+export {
+  sendEmail,
+  testGmailConnection,
+  sendQuoteEmail,
+  sendJobStatusEmail,
+} from "./email";
 
 // ==================== NOTES ====================
 export {

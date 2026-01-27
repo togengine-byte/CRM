@@ -68,18 +68,41 @@ export async function getSupplierJobs(filters?: {
 }
 
 /**
- * Get supplier job by ID
+ * Get supplier job by ID with customer and product details
  */
 export async function getSupplierJobById(jobId: number) {
   const db = await getDb();
   if (!db) return null;
 
-  const [job] = await db.select()
-    .from(supplierJobs)
-    .where(eq(supplierJobs.id, jobId))
-    .limit(1);
+  const result = await db.execute(sql`
+    SELECT 
+      sj.*,
+      q."customerId",
+      u.name as "customerName",
+      u.email as "customerEmail",
+      bp.name as "productName"
+    FROM supplier_jobs sj
+    LEFT JOIN quotes q ON sj."quoteId" = q.id
+    LEFT JOIN users u ON q."customerId" = u.id
+    LEFT JOIN size_quantities sq ON sj."sizeQuantityId" = sq.id
+    LEFT JOIN product_sizes ps ON sq."sizeId" = ps.id
+    LEFT JOIN base_products bp ON ps."productId" = bp.id
+    WHERE sj.id = ${jobId}
+    LIMIT 1
+  `);
 
-  return job || null;
+  const job = result.rows[0];
+  if (!job) return null;
+
+  return {
+    ...job,
+    customer: {
+      id: job.customerId,
+      name: job.customerName,
+      email: job.customerEmail,
+    },
+    productName: job.productName,
+  };
 }
 
 /**

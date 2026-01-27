@@ -14,6 +14,7 @@ import {
   activityLog
 } from "../../drizzle/schema";
 import { logActivity } from "./activity";
+import { sendQuoteEmail } from "./email";
 import { CreateQuoteRequest, UpdateQuoteRequest, ReviseQuoteRequest } from "./types";
 
 // ==================== QUOTE CRUD ====================
@@ -579,9 +580,19 @@ export async function sendQuoteToCustomer(quoteId: number, employeeId: number) {
     finalValue: quote.finalValue 
   });
 
-  // TODO: Implement actual email sending here
-  // Use customer.email (not customer.billingEmail) for quote notifications
-  console.log(`[Quote ${quoteId}] Would send email to: ${customer.email}`);
+  // Send email to customer
+  if (customer.email) {
+    const emailResult = await sendQuoteEmail(
+      customer.email,
+      customer.name || 'לקוח יקר',
+      quoteId,
+      Number(quote.finalValue) || 0,
+      employeeId
+    );
+    if (!emailResult.success) {
+      console.log(`[Quote ${quoteId}] Email sending failed: ${emailResult.error}`);
+    }
+  }
 
   return { 
     success: true, 
