@@ -1,6 +1,6 @@
 /**
  * Settings Router
- * Handles system settings like supplier weights, email preferences, and Gmail configuration
+ * Handles system settings like supplier weights, email preferences, and email configuration
  */
 
 import { z } from "zod";
@@ -11,12 +11,13 @@ import {
   getEmailOnStatusChangeSetting,
   setEmailOnStatusChangeSetting,
   type EmailOnStatusChange,
-  getGmailSettings,
-  setGmailSettings,
-  clearGmailSettings,
-  testGmailConnection,
-  sendEmail,
 } from "../db";
+import {
+  getEmailSettings,
+  saveEmailSettings,
+  testEmailConnection,
+  sendEmail,
+} from "../db/email";
 
 export const settingsRouter = router({
   supplierWeights: router({
@@ -56,50 +57,62 @@ export const settingsRouter = router({
       }),
   }),
 
-  // Gmail Settings
+  // Email Settings (using Resend)
   gmail: router({
     get: protectedProcedure
       .query(async ({ ctx }) => {
         if (!ctx.user) throw new Error("Not authenticated");
-        return await getGmailSettings();
+        const settings = await getEmailSettings();
+        return {
+          email: settings?.fromEmail || '',
+          isConfigured: settings?.isConfigured || true,
+        };
       }),
 
     save: adminProcedure
       .input(z.object({
-        email: z.string().email("כתובת מייל לא תקינה"),
-        appPassword: z.string().min(16, "App Password חייב להיות 16 תווים").max(19, "App Password חייב להיות 16 תווים"),
+        email: z.string().email("Invalid email address"),
+        appPassword: z.string().optional(), // Not needed for Resend but keep for compatibility
       }))
       .mutation(async ({ ctx, input }) => {
         if (!ctx.user) throw new Error("Not authenticated");
-        return await setGmailSettings(input.email, input.appPassword, ctx.user.id);
+        const success = await saveEmailSettings({
+          fromEmail: input.email,
+          fromName: 'CRM System',
+        });
+        return { success };
       }),
 
     clear: adminProcedure
       .mutation(async ({ ctx }) => {
         if (!ctx.user) throw new Error("Not authenticated");
-        return await clearGmailSettings(ctx.user.id);
+        const success = await saveEmailSettings({
+          fromEmail: 'onboarding@resend.dev',
+          fromName: 'CRM System',
+        });
+        return { success };
       }),
 
     test: adminProcedure
       .mutation(async ({ ctx }) => {
         if (!ctx.user) throw new Error("Not authenticated");
-        return await testGmailConnection();
+        return await testEmailConnection();
       }),
 
     sendTestEmail: adminProcedure
       .input(z.object({
-        to: z.string().email("כתובת מייל לא תקינה"),
+        to: z.string().email("Invalid email address"),
       }))
       .mutation(async ({ ctx, input }) => {
         if (!ctx.user) throw new Error("Not authenticated");
         return await sendEmail({
           to: input.to,
-          subject: "בדיקת מערכת מייל CRM",
+          subject: "CRM Email System Test",
           html: `
-            <div dir="rtl" style="font-family: Arial, sans-serif;">
-              <h2>בדיקת מערכת מייל</h2>
-              <p>אם קיבלת מייל זה, הגדרות ה-Gmail פועלות כראוי!</p>
-              <p>נשלח מ-CRM System</p>
+            <div style="font-family: Arial, sans-serif;">
+              <h2>Email System Test</h2>
+              <p>If you received this email, the email settings are working correctly!</p>
+              <p>Sent from CRM System</p>
             </div>
           `,
         }, ctx.user.id);
@@ -109,9 +122,9 @@ export const settingsRouter = router({
   // Send email to customer (for manual email sending)
   sendEmail: adminProcedure
     .input(z.object({
-      to: z.string().email("כתובת מייל לא תקינה"),
-      subject: z.string().min(1, "נושא נדרש"),
-      body: z.string().min(1, "תוכן נדרש"),
+      to: z.string().email("Invalid email address"),
+      subject: z.string().min(1, "Subject is required"),
+      body: z.string().min(1, "Body is required"),
     }))
     .mutation(async ({ ctx, input }) => {
       if (!ctx.user) throw new Error("Not authenticated");
@@ -119,7 +132,7 @@ export const settingsRouter = router({
         to: input.to,
         subject: input.subject,
         html: `
-          <div dir="rtl" style="font-family: Arial, sans-serif;">
+          <div style="font-family: Arial, sans-serif;">
             ${input.body.replace(/\n/g, '<br/>')}
           </div>
         `,

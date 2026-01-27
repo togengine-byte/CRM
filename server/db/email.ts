@@ -1,12 +1,15 @@
 /**
  * Email Module
  * 
- * Handles sending emails using Gmail SMTP with App Password
+ * Handles sending emails using Resend API
  */
 
-import nodemailer from 'nodemailer';
-import { getGmailSettingsInternal } from './settings';
+import { Resend } from 'resend';
+import { getSystemSetting, setSystemSetting } from './settings';
 import { logActivity } from './activity';
+
+// Resend API Key - stored in environment or settings
+const RESEND_API_KEY = process.env.RESEND_API_KEY || 're_LDhrRfMj_KhY6idbhStyKkH5uPcdSfZKf';
 
 export interface SendEmailParams {
   to: string;
@@ -21,67 +24,122 @@ export interface SendEmailResult {
   error?: string;
 }
 
+export interface EmailSettings {
+  fromEmail: string;
+  fromName: string;
+  isConfigured: boolean;
+}
+
 /**
- * Send email using configured Gmail settings
+ * Get email settings from database
+ */
+export async function getEmailSettings(): Promise<EmailSettings | null> {
+  try {
+    const settings = await getSystemSetting('email_settings');
+    if (settings && typeof settings === 'string') {
+      const parsed = JSON.parse(settings);
+      return {
+        fromEmail: parsed.fromEmail || 'onboarding@resend.dev',
+        fromName: parsed.fromName || 'CRM System',
+        isConfigured: true,
+      };
+    }
+    // Default settings
+    return {
+      fromEmail: 'onboarding@resend.dev',
+      fromName: 'CRM System',
+      isConfigured: true,
+    };
+  } catch (error) {
+    console.error('[Email] Failed to get settings:', error);
+    return {
+      fromEmail: 'onboarding@resend.dev',
+      fromName: 'CRM System',
+      isConfigured: true,
+    };
+  }
+}
+
+/**
+ * Save email settings to database
+ */
+export async function saveEmailSettings(settings: { fromEmail: string; fromName: string }): Promise<boolean> {
+  try {
+    await setSystemSetting('email_settings', JSON.stringify(settings));
+    return true;
+  } catch (error) {
+    console.error('[Email] Failed to save settings:', error);
+    return false;
+  }
+}
+
+/**
+ * Send email using Resend API
  */
 export async function sendEmail(params: SendEmailParams, userId?: number): Promise<SendEmailResult> {
   try {
     console.log('[Email] Starting to send email to:', params.to);
     
-    // Get Gmail settings
-    const gmailSettings = await getGmailSettingsInternal();
+    const settings = await getEmailSettings();
+    const resend = new Resend(RESEND_API_KEY);
     
-    if (!gmailSettings || !gmailSettings.isConfigured) {
-      console.log('[Email] Gmail not configured - email not sent');
+    console.log('[Email] Sending via Resend API...');
+    
+    const emailOptions: any = {
+      from: `${settings?.fromName || 'CRM System'} <${settings?.fromEmail || 'onboarding@resend.dev'}>`,
+      to: [params.to],
+      subject: params.subject,
+    };
+    
+    if (params.html) {
+      emailOptions.html = params.html;
+    }
+    if (params.text) {
+      emailOptions.text = params.text;
+    }
+    
+    const { data, error } = await resend.emails.send(emailOptions);
+    
+    if (error) {
+      console.error('[Email] Resend API error:', error);
+      
+      try {
+        await logActivity(userId || null, 'email_failed', {
+          to: params.to,
+          subject: params.subject,
+          error: error.message,
+        });
+      } catch (logError) {
+        console.error('[Email] Failed to log activity:', logError);
+      }
+      
       return {
         success: false,
-        error: 'Gmail settings not configured. Please set email and app password in general settings.',
+        error: error.message || 'Error sending email',
       };
     }
     
-    console.log('[Email] Gmail settings found, creating transporter...');
-    
-    // Create transporter with timeout
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: gmailSettings.email,
-        pass: gmailSettings.appPassword,
-      },
-      connectionTimeout: 10000, // 10 seconds
-      greetingTimeout: 10000,
-      socketTimeout: 10000,
-    });
-    
-    console.log('[Email] Sending email...');
-    
-    // Send email
-    const info = await transporter.sendMail({
-      from: `"CRM System" <${gmailSettings.email}>`,
-      to: params.to,
-      subject: params.subject,
-      text: params.text,
-      html: params.html,
-    });
-    
     // Log activity
-    await logActivity(userId || null, 'email_sent', {
-      to: params.to,
-      subject: params.subject,
-      messageId: info.messageId,
-    });
+    try {
+      await logActivity(userId || null, 'email_sent', {
+        to: params.to,
+        subject: params.subject,
+        messageId: data?.id,
+      });
+    } catch (logError) {
+      console.error('[Email] Failed to log activity:', logError);
+    }
     
-    console.log(`[Email] Sent successfully to ${params.to}, messageId: ${info.messageId}`);
+    console.log(`[Email] Sent successfully to ${params.to}, messageId: ${data?.id}`);
     
     return {
       success: true,
-      messageId: info.messageId,
+      messageId: data?.id,
     };
   } catch (error: any) {
     console.error('[Email] Failed to send:', error.message);
     console.error('[Email] Full error:', error);
     
-    // Log failed attempt
     try {
       await logActivity(userId || null, 'email_failed', {
         to: params.to,
@@ -100,52 +158,32 @@ export async function sendEmail(params: SendEmailParams, userId?: number): Promi
 }
 
 /**
- * Test Gmail connection
+ * Test email connection
  */
-export async function testGmailConnection(): Promise<{ success: boolean; error?: string }> {
+export async function testEmailConnection(): Promise<{ success: boolean; error?: string }> {
   try {
-    console.log('[Email] Testing Gmail connection...');
+    console.log('[Email] Testing Resend connection...');
     
-    const gmailSettings = await getGmailSettingsInternal();
+    const resend = new Resend(RESEND_API_KEY);
     
-    if (!gmailSettings || !gmailSettings.isConfigured) {
+    // Just verify the API key works by getting domains (lightweight call)
+    const { error } = await resend.domains.list();
+    
+    if (error) {
+      console.error('[Email] Resend API test failed:', error);
       return {
         success: false,
-        error: 'Gmail settings not configured',
+        error: error.message || 'API connection failed',
       };
     }
     
-    console.log('[Email] Creating transporter for test...');
-    
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: gmailSettings.email,
-        pass: gmailSettings.appPassword,
-      },
-      connectionTimeout: 10000,
-      greetingTimeout: 10000,
-      socketTimeout: 10000,
-    });
-    
-    console.log('[Email] Verifying connection...');
-    
-    // Verify connection with timeout
-    await Promise.race([
-      transporter.verify(),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Connection timeout')), 15000)
-      )
-    ]);
-    
-    console.log('[Email] Connection verified successfully');
-    
+    console.log('[Email] Resend connection verified successfully');
     return { success: true };
   } catch (error: any) {
     console.error('[Email] Connection test failed:', error.message);
     return {
       success: false,
-      error: error.message || 'Error connecting to Gmail',
+      error: error.message || 'Error connecting to email service',
     };
   }
 }
@@ -162,7 +200,7 @@ export async function sendQuoteEmail(
 ): Promise<SendEmailResult> {
   const subject = `Quote #${quoteNumber}`;
   const html = `
-    <div dir="rtl" style="font-family: Arial, sans-serif;">
+    <div style="font-family: Arial, sans-serif;">
       <h2>Hello ${customerName},</h2>
       <p>Please find attached quote number <strong>${quoteNumber}</strong>.</p>
       <p>Total: <strong>₪${quoteTotal.toLocaleString()}</strong></p>
@@ -208,3 +246,7 @@ export async function sendJobStatusEmail(
   
   return await sendEmail({ to: customerEmail, subject, html }, userId);
 }
+
+// Keep old function names for backward compatibility
+export const getGmailSettingsInternal = getEmailSettings;
+export const testGmailConnection = testEmailConnection;

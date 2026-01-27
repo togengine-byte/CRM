@@ -216,9 +216,12 @@ export {
 // ==================== EMAIL ====================
 export {
   sendEmail,
-  testGmailConnection,
+  testEmailConnection,
+  testEmailConnection as testGmailConnection, // backward compatibility
   sendQuoteEmail,
   sendJobStatusEmail,
+  getEmailSettings,
+  saveEmailSettings,
 } from "./email";
 
 // ==================== NOTES ====================
