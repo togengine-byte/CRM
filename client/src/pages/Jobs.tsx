@@ -108,7 +108,8 @@ interface Job {
 }
 
 export default function Jobs() {
-  const [statusFilter, setStatusFilter] = useState<JobStatus>("all");
+  // Default to showing only in_progress jobs (עבודות בביצוע)
+  const [statusFilter, setStatusFilter] = useState<JobStatus>("in_progress");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedJobId, setSelectedJobId] = useState<number | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
