@@ -19,7 +19,6 @@ import {
   upsertSupplierPrice,
   deleteSupplierPrice,
   getSupplierOpenJobs,
-  getSupplierRecommendations,
   getSupplierStats,
   assignSupplierToQuoteItem,
   getSupplierJobsHistory,
@@ -139,20 +138,8 @@ export const suppliersRouter = router({
       return await getSupplierOpenJobs(input.supplierId);
     }),
 
-  recommendations: protectedProcedure
-    .input(z.object({
-      sizeQuantityId: z.number(),
-      quantity: z.number().int().positive(),
-    }))
-    .query(async ({ ctx, input }) => {
-      if (!ctx.user) throw new Error("Not authenticated");
-      if (ctx.user.role !== 'admin' && ctx.user.role !== 'employee') {
-        throw new Error("Only employees can view supplier recommendations");
-      }
-      return await getSupplierRecommendations(input.sizeQuantityId, input.quantity);
-    }),
-
-  // Enhanced recommendations based on supplier_jobs history (reliability, speed, rating)
+  // DEPRECATED: Old recommendations endpoint removed - use enhancedRecommendations instead
+  // Enhanced recommendations based on the NEW algorithm with all criteria
   enhancedRecommendations: protectedProcedure
     .input(z.object({
       productId: z.number().optional(),

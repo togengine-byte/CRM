@@ -442,86 +442,10 @@ export async function updateSupplierWeights(weights: SupplierWeights, updatedBy:
   return { success: true };
 }
 
-/**
- * Get supplier recommendations for a size+quantity
- */
-export async function getSupplierRecommendations(sizeQuantityId: number, quantity: number) {
-  const db = await getDb();
-  if (!db) return [];
-
-  const weights = await getSupplierWeights();
-
-  const suppliers = await db.select({
-    supplierId: supplierPrices.supplierId,
-    supplierName: users.name,
-    supplierCompany: users.companyName,
-    price: supplierPrices.pricePerUnit,
-    deliveryDays: supplierPrices.deliveryDays,
-    qualityRating: supplierPrices.qualityRating,
-    totalRatingPoints: users.totalRatingPoints,
-    ratedDealsCount: users.ratedDealsCount,
-  })
-    .from(supplierPrices)
-    .innerJoin(users, eq(supplierPrices.supplierId, users.id))
-    .where(and(
-      eq(supplierPrices.sizeQuantityId, sizeQuantityId),
-      eq(users.status, 'active')
-    ))
-    .orderBy(supplierPrices.pricePerUnit);
-
-  if (suppliers.length === 0) return [];
-
-  const minPrice = Math.min(...suppliers.map(s => Number(s.price)));
-  const maxPrice = Math.max(...suppliers.map(s => Number(s.price)));
-  const minDelivery = Math.min(...suppliers.map(s => s.deliveryDays || 3));
-  const maxDelivery = Math.max(...suppliers.map(s => s.deliveryDays || 3));
-
-  const recommendations = suppliers.map(supplier => {
-    const price = Number(supplier.price);
-    const delivery = supplier.deliveryDays || 3;
-    const quality = Number(supplier.qualityRating || 3);
-    
-    const avgRating = supplier.ratedDealsCount && supplier.ratedDealsCount > 0
-      ? (supplier.totalRatingPoints || 0) / supplier.ratedDealsCount
-      : 3;
-    
-    const reliability = quality;
-    
-    const priceScore = maxPrice === minPrice ? 100 : 
-      ((maxPrice - price) / (maxPrice - minPrice)) * 100;
-    const deliveryScore = maxDelivery === minDelivery ? 100 : 
-      ((maxDelivery - delivery) / (maxDelivery - minDelivery)) * 100;
-    const ratingScore = (avgRating / 5) * 100;
-    const reliabilityScore = (reliability / 5) * 100;
-
-    const totalScore = 
-      (priceScore * weights.price / 100) + 
-      (ratingScore * weights.rating / 100) + 
-      (deliveryScore * weights.deliveryTime / 100) + 
-      (reliabilityScore * weights.reliability / 100);
-
-    return {
-      supplierId: supplier.supplierId,
-      supplierName: supplier.supplierName,
-      supplierCompany: supplier.supplierCompany,
-      price: price,
-      deliveryDays: delivery,
-      qualityRating: quality,
-      avgRating: Math.round(avgRating * 10) / 10,
-      scores: {
-        price: Math.round(priceScore),
-        rating: Math.round(ratingScore),
-        delivery: Math.round(deliveryScore),
-        reliability: Math.round(reliabilityScore),
-        total: Math.round(totalScore),
-      },
-      weights: weights,
-      totalCost: price * quantity,
-    };
-  });
-
-  return recommendations.sort((a, b) => b.scores.total - a.scores.total);
-}
+// NOTE: getSupplierRecommendations has been REMOVED
+// Use the enhanced algorithm from supplierRecommendations.ts instead
+// which includes all criteria: base score, promise keeping, courier confirm,
+// early finish, category expertise, current load, consistency, and cancellations
 
 /**
  * Get supplier statistics

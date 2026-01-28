@@ -3,13 +3,45 @@
  * 
  * Gets supplier recommendations for each individual quote item.
  * Each item shows suppliers who can fulfill that specific item.
- * Includes bonus for suppliers who can fulfill multiple items from the quote.
+ * Uses the NEW enhanced scoring algorithm with all criteria.
  */
 
 import { eq, sql, and, inArray } from "drizzle-orm";
 import { users, supplierPrices, baseProducts, productSizes, sizeQuantities, categories } from "../drizzle/schema";
 import { getDb } from "./db";
-import { getSupplierWeights, getSupplierReliabilityData, getSupplierRatingData, getSupplierSpeedData } from "./supplierRecommendations";
+import { 
+  getSupplierCompletedJobsCount,
+  getMarketAveragePrice,
+  getSupplierPrice,
+  getPromiseKeepingData,
+  getCourierConfirmData,
+  getEarlyFinishData,
+  getCategoryExpertiseData,
+  getCurrentLoadData,
+  getConsistencyData,
+  getCancellationData,
+} from "./supplierRecommendations";
+
+// Scoring configuration - same as main algorithm
+const SCORING_CONFIG = {
+  baseScore: {
+    noJobs: 70,
+    fewJobs: 80,
+    someJobs: 90,
+    manyJobs: 100,
+  },
+  criteria: {
+    price: { max: 10, min: -10 },
+    promiseKeeping: { max: 8, min: -8 },
+    courierConfirm: { max: 6, min: -6 },
+    earlyFinish: { max: 3, min: 0 },
+    categoryExpert: { max: 2, min: 0 },
+    currentLoad: { max: 0, min: -3 },
+    consistency: { max: 2, min: 0 },
+    cancellations: { max: 0, min: -2 },
+    multiItem: { max: 5, min: 0 }, // Bonus for multi-item capability
+  },
+};
 
 export interface QuoteItemForRecommendation {
   quoteItemId: number;
@@ -28,10 +60,22 @@ export interface SupplierForItem {
   reliabilityPct: number;
   totalScore: number;
   rank: number;
-  // How many other items from the quote this supplier can fulfill
   canFulfillOtherItems: number;
-  // Bonus percentage for multi-item capability (2% per item, max 10%)
   multiItemBonus: number;
+  isNewSupplier: boolean;
+  // Score breakdown for transparency
+  scoreBreakdown?: {
+    baseScore: number;
+    priceScore: number;
+    promiseKeepingScore: number;
+    courierConfirmScore: number;
+    earlyFinishScore: number;
+    categoryExpertScore: number;
+    currentLoadScore: number;
+    consistencyScore: number;
+    cancellationScore: number;
+    multiItemScore: number;
+  };
 }
 
 export interface ItemSupplierRecommendation {
@@ -41,14 +85,78 @@ export interface ItemSupplierRecommendation {
   categoryName: string;
   quantity: number;
   suppliers: SupplierForItem[];
-  // Currently selected supplier (if any)
   selectedSupplierId?: number;
 }
 
-/**
- * Get suppliers who have priced specific sizeQuantityIds
- * Returns a map of sizeQuantityId -> list of suppliers with their prices
- */
+// ============================================
+// SCORING CALCULATION FUNCTIONS
+// ============================================
+
+function calculateBaseScore(completedJobs: number): number {
+  if (completedJobs >= 10) return SCORING_CONFIG.baseScore.manyJobs;
+  if (completedJobs >= 5) return SCORING_CONFIG.baseScore.someJobs;
+  if (completedJobs >= 1) return SCORING_CONFIG.baseScore.fewJobs;
+  return SCORING_CONFIG.baseScore.noJobs;
+}
+
+function calculatePriceScore(supplierPrice: number, marketAverage: number): number {
+  if (marketAverage === 0 || supplierPrice === 0) return 0;
+  const priceDiffPercent = ((marketAverage - supplierPrice) / marketAverage) * 100;
+  let score = priceDiffPercent * 0.5;
+  return Math.max(SCORING_CONFIG.criteria.price.min, 
+                  Math.min(SCORING_CONFIG.criteria.price.max, score));
+}
+
+function calculatePromiseKeepingScore(percentage: number): number {
+  const score = (percentage - 80) * 0.4;
+  return Math.max(SCORING_CONFIG.criteria.promiseKeeping.min,
+                  Math.min(SCORING_CONFIG.criteria.promiseKeeping.max, score));
+}
+
+function calculateCourierConfirmScore(percentage: number): number {
+  const score = (percentage - 80) * 0.3;
+  return Math.max(SCORING_CONFIG.criteria.courierConfirm.min,
+                  Math.min(SCORING_CONFIG.criteria.courierConfirm.max, score));
+}
+
+function calculateEarlyFinishScore(avgDaysEarly: number): number {
+  const score = Math.min(avgDaysEarly, SCORING_CONFIG.criteria.earlyFinish.max);
+  return Math.max(0, score);
+}
+
+function calculateCategoryExpertScore(jobsInCategory: number): number {
+  if (jobsInCategory >= 10) return SCORING_CONFIG.criteria.categoryExpert.max;
+  if (jobsInCategory >= 5) return 1;
+  return 0;
+}
+
+function calculateCurrentLoadScore(openJobs: number): number {
+  const score = -Math.floor(openJobs / 3);
+  return Math.max(SCORING_CONFIG.criteria.currentLoad.min, score);
+}
+
+function calculateConsistencyScore(isConsistent: boolean, stdDev: number, avgDays: number): number {
+  if (avgDays === 0) return 0;
+  const ratio = stdDev / avgDays;
+  if (ratio < 0.2) return SCORING_CONFIG.criteria.consistency.max;
+  if (ratio < 0.3) return 1;
+  return 0;
+}
+
+function calculateCancellationScore(percentage: number): number {
+  const score = -Math.floor(percentage / 5);
+  return Math.max(SCORING_CONFIG.criteria.cancellations.min, score);
+}
+
+function calculateMultiItemScore(otherItemsCanFulfill: number): number {
+  // 1 point per additional item, max 5
+  return Math.min(otherItemsCanFulfill, SCORING_CONFIG.criteria.multiItem.max);
+}
+
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+
 async function getSuppliersForSizeQuantities(sizeQuantityIds: number[]): Promise<Map<number, { supplierId: number; pricePerUnit: number; deliveryDays: number }[]>> {
   const db = await getDb();
   if (!db) return new Map();
@@ -56,7 +164,6 @@ async function getSuppliersForSizeQuantities(sizeQuantityIds: number[]): Promise
   const result = new Map<number, { supplierId: number; pricePerUnit: number; deliveryDays: number }[]>();
 
   try {
-    // SECURITY FIX: Use inArray with parameterized queries instead of sql.raw to prevent SQL injection
     const pricesResult = await db
       .select({
         supplierId: supplierPrices.supplierId,
@@ -92,9 +199,6 @@ async function getSuppliersForSizeQuantities(sizeQuantityIds: number[]): Promise
   return result;
 }
 
-/**
- * Get item info including category
- */
 async function getItemInfo(item: QuoteItemForRecommendation): Promise<{
   categoryId: number;
   categoryName: string;
@@ -133,9 +237,13 @@ async function getItemInfo(item: QuoteItemForRecommendation): Promise<{
   return null;
 }
 
+// ============================================
+// MAIN FUNCTION
+// ============================================
+
 /**
  * Get recommendations for each individual quote item
- * Includes bonus for suppliers who can fulfill multiple items
+ * Uses the NEW enhanced scoring algorithm with all criteria
  */
 export async function getRecommendationsByItem(
   quoteItems: QuoteItemForRecommendation[]
@@ -155,10 +263,7 @@ export async function getRecommendationsByItem(
     }
   }
 
-  // Step 3: Get weights for scoring
-  const weights = await getSupplierWeights();
-
-  // Step 4: Build recommendations for each item
+  // Step 3: Build recommendations for each item
   const recommendations: ItemSupplierRecommendation[] = [];
 
   for (const item of quoteItems) {
@@ -168,7 +273,6 @@ export async function getRecommendationsByItem(
     const suppliersForItem = supplierPricesMap.get(item.sizeQuantityId) || [];
     
     if (suppliersForItem.length === 0) {
-      // No suppliers for this item
       recommendations.push({
         quoteItemId: item.quoteItemId,
         sizeQuantityId: item.sizeQuantityId,
@@ -180,45 +284,92 @@ export async function getRecommendationsByItem(
       continue;
     }
 
-    // Get supplier details and calculate scores
+    // Get market average price for this item
+    const marketAveragePrice = await getMarketAveragePrice(item.sizeQuantityId);
+
+    // Get supplier details and calculate scores using the NEW algorithm
     const supplierScores: SupplierForItem[] = [];
 
     for (const sp of suppliersForItem) {
-      const [supplierInfo, reliability, rating, speed] = await Promise.all([
-        db.select({
-          id: users.id,
-          name: users.name,
-          companyName: users.companyName,
-        })
-          .from(users)
-          .where(eq(users.id, sp.supplierId))
-          .limit(1),
-        getSupplierReliabilityData(sp.supplierId),
-        getSupplierRatingData(sp.supplierId),
-        getSupplierSpeedData(sp.supplierId),
+      // Get supplier info
+      const [supplierInfo] = await db.select({
+        id: users.id,
+        name: users.name,
+        companyName: users.companyName,
+      })
+        .from(users)
+        .where(eq(users.id, sp.supplierId))
+        .limit(1);
+
+      if (!supplierInfo) continue;
+
+      // Fetch all metrics in parallel
+      const [
+        completedJobs,
+        promiseKeeping,
+        courierConfirm,
+        earlyFinish,
+        categoryExpertise,
+        currentLoad,
+        consistency,
+        cancellations,
+      ] = await Promise.all([
+        getSupplierCompletedJobsCount(sp.supplierId),
+        getPromiseKeepingData(sp.supplierId),
+        getCourierConfirmData(sp.supplierId),
+        getEarlyFinishData(sp.supplierId),
+        getCategoryExpertiseData(sp.supplierId, itemInfo.categoryId),
+        getCurrentLoadData(sp.supplierId),
+        getConsistencyData(sp.supplierId),
+        getCancellationData(sp.supplierId),
       ]);
 
-      if (!supplierInfo || supplierInfo.length === 0) continue;
-
-      const supplier = supplierInfo[0];
-      
-      // Calculate multi-item bonus: 2% per additional item, max 10%
+      // Calculate multi-item bonus
       const totalItemsCanFulfill = supplierItemCount.get(sp.supplierId) || 1;
-      const otherItemsCanFulfill = totalItemsCanFulfill - 1; // Exclude current item
-      const multiItemBonus = Math.min(otherItemsCanFulfill * 2, 10); // 2% per item, max 10%
+      const otherItemsCanFulfill = totalItemsCanFulfill - 1;
+
+      // Calculate all scores using the NEW algorithm
+      const baseScore = calculateBaseScore(completedJobs);
+      const priceScore = calculatePriceScore(sp.pricePerUnit, marketAveragePrice);
+      const promiseKeepingScore = calculatePromiseKeepingScore(promiseKeeping.percentage);
+      const courierConfirmScore = calculateCourierConfirmScore(courierConfirm.percentage);
+      const earlyFinishScore = calculateEarlyFinishScore(earlyFinish.avgDaysEarly);
+      const categoryExpertScore = calculateCategoryExpertScore(categoryExpertise.jobsInCategory);
+      const currentLoadScore = calculateCurrentLoadScore(currentLoad);
+      const consistencyScore = calculateConsistencyScore(consistency.isConsistent, consistency.stdDev, consistency.avgDays);
+      const cancellationScore = calculateCancellationScore(cancellations.percentage);
+      const multiItemScore = calculateMultiItemScore(otherItemsCanFulfill);
+
+      // Calculate total score
+      const totalScore = baseScore + priceScore + promiseKeepingScore + courierConfirmScore +
+                         earlyFinishScore + categoryExpertScore + currentLoadScore +
+                         consistencyScore + cancellationScore + multiItemScore;
 
       supplierScores.push({
-        supplierId: supplier.id,
-        supplierName: supplier.name || 'ספק',
-        supplierCompany: supplier.companyName,
-        avgRating: Math.round(rating.avgRating * 10) / 10,
+        supplierId: supplierInfo.id,
+        supplierName: supplierInfo.name || 'ספק',
+        supplierCompany: supplierInfo.companyName,
+        avgRating: Math.round((promiseKeeping.percentage / 20) * 10) / 10, // Convert to 5-star scale
         pricePerUnit: sp.pricePerUnit,
         deliveryDays: sp.deliveryDays,
-        reliabilityPct: Math.round(reliability.reliabilityPct),
-        totalScore: 0, // Will calculate below
+        reliabilityPct: Math.round(courierConfirm.percentage),
+        totalScore: Math.round(totalScore * 10) / 10,
         rank: 0,
         canFulfillOtherItems: otherItemsCanFulfill,
-        multiItemBonus,
+        multiItemBonus: multiItemScore,
+        isNewSupplier: completedJobs < 5,
+        scoreBreakdown: {
+          baseScore: Math.round(baseScore * 10) / 10,
+          priceScore: Math.round(priceScore * 10) / 10,
+          promiseKeepingScore: Math.round(promiseKeepingScore * 10) / 10,
+          courierConfirmScore: Math.round(courierConfirmScore * 10) / 10,
+          earlyFinishScore: Math.round(earlyFinishScore * 10) / 10,
+          categoryExpertScore: Math.round(categoryExpertScore * 10) / 10,
+          currentLoadScore: Math.round(currentLoadScore * 10) / 10,
+          consistencyScore: Math.round(consistencyScore * 10) / 10,
+          cancellationScore: Math.round(cancellationScore * 10) / 10,
+          multiItemScore: Math.round(multiItemScore * 10) / 10,
+        },
       });
     }
 
@@ -232,35 +383,6 @@ export async function getRecommendationsByItem(
         suppliers: [],
       });
       continue;
-    }
-
-    // Normalize and calculate total scores
-    const prices = supplierScores.map(s => s.pricePerUnit).filter(p => p > 0);
-    const deliveries = supplierScores.map(s => s.deliveryDays).filter(d => d > 0);
-    
-    const minPrice = prices.length > 0 ? Math.min(...prices) : 1;
-    const maxPrice = prices.length > 0 ? Math.max(...prices) : 10;
-    const minDelivery = deliveries.length > 0 ? Math.min(...deliveries) : 1;
-    const maxDelivery = deliveries.length > 0 ? Math.max(...deliveries) : 7;
-
-    for (const supplier of supplierScores) {
-      const priceScore = maxPrice === minPrice ? 50 : 
-        ((maxPrice - supplier.pricePerUnit) / (maxPrice - minPrice)) * 100;
-      
-      const deliveryScore = maxDelivery === minDelivery ? 50 : 
-        ((maxDelivery - supplier.deliveryDays) / (maxDelivery - minDelivery)) * 100;
-
-      const ratingScore = (supplier.avgRating / 5) * 100;
-
-      // Base score from weights
-      let baseScore = 
-        (priceScore * weights.price / 100) + 
-        (ratingScore * weights.rating / 100) + 
-        (deliveryScore * weights.deliveryTime / 100) + 
-        (supplier.reliabilityPct * weights.reliability / 100);
-
-      // Add multi-item bonus (as percentage of base score)
-      supplier.totalScore = Math.round(baseScore * (1 + supplier.multiItemBonus / 100));
     }
 
     // Sort by score and assign ranks
@@ -297,11 +419,9 @@ export async function selectSupplierForItem(
   if (!db) return { success: false, updatedItem: null };
 
   try {
-    // Calculate customer price with markup
     const supplierCost = pricePerUnit;
     const customerPrice = Math.round(supplierCost * (1 + markupPercentage / 100));
 
-    // Get supplier name
     const [supplierInfo] = await db.select({
       name: users.name,
       companyName: users.companyName,
@@ -312,7 +432,6 @@ export async function selectSupplierForItem(
 
     const supplierName = supplierInfo?.companyName || supplierInfo?.name || 'ספק';
 
-    // Update quote item
     await db.execute(sql`
       UPDATE quote_items
       SET "supplierId" = ${supplierId},
@@ -323,7 +442,6 @@ export async function selectSupplierForItem(
       WHERE id = ${quoteItemId}
     `);
 
-    // Recalculate quote totals
     const totalsResult = await db.execute(sql`
       SELECT 
         COALESCE(SUM(CAST("supplierCost" AS DECIMAL)), 0) as total_supplier_cost,
@@ -336,7 +454,6 @@ export async function selectSupplierForItem(
     const totalSupplierCost = parseFloat(totals.total_supplier_cost) || 0;
     const totalCustomerPrice = parseFloat(totals.total_customer_price) || 0;
 
-    // Update quote totals
     await db.execute(sql`
       UPDATE quotes
       SET "totalSupplierCost" = ${totalSupplierCost.toString()},

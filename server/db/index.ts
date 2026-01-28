@@ -91,7 +91,7 @@ export {
   getSupplierOpenJobs,
   getSupplierWeights,
   updateSupplierWeights,
-  getSupplierRecommendations,
+  // getSupplierRecommendations - REMOVED: Use enhanced algorithm from supplierRecommendations.ts
   getSupplierStats,
   assignSupplierToQuoteItem,
 } from "./suppliers";
