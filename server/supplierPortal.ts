@@ -26,7 +26,14 @@ export const supplierPortalRouter = router({
 
       // Get supplier's price listings
       const isAdminOrEmployee = ctx.user.role === "admin" || ctx.user.role === "employee";
-      const targetSupplierId = isAdminOrEmployee && input?.supplierId ? input.supplierId : ctx.user.id;
+      
+      // SECURITY FIX: Prevent IDOR - suppliers can only view their own data
+      let targetSupplierId = ctx.user.id;
+      if (isAdminOrEmployee && input?.supplierId) {
+        targetSupplierId = input.supplierId;
+      } else if (input?.supplierId && input.supplierId !== ctx.user.id) {
+        throw new Error("Access denied: You can only view your own data");
+      }
       const prices = await db.select().from(supplierPrices).where(eq(supplierPrices.supplierId, targetSupplierId));
 
       if (prices.length === 0) {
@@ -72,7 +79,14 @@ export const supplierPortalRouter = router({
 
       const offset = (input.page - 1) * input.limit;
       const isAdminOrEmployee = ctx.user.role === "admin" || ctx.user.role === "employee";
-      const targetSupplierId = isAdminOrEmployee && input.supplierId ? input.supplierId : ctx.user.id;
+      
+      // SECURITY FIX: Prevent IDOR - suppliers can only view their own data
+      let targetSupplierId = ctx.user.id;
+      if (isAdminOrEmployee && input.supplierId) {
+        targetSupplierId = input.supplierId;
+      } else if (input.supplierId && input.supplierId !== ctx.user.id) {
+        throw new Error("Access denied: You can only view your own data");
+      }
 
       // Get all prices with size+quantity info for target supplier
       const allPrices = await db
@@ -145,7 +159,14 @@ export const supplierPortalRouter = router({
       if (!db) throw new Error("Database not available");
 
       const isAdminOrEmployee = ctx.user.role === "admin" || ctx.user.role === "employee";
-      const targetSupplierId = isAdminOrEmployee && input.supplierId ? input.supplierId : ctx.user.id;
+      
+      // SECURITY FIX: Prevent IDOR - suppliers can only view their own data
+      let targetSupplierId = ctx.user.id;
+      if (isAdminOrEmployee && input.supplierId) {
+        targetSupplierId = input.supplierId;
+      } else if (input.supplierId && input.supplierId !== ctx.user.id) {
+        throw new Error("Access denied: You can only view your own data");
+      }
 
       // Get all size quantities with product info
       const allSizeQuantities = await db
@@ -216,7 +237,14 @@ export const supplierPortalRouter = router({
       if (!db) throw new Error("Database not available");
 
       const isAdminOrEmployee = ctx.user.role === "admin" || ctx.user.role === "employee";
-      const targetSupplierId = isAdminOrEmployee && input.supplierId ? input.supplierId : ctx.user.id;
+      
+      // SECURITY FIX: Prevent IDOR - suppliers can only create prices for themselves
+      let targetSupplierId = ctx.user.id;
+      if (isAdminOrEmployee && input.supplierId) {
+        targetSupplierId = input.supplierId;
+      } else if (input.supplierId && input.supplierId !== ctx.user.id) {
+        throw new Error("Access denied: You can only create prices for yourself");
+      }
 
       // Check if price already exists
       const existing = await db
@@ -344,7 +372,14 @@ export const supplierPortalRouter = router({
       if (!db) throw new Error("Database not available");
 
       const isAdminOrEmployee = ctx.user.role === "admin" || ctx.user.role === "employee";
-      const targetSupplierId = isAdminOrEmployee && input?.supplierId ? input.supplierId : ctx.user.id;
+      
+      // SECURITY FIX: Prevent IDOR - suppliers can only view their own data
+      let targetSupplierId = ctx.user.id;
+      if (isAdminOrEmployee && input?.supplierId) {
+        targetSupplierId = input.supplierId;
+      } else if (input?.supplierId && input.supplierId !== ctx.user.id) {
+        throw new Error("Access denied: You can only view your own data");
+      }
 
       // Get supplier info
       const supplierResult = await db.execute(sql`
@@ -412,7 +447,14 @@ export const supplierPortalRouter = router({
       if (!db) throw new Error("Database not available");
 
       const isAdminOrEmployee = ctx.user.role === "admin" || ctx.user.role === "employee";
-      const targetSupplierId = isAdminOrEmployee && input?.supplierId ? input.supplierId : ctx.user.id;
+      
+      // SECURITY FIX: Prevent IDOR - suppliers can only view their own data
+      let targetSupplierId = ctx.user.id;
+      if (isAdminOrEmployee && input?.supplierId) {
+        targetSupplierId = input.supplierId;
+      } else if (input?.supplierId && input.supplierId !== ctx.user.id) {
+        throw new Error("Access denied: You can only view your own data");
+      }
 
       // Get pending orders (not yet accepted by supplier)
       const result = await db.execute(sql`
@@ -475,7 +517,14 @@ export const supplierPortalRouter = router({
       if (!db) throw new Error("Database not available");
 
       const isAdminOrEmployee = ctx.user.role === "admin" || ctx.user.role === "employee";
-      const targetSupplierId = isAdminOrEmployee && input?.supplierId ? input.supplierId : ctx.user.id;
+      
+      // SECURITY FIX: Prevent IDOR - suppliers can only view their own data
+      let targetSupplierId = ctx.user.id;
+      if (isAdminOrEmployee && input?.supplierId) {
+        targetSupplierId = input.supplierId;
+      } else if (input?.supplierId && input.supplierId !== ctx.user.id) {
+        throw new Error("Access denied: You can only view your own data");
+      }
 
       // Get accepted jobs (in progress)
       const result = await db.execute(sql`
@@ -677,7 +726,14 @@ export const supplierPortalRouter = router({
       if (!db) throw new Error("Database not available");
 
       const isAdminOrEmployee = ctx.user.role === "admin" || ctx.user.role === "employee";
-      const targetSupplierId = isAdminOrEmployee && input?.supplierId ? input.supplierId : ctx.user.id;
+      
+      // SECURITY FIX: Prevent IDOR - suppliers can only view their own data
+      let targetSupplierId = ctx.user.id;
+      if (isAdminOrEmployee && input?.supplierId) {
+        targetSupplierId = input.supplierId;
+      } else if (input?.supplierId && input.supplierId !== ctx.user.id) {
+        throw new Error("Access denied: You can only view your own data");
+      }
       const limit = input?.limit || 50;
 
       // Get completed and cancelled jobs
@@ -743,7 +799,14 @@ export const supplierPortalRouter = router({
       if (!db) throw new Error("Database not available");
 
       const isAdminOrEmployee = ctx.user.role === "admin" || ctx.user.role === "employee";
-      const targetSupplierId = isAdminOrEmployee && input?.supplierId ? input.supplierId : ctx.user.id;
+      
+      // SECURITY FIX: Prevent IDOR - suppliers can only view their own data
+      let targetSupplierId = ctx.user.id;
+      if (isAdminOrEmployee && input?.supplierId) {
+        targetSupplierId = input.supplierId;
+      } else if (input?.supplierId && input.supplierId !== ctx.user.id) {
+        throw new Error("Access denied: You can only view your own data");
+      }
       const limit = input?.limit || 100;
 
       // Get collected/picked up jobs
