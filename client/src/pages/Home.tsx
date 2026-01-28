@@ -1,5 +1,6 @@
 import { useState } from "react";
 import React from "react";
+import { ActivityFeedCompact } from "@/components/ActivityFeed";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -847,74 +848,6 @@ function SupplierRecommendationsModal({
   );
 }
 
-// ==================== ACTIVITY FEED ====================
-
-function ActivityFeedCard({ activities, isLoading }: { activities: any[]; isLoading: boolean }) {
-  const actionTypeLabels: Record<string, string> = {
-    quote_created: 'נוצרה הצעת מחיר חדשה',
-    quote_sent: 'הצעת מחיר נשלחה',
-    quote_approved: 'הצעת מחיר אושרה',
-    quote_rejected: 'הצעת מחיר נדחתה',
-    customer_created: 'לקוח חדש נוסף',
-    customer_approved: 'לקוח אושר',
-    supplier_created: 'ספק חדש נוסף',
-    product_created: 'מוצר חדש נוסף',
-    customer_signup_request: 'בקשה חדשה התקבלה',
-  };
-
-  const getActivityIcon = (actionType: string) => {
-    if (actionType.includes('quote')) return <FileText className="h-3.5 w-3.5" />;
-    if (actionType.includes('customer')) return <Users className="h-3.5 w-3.5" />;
-    if (actionType.includes('supplier')) return <Truck className="h-3.5 w-3.5" />;
-    return <Activity className="h-3.5 w-3.5" />;
-  };
-
-  return (
-    <Card className="border border-slate-200 shadow-none bg-white">
-      <CardHeader className="pb-2 pt-3 px-4">
-        <div className="flex items-center gap-2">
-          <Activity className="h-4 w-4 text-slate-600" />
-          <CardTitle className="text-sm font-medium text-slate-900">פעילות אחרונה</CardTitle>
-        </div>
-      </CardHeader>
-      <CardContent className="px-4 pb-3">
-        {isLoading ? (
-          <div className="space-y-2">
-            {[...Array(4)].map((_, i) => (
-              <Skeleton key={i} className="h-8 w-full" />
-            ))}
-          </div>
-        ) : activities.length === 0 ? (
-          <div className="flex items-center justify-center py-4 text-center">
-            <p className="text-xs text-slate-400">אין פעילות אחרונה</p>
-          </div>
-        ) : (
-          <div className="space-y-0.5">
-            {activities.slice(0, 6).map((activity, index) => (
-              <div key={activity.id || index} className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-slate-50">
-                <div className="h-5 w-5 rounded-full bg-slate-100 flex items-center justify-center shrink-0 text-slate-400">
-                  {getActivityIcon(activity.actionType)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-slate-600 truncate">
-                    {actionTypeLabels[activity.actionType] || activity.actionType}
-                  </p>
-                </div>
-                <span className="text-[10px] text-slate-400 shrink-0">
-                  {activity.createdAt ? new Date(activity.createdAt).toLocaleTimeString('he-IL', {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  }) : ''}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
 // ==================== MAIN HOME COMPONENT ====================
 
 export default function Home() {
@@ -982,7 +915,7 @@ export default function Home() {
           isLoading={signupsLoading} 
           onRefresh={handleSignupsRefresh} 
         />
-        <ActivityFeedCard 
+        <ActivityFeedCompact 
           activities={activities || []} 
           isLoading={activitiesLoading} 
         />
