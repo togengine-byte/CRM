@@ -236,6 +236,8 @@ export async function getActiveJobs() {
       sj."acceptedAt",
       sj."isCancelled",
       sj."cancelledAt",
+      sj."pickedUpAt",
+      sj."deliveredAt",
       supplier.name as "supplierName",
       supplier."companyName" as "supplierCompany",
       supplier.phone as "supplierPhone",
@@ -266,7 +268,7 @@ export async function getActiveJobs() {
     LEFT JOIN size_quantities sq ON sj."sizeQuantityId" = sq.id
     LEFT JOIN product_sizes ps ON sq.size_id = ps.id
     LEFT JOIN base_products bp ON ps.product_id = bp.id
-    WHERE sj.status IN ('pending', 'in_progress', 'ready')
+    WHERE sj.status IN ('pending', 'in_progress', 'ready', 'picked_up', 'delivered')
     ORDER BY sj."createdAt" DESC
   `);
 
@@ -289,6 +291,8 @@ export async function getActiveJobs() {
     acceptedAt: row.acceptedAt,
     isCancelled: row.isCancelled,
     cancelledAt: row.cancelledAt,
+    pickedUpAt: row.pickedUpAt,
+    deliveredAt: row.deliveredAt,
     supplierName: row.supplierName,
     supplierCompany: row.supplierCompany,
     supplierPhone: row.supplierPhone,

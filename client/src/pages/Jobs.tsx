@@ -190,6 +190,7 @@ export default function Jobs() {
     pending: jobs?.filter((j: Job) => j.status === "pending").length || 0,
     inProgress: jobs?.filter((j: Job) => j.status === "in_progress").length || 0,
     ready: jobs?.filter((j: Job) => j.status === "ready").length || 0,
+    pickedUp: jobs?.filter((j: Job) => j.status === "picked_up").length || 0,
     delivered: jobs?.filter((j: Job) => j.status === "delivered").length || 0,
   };
 
@@ -225,7 +226,7 @@ export default function Jobs() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-5">
+      <div className="grid gap-4 md:grid-cols-6">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -267,6 +268,17 @@ export default function Jobs() {
                 <p className="text-2xl font-bold text-green-600">{stats.ready}</p>
               </div>
               <Package className="h-8 w-8 text-green-500/50" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">נאספו</p>
+                <p className="text-2xl font-bold text-blue-600">{stats.pickedUp}</p>
+              </div>
+              <Truck className="h-8 w-8 text-blue-500/50" />
             </div>
           </CardContent>
         </Card>
@@ -517,6 +529,14 @@ export default function Jobs() {
                                     <p className="text-sm text-muted-foreground">מוכן בתאריך</p>
                                     <p className="font-medium text-green-600">
                                       {new Date(jobDetails.supplierReadyAt).toLocaleDateString("he-IL")}
+                                    </p>
+                                  </div>
+                                )}
+                                {jobDetails.pickedUpAt && (
+                                  <div>
+                                    <p className="text-sm text-muted-foreground">נאסף בתאריך</p>
+                                    <p className="font-medium text-blue-600">
+                                      {new Date(jobDetails.pickedUpAt).toLocaleDateString("he-IL")}
                                     </p>
                                   </div>
                                 )}
