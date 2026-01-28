@@ -93,11 +93,20 @@ export async function setEmailOnStatusChange(value: EmailOnStatusChange, userId:
 
 // ==================== VALIDATION SETTINGS ====================
 
+export interface FileValidationSettings {
+  minDpi: number;
+  requiredColorspace: string;
+  maxFileSizeMb: number;
+  allowedFormats: string[];
+  requireBleed: boolean;
+  bleedSizeMm: number;
+}
+
 /**
  * Get file validation settings
  */
-export async function getFileValidationSettings() {
-  const settings = await getSystemSetting('file_validation');
+export async function getFileValidationSettings(): Promise<FileValidationSettings> {
+  const settings = await getSystemSetting('file_validation') as FileValidationSettings | null;
   return settings || {
     minDpi: 300,
     requiredColorspace: 'CMYK',
