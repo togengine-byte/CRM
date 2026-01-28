@@ -619,9 +619,10 @@ export async function calculateProductPrice(input: {
   let addonsTotal = 0;
 
   if (input.addonIds && input.addonIds.length > 0) {
+    // SECURITY FIX: Use inArray instead of raw SQL to prevent SQL injection
     const addons = await db.select()
       .from(productAddons)
-      .where(sql`${productAddons.id} IN (${input.addonIds.join(',')})`);
+      .where(inArray(productAddons.id, input.addonIds));
 
     for (const addon of addons) {
       const addonPrice = parseFloat(addon.price || '0');

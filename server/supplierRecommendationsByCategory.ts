@@ -58,22 +58,25 @@ async function getSuppliersForSizeQuantities(sizeQuantityIds: number[]): Promise
   const result = new Map<number, { supplierId: number; pricePerUnit: number; deliveryDays: number }[]>();
 
   try {
-    // Build the IN clause dynamically to avoid ANY() issues with Drizzle
-    const sqIdList = sizeQuantityIds.join(',');
-    const pricesResult = await db.execute(sql`
-      SELECT 
-        sp."supplierId",
-        sp."sizeQuantityId",
-        sp."pricePerUnit",
-        sp."deliveryDays"
-      FROM supplier_prices sp
-      JOIN users u ON sp."supplierId" = u.id
-      WHERE sp."sizeQuantityId" IN (${sql.raw(sqIdList)})
-        AND u.status = 'active'
-        AND u.role = 'supplier'
-    `);
+    // SECURITY FIX: Use inArray with parameterized queries instead of sql.raw to prevent SQL injection
+    const pricesResult = await db
+      .select({
+        supplierId: supplierPrices.supplierId,
+        sizeQuantityId: supplierPrices.sizeQuantityId,
+        pricePerUnit: supplierPrices.pricePerUnit,
+        deliveryDays: supplierPrices.deliveryDays,
+      })
+      .from(supplierPrices)
+      .innerJoin(users, eq(supplierPrices.supplierId, users.id))
+      .where(
+        and(
+          inArray(supplierPrices.sizeQuantityId, sizeQuantityIds),
+          eq(users.status, 'active'),
+          eq(users.role, 'supplier')
+        )
+      );
 
-    for (const row of pricesResult.rows as any[]) {
+    for (const row of pricesResult) {
       const sqId = row.sizeQuantityId;
       if (!result.has(sqId)) {
         result.set(sqId, []);
