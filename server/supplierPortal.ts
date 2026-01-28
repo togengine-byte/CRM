@@ -584,10 +584,10 @@ export const supplierPortalRouter = router({
         throw new Error("עבודה זו כבר אושרה או בסטטוס אחר");
       }
 
-      // Accept the job
+      // Accept the job - set status to in_progress so it shows in "עבודות בביצוע"
       await db.execute(sql`
         UPDATE supplier_jobs
-        SET status = 'accepted',
+        SET status = 'in_progress',
             "isAccepted" = true,
             "acceptedAt" = NOW(),
             "updatedAt" = NOW()
