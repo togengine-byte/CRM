@@ -114,7 +114,7 @@ export const quotesRouter = router({
   updateStatus: protectedProcedure
     .input(z.object({
       quoteId: z.number(),
-      status: z.enum(['draft', 'sent', 'approved', 'rejected', 'superseded', 'in_production', 'ready']),
+      status: z.enum(['draft', 'sent', 'approved', 'rejected', 'superseded', 'in_production', 'ready', 'delivered']),
     }))
     .mutation(async ({ ctx, input }) => {
       if (!ctx.user) throw new Error("Not authenticated");
