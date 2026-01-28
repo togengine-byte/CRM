@@ -13,7 +13,7 @@ import { logActivity } from "./activity";
 /**
  * Get notes for an entity
  */
-export async function getNotes(entityType: 'customer' | 'quote' | 'supplier' | 'job', entityId: number) {
+export async function getNotes(entityType: string, entityId: number) {
   const db = await getDb();
   if (!db) return [];
 
@@ -21,11 +21,11 @@ export async function getNotes(entityType: 'customer' | 'quote' | 'supplier' | '
     id: notes.id,
     content: notes.content,
     createdAt: notes.createdAt,
-    authorId: notes.authorId,
+    createdBy: notes.createdBy,
     userName: users.name,
   })
     .from(notes)
-    .leftJoin(users, eq(notes.authorId, users.id))
+    .leftJoin(users, eq(notes.createdBy, users.id))
     .where(and(
       eq(notes.entityType, entityType),
       eq(notes.entityId, entityId)
@@ -37,10 +37,10 @@ export async function getNotes(entityType: 'customer' | 'quote' | 'supplier' | '
  * Create note
  */
 export async function createNote(input: {
-  entityType: 'customer' | 'quote' | 'supplier' | 'job';
+  entityType: string;
   entityId: number;
   content: string;
-  authorId: number;
+  createdBy: number;
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -53,10 +53,10 @@ export async function createNote(input: {
     entityType: input.entityType,
     entityId: input.entityId,
     content: input.content.trim(),
-    authorId: input.authorId,
+    createdBy: input.createdBy,
   }).returning();
 
-  await logActivity(input.authorId, "note_created", { 
+  await logActivity(input.createdBy, "note_created", { 
     noteId: result[0].id,
     entityType: input.entityType,
     entityId: input.entityId 
@@ -85,7 +85,7 @@ export async function updateNote(noteId: number, content: string, userId: number
     throw new Error("Note not found");
   }
 
-  if (note.authorId !== userId) {
+  if (note.createdBy !== userId) {
     throw new Error("You can only edit your own notes");
   }
 
@@ -117,7 +117,7 @@ export async function deleteNote(noteId: number, userId: number) {
     throw new Error("Note not found");
   }
 
-  if (note.authorId !== userId) {
+  if (note.createdBy !== userId) {
     throw new Error("You can only delete your own notes");
   }
 
@@ -146,7 +146,7 @@ export async function addQuoteNote(quoteId: number, content: string, userId: num
     entityType: 'quote',
     entityId: quoteId,
     content,
-    authorId: userId,
+    createdBy: userId,
   });
 }
 
@@ -167,7 +167,7 @@ export async function addCustomerNote(customerId: number, content: string, userI
     entityType: 'customer',
     entityId: customerId,
     content,
-    authorId: userId,
+    createdBy: userId,
   });
 }
 
@@ -188,7 +188,7 @@ export async function addSupplierNote(supplierId: number, content: string, userI
     entityType: 'supplier',
     entityId: supplierId,
     content,
-    authorId: userId,
+    createdBy: userId,
   });
 }
 
@@ -209,6 +209,6 @@ export async function addJobNote(jobId: number, content: string, userId: number)
     entityType: 'job',
     entityId: jobId,
     content,
-    authorId: userId,
+    createdBy: userId,
   });
 }

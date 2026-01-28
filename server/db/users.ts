@@ -64,6 +64,7 @@ export async function upsertUser(data: {
   openId: string;
   email?: string;
   name?: string;
+  avatar?: string;
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -75,6 +76,7 @@ export async function upsertUser(data: {
       .set({
         email: data.email || existing.email,
         name: data.name || existing.name,
+        avatar: data.avatar || existing.avatar,
         updatedAt: new Date(),
       })
       .where(eq(users.openId, data.openId));
@@ -86,6 +88,7 @@ export async function upsertUser(data: {
     openId: data.openId,
     email: data.email || null,
     name: data.name || null,
+    avatar: data.avatar || null,
     role: 'customer',
     status: 'pending_approval',
   }).returning();

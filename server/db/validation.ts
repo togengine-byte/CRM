@@ -6,7 +6,7 @@
 
 import { FileValidationResult, FileWarning } from "./types";
 import { getFileValidationSettings } from "./settings";
-import { getDb, eq, desc, and } from "./connection";
+import { getDb, eq, desc } from "./connection";
 import { validationProfiles } from "../../drizzle/schema";
 
 // ==================== FILE VALIDATION ====================
@@ -203,6 +203,8 @@ export async function validateMultipleFiles(files: Array<{
 
 
 // ==================== VALIDATION PROFILES ====================
+
+import { validationProfiles } from "../../drizzle/schema";
 
 function safeParseJsonArray(value: any): string[] {
   if (Array.isArray(value)) return value;

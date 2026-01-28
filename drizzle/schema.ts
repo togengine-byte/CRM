@@ -3,7 +3,7 @@ import { integer, pgEnum, pgTable, text, timestamp, varchar, decimal, jsonb, boo
 export const userRoleEnum = pgEnum("user_role", ["admin", "employee", "customer", "supplier", "courier"]);
 export const userStatusEnum = pgEnum("user_status", ["pending_approval", "active", "rejected", "deactivated"]);
 export const quoteStatusEnum = pgEnum("quote_status", ["draft", "sent", "approved", "rejected", "superseded", "in_production", "ready"]);
-export const entityTypeEnum = pgEnum("entity_type", ["customer", "quote", "supplier", "job"]);
+export const entityTypeEnum = pgEnum("entity_type", ["customer", "quote"]);
 
 // Users table with all roles including COURIER
 export const users = pgTable("users", {
