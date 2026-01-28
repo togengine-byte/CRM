@@ -670,16 +670,32 @@ export async function updateJobStatus(jobId: number, status: string, userId?: nu
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  await db.execute(sql`
-    UPDATE supplier_jobs 
-    SET 
-      status = ${status},
-      ${status === 'ready' ? sql`"supplierMarkedReady" = true, "supplierReadyAt" = NOW(),` : sql``}
-      ${status === 'picked_up' ? sql`"pickedUpAt" = NOW(),` : sql``}
-      ${status === 'delivered' ? sql`"deliveredAt" = NOW(), "actualDeliveryDate" = CURRENT_DATE,` : sql``}
-      "updatedAt" = NOW()
-    WHERE id = ${jobId}
-  `);
+  // Update based on status - separate queries to avoid SQL syntax issues
+  if (status === 'ready') {
+    await db.execute(sql`
+      UPDATE supplier_jobs 
+      SET status = ${status}, "supplierMarkedReady" = true, "supplierReadyAt" = NOW(), "updatedAt" = NOW()
+      WHERE id = ${jobId}
+    `);
+  } else if (status === 'picked_up') {
+    await db.execute(sql`
+      UPDATE supplier_jobs 
+      SET status = ${status}, "pickedUpAt" = NOW(), "updatedAt" = NOW()
+      WHERE id = ${jobId}
+    `);
+  } else if (status === 'delivered') {
+    await db.execute(sql`
+      UPDATE supplier_jobs 
+      SET status = ${status}, "deliveredAt" = NOW(), "actualDeliveryDate" = CURRENT_DATE, "updatedAt" = NOW()
+      WHERE id = ${jobId}
+    `);
+  } else {
+    await db.execute(sql`
+      UPDATE supplier_jobs 
+      SET status = ${status}, "updatedAt" = NOW()
+      WHERE id = ${jobId}
+    `);
+  }
 
   if (userId) {
     await logActivity(userId, 'job_status_updated', { jobId, status });
