@@ -399,7 +399,7 @@ function PendingOrdersTab({ supplierId }: { supplierId: number }) {
                       <div className="flex items-center gap-4 text-sm text-slate-600">
                         <span>כמות: <strong>{order.quantity}</strong></span>
                         <span>מחיר ליחידה: <strong>₪{order.pricePerUnit.toFixed(2)}</strong></span>
-                        <span>סה"כ: <strong>₪{(order.quantity * order.pricePerUnit).toFixed(2)}</strong></span>
+                        <span>סה"כ: <strong>₪{order.pricePerUnit.toFixed(2)}</strong></span>
                       </div>
                       <div className="flex items-center gap-1 text-sm text-blue-600">
                         <Calendar className="h-4 w-4" />
@@ -554,7 +554,7 @@ function ActiveJobsTab({ supplierId }: { supplierId: number }) {
                   </div>
                   <div>
                     <p className="text-xs text-slate-500">מחיר</p>
-                    <p className="font-medium">₪{(job.quantity * job.pricePerUnit).toFixed(2)}</p>
+                    <p className="font-medium">₪{job.pricePerUnit.toFixed(2)}</p>
                   </div>
                   <div>
                     <p className="text-xs text-slate-500">אושר בתאריך</p>
@@ -672,7 +672,7 @@ function HistoryTab({ supplierId }: { supplierId: number }) {
                     )}
                   </div>
                   <div className="text-left">
-                    <p className="font-semibold">₪{(job.quantity * job.pricePerUnit).toFixed(2)}</p>
+                    <p className="font-semibold">₪{job.pricePerUnit.toFixed(2)}</p>
                     <p className="text-sm text-slate-500">
                       {new Date(job.createdAt).toLocaleDateString('he-IL')}
                     </p>
@@ -756,7 +756,7 @@ function CollectedJobsTab({ supplierId }: { supplierId: number }) {
                     </p>
                   </div>
                   <div className="text-left">
-                    <p className="font-semibold">₪{(job.quantity * job.pricePerUnit).toFixed(2)}</p>
+                    <p className="font-semibold">₪{job.pricePerUnit.toFixed(2)}</p>
                     <p className="text-sm text-slate-500">
                       {new Date(job.updatedAt).toLocaleDateString('he-IL')}
                     </p>
