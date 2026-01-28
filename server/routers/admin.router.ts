@@ -14,8 +14,11 @@ import {
   getPendingCustomers,
 } from "../db";
 
-// Developer access code
-const DEVELOPER_ACCESS_CODE = "15974108";
+// SECURITY FIX: Developer access code now read from environment variable
+const DEVELOPER_ACCESS_CODE = process.env.DEVELOPER_ACCESS_CODE;
+if (!DEVELOPER_ACCESS_CODE) {
+  console.error("[SECURITY] DEVELOPER_ACCESS_CODE environment variable is not set!");
+}
 
 export const adminRouter = router({
   approveCustomer: adminProcedure
