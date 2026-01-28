@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelRight, Users, FileText, Truck, Package, BarChart3, Settings, Menu, X, ShoppingBag, User, Shield, Briefcase, Bell, CheckCircle, Clock, PackageCheck } from "lucide-react";
+import { LayoutDashboard, LogOut, PanelRight, Users, FileText, Truck, Package, BarChart3, Settings, Menu, X, ShoppingBag, User, Shield, Briefcase, Bell, CheckCircle, Clock, PackageCheck, PackageX, Archive } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -25,6 +25,8 @@ const adminMenuItems = [
   { icon: CheckCircle, label: "אושר על ידי הלקוח", path: "/customer-approved" },
   { icon: Briefcase, label: "עבודות בביצוע", path: "/jobs" },
   { icon: PackageCheck, label: "ממתין לאיסוף", path: "/ready-for-pickup" },
+  { icon: Truck, label: "נאסף", path: "/picked-up" },
+  { icon: Archive, label: "נמסר", path: "/delivered" },
   { icon: Users, label: "לקוחות", path: "/customers" },
   { icon: Truck, label: "ספקים", path: "/suppliers" },
   { icon: Package, label: "מוצרים", path: "/products" },
@@ -40,6 +42,8 @@ const employeeMenuItems = [
   { icon: CheckCircle, label: "אושר על ידי הלקוח", path: "/customer-approved" },
   { icon: Briefcase, label: "עבודות בביצוע", path: "/jobs" },
   { icon: PackageCheck, label: "ממתין לאיסוף", path: "/ready-for-pickup" },
+  { icon: Truck, label: "נאסף", path: "/picked-up" },
+  { icon: Archive, label: "נמסר", path: "/delivered" },
   { icon: Users, label: "לקוחות", path: "/customers" },
   { icon: Truck, label: "ספקים", path: "/suppliers" },
   { icon: Package, label: "מוצרים", path: "/products" },

@@ -23,6 +23,8 @@ import AdminSetup from "./pages/AdminSetup";
 import CustomerApproved from "./pages/CustomerApproved";
 import PendingApproval from "./pages/PendingApproval";
 import ReadyForPickup from "./pages/ReadyForPickup";
+import PickedUp from "./pages/PickedUp";
+import Delivered from "./pages/Delivered";
 import CustomerPortalPreview from "./pages/CustomerPortalPreview";
 
 /**
@@ -121,6 +123,24 @@ function Router() {
         <ProtectedRoute requiredRole={['admin', 'employee']}>
           <DashboardLayout>
             <ReadyForPickup />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
+      
+      {/* Picked Up - עבודות שנאספו - זמין לאדמין ועובדים */}
+      <Route path="/picked-up">
+        <ProtectedRoute requiredRole={['admin', 'employee']}>
+          <DashboardLayout>
+            <PickedUp />
+          </DashboardLayout>
+        </ProtectedRoute>
+      </Route>
+      
+      {/* Delivered - עבודות שנמסרו - זמין לאדמין ועובדים */}
+      <Route path="/delivered">
+        <ProtectedRoute requiredRole={['admin', 'employee']}>
+          <DashboardLayout>
+            <Delivered />
           </DashboardLayout>
         </ProtectedRoute>
       </Route>
