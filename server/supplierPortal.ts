@@ -502,7 +502,7 @@ export const supplierPortalRouter = router({
         LEFT JOIN product_sizes ps ON sq.size_id = ps.id
         LEFT JOIN base_products bp ON ps.product_id = bp.id
         WHERE sj."supplierId" = ${targetSupplierId}
-          AND sj.status IN ('accepted', 'ready')
+          AND sj.status = 'in_progress'
           AND sj."isCancelled" = false
         ORDER BY sj."acceptedAt" DESC
       `);
@@ -644,8 +644,8 @@ export const supplierPortalRouter = router({
         throw new Error("לא ניתן לעדכן עבודה מבוטלת");
       }
 
-      if (job.status !== 'accepted') {
-        throw new Error("ניתן לסמן כמוכן רק עבודות שאושרו");
+      if (job.status !== 'in_progress') {
+        throw new Error("ניתן לסמן כמוכן רק עבודות בביצוע");
       }
 
       // Mark as ready
