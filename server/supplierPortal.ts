@@ -390,8 +390,8 @@ export const supplierPortalRouter = router({
       // Get job counts by status
       const jobCountsResult = await db.execute(sql`
         SELECT 
-          COUNT(CASE WHEN status = 'pending' AND "isCancelled" = false THEN 1 END) as pending_orders,
-          COUNT(CASE WHEN status = 'accepted' AND "isCancelled" = false THEN 1 END) as in_progress,
+          COUNT(CASE WHEN status = 'in_progress' AND ("isAccepted" = false OR "isAccepted" IS NULL) AND "isCancelled" = false THEN 1 END) as pending_orders,
+          COUNT(CASE WHEN status = 'in_progress' AND "isAccepted" = true AND "isCancelled" = false THEN 1 END) as in_progress,
           COUNT(CASE WHEN status = 'ready' AND "isCancelled" = false THEN 1 END) as ready_for_pickup,
           COUNT(CASE WHEN status = 'delivered' THEN 1 END) as completed,
           COUNT(CASE WHEN "isCancelled" = true THEN 1 END) as cancelled
