@@ -52,11 +52,19 @@ export default function Analytics() {
     setAppliedCustomerFilter(customerFilter);
   };
   
+  // Calculate date range for queries - always fetch full year for chart
+  const dateRange = useMemo(() => {
+    const end = new Date();
+    const start = new Date();
+    start.setFullYear(start.getFullYear() - 1);
+    return { startDate: start, endDate: end };
+  }, []);
+
   const { data: summary, isLoading: summaryLoading } = trpc.analytics.summary.useQuery();
-  const { data: productPerformance, isLoading: productsLoading } = trpc.analytics.productPerformance.useQuery();
-  const { data: supplierPerformance, isLoading: suppliersLoading } = trpc.analytics.supplierPerformance.useQuery();
-  const { data: customerAnalytics, isLoading: customersLoading } = trpc.analytics.customerAnalytics.useQuery();
-  const { data: revenueReport, isLoading: revenueLoading } = trpc.analytics.revenueReport.useQuery();
+  const { data: productPerformance, isLoading: productsLoading } = trpc.analytics.productPerformance.useQuery(dateRange);
+  const { data: supplierPerformance, isLoading: suppliersLoading } = trpc.analytics.supplierPerformance.useQuery(dateRange);
+  const { data: customerAnalytics, isLoading: customersLoading } = trpc.analytics.customerAnalytics.useQuery(dateRange);
+  const { data: revenueReport, isLoading: revenueLoading } = trpc.analytics.revenueReport.useQuery(dateRange);
   const { data: suppliers } = trpc.suppliers.list.useQuery();
   const { data: customers } = trpc.customers.list.useQuery();
 
@@ -301,38 +309,46 @@ export default function Analytics() {
         </Card>
       </div>
 
-      {/* Revenue Chart */}
+      {/* Revenue Chart - Google Analytics Style */}
       <Card className="bg-white border-gray-200 shadow-sm">
         <CardHeader className="pb-0 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium text-gray-700">מגמת הכנסות ורווח</CardTitle>
           <div className="flex items-center gap-4 text-xs">
             <div className="flex items-center gap-1.5">
-              <div className="w-3 h-0.5 bg-gray-500 rounded"></div>
+              <div className="w-2.5 h-2.5 rounded-full bg-blue-500"></div>
               <span className="text-gray-500">הכנסות</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-3 h-0.5 bg-emerald-500 rounded"></div>
+              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
               <span className="text-gray-500">רווח</span>
             </div>
           </div>
         </CardHeader>
         <CardContent className="pt-4">
           {filteredRevenueData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={260}>
-              <LineChart data={filteredRevenueData.slice().reverse()} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+            <ResponsiveContainer width="100%" height={280}>
+              <LineChart 
+                data={filteredRevenueData.slice().reverse()} 
+                margin={{ top: 20, right: 30, left: 10, bottom: 10 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
                 <XAxis 
                   dataKey="month" 
-                  tick={{ fontSize: 11, fill: '#9ca3af' }} 
-                  tickFormatter={(value) => value ? value.slice(5) : ''}
-                  axisLine={false}
+                  tick={{ fontSize: 11, fill: '#6b7280' }} 
+                  tickFormatter={(value) => {
+                    if (!value) return '';
+                    const parts = value.split('-');
+                    const monthNames = ['', 'ינו', 'פבר', 'מרץ', 'אפר', 'מאי', 'יוני', 'יולי', 'אוג', 'ספט', 'אוק', 'נוב', 'דצמ'];
+                    return monthNames[parseInt(parts[1])] || parts[1];
+                  }}
+                  axisLine={{ stroke: '#e5e7eb' }}
                   tickLine={false}
-                  padding={{ left: 20, right: 20 }}
+                  dy={10}
                 />
                 <YAxis 
-                  tick={{ fontSize: 11, fill: '#9ca3af' }} 
+                  tick={{ fontSize: 11, fill: '#6b7280' }} 
                   tickFormatter={(value) => formatShortCurrency(value)} 
-                  width={65}
+                  width={70}
                   axisLine={false}
                   tickLine={false}
                 />
@@ -341,23 +357,28 @@ export default function Analytics() {
                     formatCurrency(value), 
                     name === 'revenue' ? 'הכנסות' : 'רווח'
                   ]}
-                  labelFormatter={(label) => label}
+                  labelFormatter={(label) => {
+                    if (!label) return '';
+                    const parts = label.split('-');
+                    const monthNames = ['', 'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
+                    return `${monthNames[parseInt(parts[1])] || parts[1]} ${parts[0]}`;
+                  }}
                   contentStyle={{ 
                     borderRadius: '8px', 
-                    border: '1px solid #e5e7eb',
-                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
+                    border: 'none',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                     fontSize: '12px',
-                    padding: '8px 12px'
+                    padding: '10px 14px'
                   }}
                 />
                 <Line 
                   type="monotone" 
                   dataKey="revenue" 
                   name="revenue"
-                  stroke="#6b7280" 
-                  strokeWidth={2}
-                  dot={{ r: 4, fill: '#6b7280', strokeWidth: 2, stroke: '#fff' }}
-                  activeDot={{ r: 6, fill: '#374151', strokeWidth: 2, stroke: '#fff' }}
+                  stroke="#3b82f6" 
+                  strokeWidth={2.5}
+                  dot={{ r: 4, fill: '#3b82f6', strokeWidth: 0 }}
+                  activeDot={{ r: 6, fill: '#3b82f6', strokeWidth: 3, stroke: '#fff' }}
                   connectNulls
                 />
                 <Line 
@@ -365,15 +386,15 @@ export default function Analytics() {
                   dataKey="profit" 
                   name="profit"
                   stroke="#10b981" 
-                  strokeWidth={2}
-                  dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }}
-                  activeDot={{ r: 6, fill: '#059669', strokeWidth: 2, stroke: '#fff' }}
+                  strokeWidth={2.5}
+                  dot={{ r: 4, fill: '#10b981', strokeWidth: 0 }}
+                  activeDot={{ r: 6, fill: '#10b981', strokeWidth: 3, stroke: '#fff' }}
                   connectNulls
                 />
               </LineChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-[260px] flex items-center justify-center text-gray-400 text-sm">
+            <div className="h-[280px] flex items-center justify-center text-gray-400 text-sm">
               אין נתונים לתקופה זו
             </div>
           )}
