@@ -8,6 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
 import { 
   TrendingUp, 
@@ -36,21 +37,29 @@ import {
 type DateFilter = 'week' | 'month' | 'quarter' | 'year' | 'all';
 
 export default function Analytics() {
-  const [dateFilter, setDateFilter] = useState<DateFilter>('month');
+  const [dateFilter, setDateFilter] = useState<DateFilter>('year');
   const [supplierFilter, setSupplierFilter] = useState<string>('all');
   const [customerFilter, setCustomerFilter] = useState<string>('all');
   const [expandedSection, setExpandedSection] = useState<string | null>('products');
   
+  // Custom date range
+  const [startDateStr, setStartDateStr] = useState<string>('');
+  const [endDateStr, setEndDateStr] = useState<string>('');
+  
   // Applied filters (only update when "הצג" is clicked)
-  const [appliedDateFilter, setAppliedDateFilter] = useState<DateFilter>('month');
+  const [appliedDateFilter, setAppliedDateFilter] = useState<DateFilter>('year');
   const [appliedSupplierFilter, setAppliedSupplierFilter] = useState<string>('all');
   const [appliedCustomerFilter, setAppliedCustomerFilter] = useState<string>('all');
+  const [appliedStartDate, setAppliedStartDate] = useState<string>('');
+  const [appliedEndDate, setAppliedEndDate] = useState<string>('');
   
   const applyFilters = () => {
-    console.log('Apply filters clicked:', { dateFilter, supplierFilter, customerFilter });
+    console.log('Apply filters clicked:', { dateFilter, supplierFilter, customerFilter, startDateStr, endDateStr });
     setAppliedDateFilter(dateFilter);
     setAppliedSupplierFilter(supplierFilter);
     setAppliedCustomerFilter(customerFilter);
+    setAppliedStartDate(startDateStr);
+    setAppliedEndDate(endDateStr);
   };
   
   // Calculate date range for queries - always fetch full year for chart
@@ -74,7 +83,19 @@ export default function Analytics() {
   // Filter data based on APPLIED filters (only changes when "הצג" is clicked)
   const filteredRevenueData = useMemo(() => {
     if (!revenueReport?.byMonth || revenueReport.byMonth.length === 0) return [];
-    const months = revenueReport.byMonth;
+    let months = revenueReport.byMonth;
+    
+    // If custom date range is set, filter by date
+    if (appliedStartDate || appliedEndDate) {
+      months = months.filter((m: any) => {
+        const monthDate = m.month; // Format: "2026-01"
+        if (appliedStartDate && monthDate < appliedStartDate.substring(0, 7)) return false;
+        if (appliedEndDate && monthDate > appliedEndDate.substring(0, 7)) return false;
+        return true;
+      });
+      return months;
+    }
+    
     // Take from the END of the array (most recent months)
     switch (appliedDateFilter) {
       case 'week': return months.slice(-1); // Last month
@@ -83,7 +104,7 @@ export default function Analytics() {
       case 'year': return months.slice(-12); // Last 12 months
       default: return months; // All data
     }
-  }, [revenueReport, appliedDateFilter]);
+  }, [revenueReport, appliedDateFilter, appliedStartDate, appliedEndDate]);
 
   // Filter suppliers data based on APPLIED filter
   const filteredSupplierData = useMemo(() => {
@@ -236,6 +257,26 @@ export default function Analytics() {
               ))}
             </SelectContent>
           </Select>
+
+          <div className="flex items-center gap-1">
+            <span className="text-xs text-gray-500">מ:</span>
+            <Input
+              type="date"
+              value={startDateStr}
+              onChange={(e) => setStartDateStr(e.target.value)}
+              className="w-[130px] h-9 text-sm bg-white border-gray-200"
+            />
+          </div>
+
+          <div className="flex items-center gap-1">
+            <span className="text-xs text-gray-500">עד:</span>
+            <Input
+              type="date"
+              value={endDateStr}
+              onChange={(e) => setEndDateStr(e.target.value)}
+              className="w-[130px] h-9 text-sm bg-white border-gray-200"
+            />
+          </div>
 
           <Button 
             type="button"

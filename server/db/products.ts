@@ -141,6 +141,7 @@ export async function createProduct(input: CreateProductInput) {
     name: input.name,
     description: input.description || null,
     category: input.category || null,
+    categoryId: input.categoryId || null,
     isActive: true,
   }).returning({ id: baseProducts.id });
 

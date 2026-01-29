@@ -69,6 +69,7 @@ export interface CreateProductInput {
   name: string;
   description?: string;
   category?: string;
+  categoryId?: number;
 }
 
 export interface UpdateProductInput {
