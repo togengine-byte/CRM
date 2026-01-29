@@ -553,7 +553,7 @@ export const supplierPortalRouter = router({
         WHERE sj."supplierId" = ${targetSupplierId}
           AND sj.status = 'in_progress'
           AND sj."isCancelled" = false
-        ORDER BY sj."acceptedAt" DESC
+        ORDER BY sj."createdAt" DESC
       `);
 
       // Get attachments for each job
@@ -835,7 +835,7 @@ export const supplierPortalRouter = router({
         LEFT JOIN product_sizes ps ON sq.size_id = ps.id
         LEFT JOIN base_products bp ON ps.product_id = bp.id
         WHERE sj."supplierId" = ${targetSupplierId}
-          AND sj.status IN ('picked_up', 'delivered')
+          AND sj.status = 'picked_up'
           AND sj."isCancelled" = false
         ORDER BY sj."updatedAt" DESC
         LIMIT ${limit}

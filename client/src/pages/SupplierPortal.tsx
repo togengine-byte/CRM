@@ -1078,14 +1078,10 @@ function SupplierPortalView({ supplier, onBack }: { supplier: Supplier; onBack: 
 
       {/* Main Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-6 mb-6">
+        <TabsList className="grid w-full grid-cols-5 mb-6">
           <TabsTrigger value="dashboard" className="gap-2">
             <BarChart3 className="h-4 w-4" />
             דשבורד
-          </TabsTrigger>
-          <TabsTrigger value="orders" className="gap-2">
-            <Package className="h-4 w-4" />
-            הזמנות
           </TabsTrigger>
           <TabsTrigger value="jobs" className="gap-2">
             <Clock className="h-4 w-4" />
@@ -1107,10 +1103,6 @@ function SupplierPortalView({ supplier, onBack }: { supplier: Supplier; onBack: 
 
         <TabsContent value="dashboard">
           <DashboardTab supplierId={supplier.id} />
-        </TabsContent>
-
-        <TabsContent value="orders">
-          <PendingOrdersTab supplierId={supplier.id} />
         </TabsContent>
 
         <TabsContent value="jobs">
