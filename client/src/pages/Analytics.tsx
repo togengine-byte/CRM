@@ -40,6 +40,17 @@ export default function Analytics() {
   const [customerFilter, setCustomerFilter] = useState<string>('all');
   const [expandedSection, setExpandedSection] = useState<string | null>('products');
   
+  // Applied filters (only update when "הצג" is clicked)
+  const [appliedDateFilter, setAppliedDateFilter] = useState<DateFilter>('month');
+  const [appliedSupplierFilter, setAppliedSupplierFilter] = useState<string>('all');
+  const [appliedCustomerFilter, setAppliedCustomerFilter] = useState<string>('all');
+  
+  const applyFilters = () => {
+    setAppliedDateFilter(dateFilter);
+    setAppliedSupplierFilter(supplierFilter);
+    setAppliedCustomerFilter(customerFilter);
+  };
+  
   const { data: summary, isLoading: summaryLoading } = trpc.analytics.summary.useQuery();
   const { data: productPerformance, isLoading: productsLoading } = trpc.analytics.productPerformance.useQuery();
   const { data: supplierPerformance, isLoading: suppliersLoading } = trpc.analytics.supplierPerformance.useQuery();
@@ -50,47 +61,47 @@ export default function Analytics() {
 
   const isLoading = summaryLoading || productsLoading || suppliersLoading || customersLoading || revenueLoading;
 
-  // Filter data based on selected filters
+  // Filter data based on APPLIED filters (only changes when "הצג" is clicked)
   const filteredRevenueData = useMemo(() => {
     if (!revenueReport?.byMonth) return [];
     const months = revenueReport.byMonth;
-    switch (dateFilter) {
+    switch (appliedDateFilter) {
       case 'week': return months.slice(0, 1);
       case 'month': return months.slice(0, 1);
       case 'quarter': return months.slice(0, 3);
       case 'year': return months.slice(0, 12);
       default: return months;
     }
-  }, [revenueReport, dateFilter]);
+  }, [revenueReport, appliedDateFilter]);
 
-  // Filter suppliers data
+  // Filter suppliers data based on APPLIED filter
   const filteredSupplierData = useMemo(() => {
     if (!supplierPerformance) return [];
-    if (supplierFilter === 'all') return supplierPerformance;
-    return supplierPerformance.filter((s: any) => s.supplierId?.toString() === supplierFilter);
-  }, [supplierPerformance, supplierFilter]);
+    if (appliedSupplierFilter === 'all') return supplierPerformance;
+    return supplierPerformance.filter((s: any) => s.supplierId?.toString() === appliedSupplierFilter);
+  }, [supplierPerformance, appliedSupplierFilter]);
 
-  // Filter customers data
+  // Filter customers data based on APPLIED filter
   const filteredCustomerData = useMemo(() => {
     if (!customerAnalytics) return [];
-    if (customerFilter === 'all') return customerAnalytics;
-    return customerAnalytics.filter((c: any) => c.customerId?.toString() === customerFilter);
-  }, [customerAnalytics, customerFilter]);
+    if (appliedCustomerFilter === 'all') return customerAnalytics;
+    return customerAnalytics.filter((c: any) => c.customerId?.toString() === appliedCustomerFilter);
+  }, [customerAnalytics, appliedCustomerFilter]);
 
-  // Calculate totals based on filters
+  // Calculate totals based on APPLIED filters
   const filteredTotals = useMemo(() => {
     let revenue = revenueReport?.totalRevenue || 0;
     let cost = revenueReport?.totalCost || 0;
     let profit = revenueReport?.profit || 0;
 
-    if (filteredRevenueData.length > 0 && dateFilter !== 'all') {
+    if (filteredRevenueData.length > 0 && appliedDateFilter !== 'all') {
       revenue = filteredRevenueData.reduce((sum, m) => sum + (m.revenue || 0), 0);
       cost = filteredRevenueData.reduce((sum, m) => sum + (m.cost || 0), 0);
       profit = filteredRevenueData.reduce((sum, m) => sum + (m.profit || 0), 0);
     }
 
     return { revenue, cost, profit, margin: revenue > 0 ? (profit / revenue) * 100 : 0 };
-  }, [revenueReport, filteredRevenueData, dateFilter]);
+  }, [revenueReport, filteredRevenueData, appliedDateFilter]);
 
   // Calculate period comparison
   const periodComparison = useMemo(() => {
@@ -214,6 +225,14 @@ export default function Analytics() {
               ))}
             </SelectContent>
           </Select>
+
+          <Button 
+            size="sm" 
+            className="h-9 text-sm bg-gray-800 hover:bg-gray-700 text-white"
+            onClick={applyFilters}
+          >
+            הצג
+          </Button>
 
           <Button 
             variant="outline" 
@@ -408,12 +427,12 @@ export default function Analytics() {
                 {/* Products Chart */}
                 <div>
                   {productPerformance && productPerformance.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={250}>
-                      <BarChart data={productPerformance.slice(0, 8)} layout="vertical">
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" horizontal={false} />
+                    <ResponsiveContainer width="100%" height={220}>
+                      <BarChart data={productPerformance.slice(0, 6)} layout="vertical" margin={{ left: 10, right: 10 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" horizontal={false} />
                         <XAxis 
                           type="number" 
-                          tick={{ fontSize: 10, fill: '#6b7280' }} 
+                          tick={{ fontSize: 9, fill: '#9ca3af' }} 
                           tickFormatter={(value) => formatShortCurrency(value)}
                           axisLine={false}
                           tickLine={false}
@@ -421,9 +440,9 @@ export default function Analytics() {
                         <YAxis 
                           dataKey="productName" 
                           type="category" 
-                          width={80} 
-                          tick={{ fontSize: 10, fill: '#6b7280' }}
-                          tickFormatter={(value) => value.length > 10 ? value.slice(0, 10) + '..' : value}
+                          width={100} 
+                          tick={{ fontSize: 9, fill: '#6b7280' }}
+                          tickFormatter={(value) => value && value.length > 12 ? value.slice(0, 12) + '...' : value}
                           axisLine={false}
                           tickLine={false}
                         />
@@ -432,14 +451,14 @@ export default function Analytics() {
                           contentStyle={{ 
                             borderRadius: '6px', 
                             border: '1px solid #e5e7eb',
-                            fontSize: '12px'
+                            fontSize: '11px'
                           }}
                         />
-                        <Bar dataKey="totalRevenue" fill="#374151" radius={[0, 3, 3, 0]} />
+                        <Bar dataKey="totalRevenue" fill="#6b7280" radius={[0, 2, 2, 0]} barSize={18} />
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="h-[250px] flex items-center justify-center text-gray-400 text-sm">
+                    <div className="h-[220px] flex items-center justify-center text-gray-400 text-sm">
                       אין נתונים
                     </div>
                   )}
@@ -503,12 +522,12 @@ export default function Analytics() {
                 {/* Suppliers Chart */}
                 <div>
                   {filteredSupplierData && filteredSupplierData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={250}>
-                      <BarChart data={filteredSupplierData.slice(0, 8)} layout="vertical">
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" horizontal={false} />
+                    <ResponsiveContainer width="100%" height={220}>
+                      <BarChart data={filteredSupplierData.slice(0, 6)} layout="vertical" margin={{ left: 10, right: 10 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" horizontal={false} />
                         <XAxis 
                           type="number" 
-                          tick={{ fontSize: 10, fill: '#6b7280' }} 
+                          tick={{ fontSize: 9, fill: '#9ca3af' }} 
                           tickFormatter={(value) => formatShortCurrency(value)}
                           axisLine={false}
                           tickLine={false}
@@ -516,11 +535,11 @@ export default function Analytics() {
                         <YAxis 
                           dataKey="supplierName" 
                           type="category" 
-                          width={80} 
-                          tick={{ fontSize: 10, fill: '#6b7280' }}
+                          width={100} 
+                          tick={{ fontSize: 9, fill: '#6b7280' }}
                           tickFormatter={(value) => {
                             const name = value || 'לא ידוע';
-                            return name.length > 10 ? name.slice(0, 10) + '..' : name;
+                            return name.length > 12 ? name.slice(0, 12) + '...' : name;
                           }}
                           axisLine={false}
                           tickLine={false}
@@ -530,14 +549,14 @@ export default function Analytics() {
                           contentStyle={{ 
                             borderRadius: '6px', 
                             border: '1px solid #e5e7eb',
-                            fontSize: '12px'
+                            fontSize: '11px'
                           }}
                         />
-                        <Bar dataKey="totalRevenue" fill="#6b7280" radius={[0, 3, 3, 0]} />
+                        <Bar dataKey="totalRevenue" fill="#6b7280" radius={[0, 2, 2, 0]} barSize={18} />
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="h-[250px] flex items-center justify-center text-gray-400 text-sm">
+                    <div className="h-[220px] flex items-center justify-center text-gray-400 text-sm">
                       אין נתונים
                     </div>
                   )}
@@ -607,12 +626,12 @@ export default function Analytics() {
                 {/* Customers Chart */}
                 <div>
                   {filteredCustomerData && filteredCustomerData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={250}>
-                      <BarChart data={filteredCustomerData.slice(0, 8)} layout="vertical">
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" horizontal={false} />
+                    <ResponsiveContainer width="100%" height={220}>
+                      <BarChart data={filteredCustomerData.slice(0, 6)} layout="vertical" margin={{ left: 10, right: 10 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" horizontal={false} />
                         <XAxis 
                           type="number" 
-                          tick={{ fontSize: 10, fill: '#6b7280' }} 
+                          tick={{ fontSize: 9, fill: '#9ca3af' }} 
                           tickFormatter={(value) => formatShortCurrency(value)}
                           axisLine={false}
                           tickLine={false}
@@ -620,11 +639,11 @@ export default function Analytics() {
                         <YAxis 
                           dataKey="customerName" 
                           type="category" 
-                          width={80} 
-                          tick={{ fontSize: 10, fill: '#6b7280' }}
+                          width={100} 
+                          tick={{ fontSize: 9, fill: '#6b7280' }}
                           tickFormatter={(value) => {
                             const name = value || 'לא ידוע';
-                            return name.length > 10 ? name.slice(0, 10) + '..' : name;
+                            return name.length > 12 ? name.slice(0, 12) + '...' : name;
                           }}
                           axisLine={false}
                           tickLine={false}
@@ -634,14 +653,14 @@ export default function Analytics() {
                           contentStyle={{ 
                             borderRadius: '6px', 
                             border: '1px solid #e5e7eb',
-                            fontSize: '12px'
+                            fontSize: '11px'
                           }}
                         />
-                        <Bar dataKey="totalRevenue" fill="#9ca3af" radius={[0, 3, 3, 0]} />
+                        <Bar dataKey="totalRevenue" fill="#9ca3af" radius={[0, 2, 2, 0]} barSize={18} />
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="h-[250px] flex items-center justify-center text-gray-400 text-sm">
+                    <div className="h-[220px] flex items-center justify-center text-gray-400 text-sm">
                       אין נתונים
                     </div>
                   )}
