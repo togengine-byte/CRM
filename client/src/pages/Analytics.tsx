@@ -430,38 +430,41 @@ export default function Analytics() {
                 {/* Products Chart */}
                 <div>
                   {productPerformance && productPerformance.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={220}>
-                      <BarChart data={productPerformance.slice(0, 6)} layout="vertical" margin={{ left: 10, right: 10 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" horizontal={false} />
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={productPerformance.slice(0, 6)} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
                         <XAxis 
-                          type="number" 
+                          dataKey="productName"
+                          tick={{ fontSize: 9, fill: '#9ca3af' }} 
+                          tickFormatter={(value) => value && value.length > 8 ? value.slice(0, 8) + '..' : value}
+                          axisLine={false}
+                          tickLine={false}
+                          interval={0}
+                          angle={-20}
+                          textAnchor="end"
+                          height={50}
+                        />
+                        <YAxis 
                           tick={{ fontSize: 9, fill: '#9ca3af' }} 
                           tickFormatter={(value) => formatShortCurrency(value)}
                           axisLine={false}
                           tickLine={false}
-                        />
-                        <YAxis 
-                          dataKey="productName" 
-                          type="category" 
-                          width={100} 
-                          tick={{ fontSize: 9, fill: '#6b7280' }}
-                          tickFormatter={(value) => value && value.length > 12 ? value.slice(0, 12) + '...' : value}
-                          axisLine={false}
-                          tickLine={false}
+                          width={50}
                         />
                         <Tooltip 
-                          formatter={(value: number) => formatCurrency(value)} 
+                          formatter={(value: number) => formatCurrency(value)}
+                          labelFormatter={(label) => label}
                           contentStyle={{ 
                             borderRadius: '6px', 
                             border: '1px solid #e5e7eb',
                             fontSize: '11px'
                           }}
                         />
-                        <Bar dataKey="totalRevenue" fill="#6b7280" radius={[0, 2, 2, 0]} barSize={18} />
+                        <Bar dataKey="totalRevenue" fill="#6b7280" radius={[3, 3, 0, 0]} barSize={32} />
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="h-[220px] flex items-center justify-center text-gray-400 text-sm">
+                    <div className="h-[200px] flex items-center justify-center text-gray-400 text-sm">
                       אין נתונים
                     </div>
                   )}
@@ -525,41 +528,44 @@ export default function Analytics() {
                 {/* Suppliers Chart */}
                 <div>
                   {filteredSupplierData && filteredSupplierData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={220}>
-                      <BarChart data={filteredSupplierData.slice(0, 6)} layout="vertical" margin={{ left: 10, right: 10 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" horizontal={false} />
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={filteredSupplierData.slice(0, 6)} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
                         <XAxis 
-                          type="number" 
+                          dataKey="supplierName"
+                          tick={{ fontSize: 9, fill: '#9ca3af' }} 
+                          tickFormatter={(value) => {
+                            const name = value || 'לא ידוע';
+                            return name.length > 8 ? name.slice(0, 8) + '..' : name;
+                          }}
+                          axisLine={false}
+                          tickLine={false}
+                          interval={0}
+                          angle={-20}
+                          textAnchor="end"
+                          height={50}
+                        />
+                        <YAxis 
                           tick={{ fontSize: 9, fill: '#9ca3af' }} 
                           tickFormatter={(value) => formatShortCurrency(value)}
                           axisLine={false}
                           tickLine={false}
-                        />
-                        <YAxis 
-                          dataKey="supplierName" 
-                          type="category" 
-                          width={100} 
-                          tick={{ fontSize: 9, fill: '#6b7280' }}
-                          tickFormatter={(value) => {
-                            const name = value || 'לא ידוע';
-                            return name.length > 12 ? name.slice(0, 12) + '...' : name;
-                          }}
-                          axisLine={false}
-                          tickLine={false}
+                          width={50}
                         />
                         <Tooltip 
-                          formatter={(value: number) => formatCurrency(value)} 
+                          formatter={(value: number) => formatCurrency(value)}
+                          labelFormatter={(label) => label}
                           contentStyle={{ 
                             borderRadius: '6px', 
                             border: '1px solid #e5e7eb',
                             fontSize: '11px'
                           }}
                         />
-                        <Bar dataKey="totalRevenue" fill="#6b7280" radius={[0, 2, 2, 0]} barSize={18} />
+                        <Bar dataKey="totalRevenue" fill="#6b7280" radius={[3, 3, 0, 0]} barSize={32} />
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="h-[220px] flex items-center justify-center text-gray-400 text-sm">
+                    <div className="h-[200px] flex items-center justify-center text-gray-400 text-sm">
                       אין נתונים
                     </div>
                   )}
@@ -629,41 +635,44 @@ export default function Analytics() {
                 {/* Customers Chart */}
                 <div>
                   {filteredCustomerData && filteredCustomerData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={220}>
-                      <BarChart data={filteredCustomerData.slice(0, 6)} layout="vertical" margin={{ left: 10, right: 10 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" horizontal={false} />
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={filteredCustomerData.slice(0, 6)} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
                         <XAxis 
-                          type="number" 
+                          dataKey="customerName"
+                          tick={{ fontSize: 9, fill: '#9ca3af' }} 
+                          tickFormatter={(value) => {
+                            const name = value || 'לא ידוע';
+                            return name.length > 8 ? name.slice(0, 8) + '..' : name;
+                          }}
+                          axisLine={false}
+                          tickLine={false}
+                          interval={0}
+                          angle={-20}
+                          textAnchor="end"
+                          height={50}
+                        />
+                        <YAxis 
                           tick={{ fontSize: 9, fill: '#9ca3af' }} 
                           tickFormatter={(value) => formatShortCurrency(value)}
                           axisLine={false}
                           tickLine={false}
-                        />
-                        <YAxis 
-                          dataKey="customerName" 
-                          type="category" 
-                          width={100} 
-                          tick={{ fontSize: 9, fill: '#6b7280' }}
-                          tickFormatter={(value) => {
-                            const name = value || 'לא ידוע';
-                            return name.length > 12 ? name.slice(0, 12) + '...' : name;
-                          }}
-                          axisLine={false}
-                          tickLine={false}
+                          width={50}
                         />
                         <Tooltip 
-                          formatter={(value: number) => formatCurrency(value)} 
+                          formatter={(value: number) => formatCurrency(value)}
+                          labelFormatter={(label) => label}
                           contentStyle={{ 
                             borderRadius: '6px', 
                             border: '1px solid #e5e7eb',
                             fontSize: '11px'
                           }}
                         />
-                        <Bar dataKey="totalRevenue" fill="#9ca3af" radius={[0, 2, 2, 0]} barSize={18} />
+                        <Bar dataKey="totalRevenue" fill="#9ca3af" radius={[3, 3, 0, 0]} barSize={32} />
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="h-[220px] flex items-center justify-center text-gray-400 text-sm">
+                    <div className="h-[200px] flex items-center justify-center text-gray-400 text-sm">
                       אין נתונים
                     </div>
                   )}

@@ -656,8 +656,8 @@ export async function getRevenueReport(startDate?: Date, endDate?: Date) {
   const db = await getDb();
   if (!db) return { totalRevenue: 0, totalCost: 0, profit: 0, margin: 0, byMonth: [] };
 
-  // Default to last month if no dates provided
-  const start = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  // Default to last 6 months if no dates provided (for better chart visualization)
+  const start = startDate || new Date(Date.now() - 180 * 24 * 60 * 60 * 1000);
   const end = endDate || new Date();
 
   const summary = await db.select({
