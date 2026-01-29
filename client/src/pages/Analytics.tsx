@@ -27,9 +27,10 @@ import {
   YAxis,
   Tooltip,
   ResponsiveContainer,
-  AreaChart,
-  Area,
+  LineChart,
+  Line,
   CartesianGrid,
+  Legend,
 } from "recharts";
 
 type DateFilter = 'week' | 'month' | 'quarter' | 'year' | 'all';
@@ -302,35 +303,36 @@ export default function Analytics() {
 
       {/* Revenue Chart */}
       <Card className="bg-white border-gray-200 shadow-sm">
-        <CardHeader className="pb-0">
+        <CardHeader className="pb-0 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium text-gray-700">מגמת הכנסות ורווח</CardTitle>
+          <div className="flex items-center gap-4 text-xs">
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-0.5 bg-gray-500 rounded"></div>
+              <span className="text-gray-500">הכנסות</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-0.5 bg-emerald-500 rounded"></div>
+              <span className="text-gray-500">רווח</span>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="pt-4">
           {filteredRevenueData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={240}>
-              <AreaChart data={filteredRevenueData.slice().reverse()}>
-                <defs>
-                  <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#9ca3af" stopOpacity={0.08}/>
-                    <stop offset="100%" stopColor="#9ca3af" stopOpacity={0}/>
-                  </linearGradient>
-                  <linearGradient id="profitGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#86efac" stopOpacity={0.08}/>
-                    <stop offset="100%" stopColor="#86efac" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+            <ResponsiveContainer width="100%" height={260}>
+              <LineChart data={filteredRevenueData.slice().reverse()} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
                 <XAxis 
                   dataKey="month" 
-                  tick={{ fontSize: 11, fill: '#6b7280' }} 
-                  tickFormatter={(value) => value.slice(5)}
+                  tick={{ fontSize: 11, fill: '#9ca3af' }} 
+                  tickFormatter={(value) => value ? value.slice(5) : ''}
                   axisLine={false}
                   tickLine={false}
+                  padding={{ left: 20, right: 20 }}
                 />
                 <YAxis 
-                  tick={{ fontSize: 11, fill: '#6b7280' }} 
+                  tick={{ fontSize: 11, fill: '#9ca3af' }} 
                   tickFormatter={(value) => formatShortCurrency(value)} 
-                  width={60}
+                  width={65}
                   axisLine={false}
                   tickLine={false}
                 />
@@ -341,36 +343,37 @@ export default function Analytics() {
                   ]}
                   labelFormatter={(label) => label}
                   contentStyle={{ 
-                    borderRadius: '6px', 
+                    borderRadius: '8px', 
                     border: '1px solid #e5e7eb',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-                    fontSize: '12px'
+                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
+                    fontSize: '12px',
+                    padding: '8px 12px'
                   }}
                 />
-                <Area 
+                <Line 
                   type="monotone" 
                   dataKey="revenue" 
                   name="revenue"
-                  stroke="#9ca3af" 
-                  strokeWidth={1.5}
-                  fill="url(#revenueGradient)"
-                  dot={{ r: 3, fill: '#6b7280', strokeWidth: 0 }}
-                  activeDot={{ r: 4, fill: '#374151' }}
+                  stroke="#6b7280" 
+                  strokeWidth={2}
+                  dot={{ r: 4, fill: '#6b7280', strokeWidth: 2, stroke: '#fff' }}
+                  activeDot={{ r: 6, fill: '#374151', strokeWidth: 2, stroke: '#fff' }}
+                  connectNulls
                 />
-                <Area 
+                <Line 
                   type="monotone" 
                   dataKey="profit" 
                   name="profit"
-                  stroke="#86efac" 
-                  strokeWidth={1.5}
-                  fill="url(#profitGradient)"
-                  dot={{ r: 3, fill: '#22c55e', strokeWidth: 0 }}
-                  activeDot={{ r: 4, fill: '#16a34a' }}
+                  stroke="#10b981" 
+                  strokeWidth={2}
+                  dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }}
+                  activeDot={{ r: 6, fill: '#059669', strokeWidth: 2, stroke: '#fff' }}
+                  connectNulls
                 />
-              </AreaChart>
+              </LineChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-[240px] flex items-center justify-center text-gray-400 text-sm">
+            <div className="h-[260px] flex items-center justify-center text-gray-400 text-sm">
               אין נתונים לתקופה זו
             </div>
           )}
