@@ -73,14 +73,15 @@ export default function Analytics() {
 
   // Filter data based on APPLIED filters (only changes when "הצג" is clicked)
   const filteredRevenueData = useMemo(() => {
-    if (!revenueReport?.byMonth) return [];
+    if (!revenueReport?.byMonth || revenueReport.byMonth.length === 0) return [];
     const months = revenueReport.byMonth;
+    // Take from the END of the array (most recent months)
     switch (appliedDateFilter) {
-      case 'week': return months.slice(0, 1);
-      case 'month': return months.slice(0, 1);
-      case 'quarter': return months.slice(0, 3);
-      case 'year': return months.slice(0, 12);
-      default: return months;
+      case 'week': return months.slice(-1); // Last month
+      case 'month': return months.slice(-1); // Last month
+      case 'quarter': return months.slice(-3); // Last 3 months
+      case 'year': return months.slice(-12); // Last 12 months
+      default: return months; // All data
     }
   }, [revenueReport, appliedDateFilter]);
 
@@ -334,7 +335,7 @@ export default function Analytics() {
           {filteredRevenueData.length > 0 ? (
             <ResponsiveContainer width="100%" height={280}>
               <LineChart 
-                data={filteredRevenueData.slice().reverse()} 
+                data={filteredRevenueData} 
                 margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
