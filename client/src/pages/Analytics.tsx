@@ -292,12 +292,12 @@ export default function Analytics() {
               <AreaChart data={filteredRevenueData.slice().reverse()}>
                 <defs>
                   <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#374151" stopOpacity={0.15}/>
-                    <stop offset="100%" stopColor="#374151" stopOpacity={0}/>
+                    <stop offset="0%" stopColor="#9ca3af" stopOpacity={0.08}/>
+                    <stop offset="100%" stopColor="#9ca3af" stopOpacity={0}/>
                   </linearGradient>
                   <linearGradient id="profitGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#059669" stopOpacity={0.15}/>
-                    <stop offset="100%" stopColor="#059669" stopOpacity={0}/>
+                    <stop offset="0%" stopColor="#86efac" stopOpacity={0.08}/>
+                    <stop offset="100%" stopColor="#86efac" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
@@ -332,17 +332,21 @@ export default function Analytics() {
                   type="monotone" 
                   dataKey="revenue" 
                   name="revenue"
-                  stroke="#374151" 
-                  strokeWidth={2}
-                  fill="url(#revenueGradient)" 
+                  stroke="#9ca3af" 
+                  strokeWidth={1.5}
+                  fill="url(#revenueGradient)"
+                  dot={{ r: 3, fill: '#6b7280', strokeWidth: 0 }}
+                  activeDot={{ r: 4, fill: '#374151' }}
                 />
                 <Area 
                   type="monotone" 
                   dataKey="profit" 
                   name="profit"
-                  stroke="#059669" 
-                  strokeWidth={2}
-                  fill="url(#profitGradient)" 
+                  stroke="#86efac" 
+                  strokeWidth={1.5}
+                  fill="url(#profitGradient)"
+                  dot={{ r: 3, fill: '#22c55e', strokeWidth: 0 }}
+                  activeDot={{ r: 4, fill: '#16a34a' }}
                 />
               </AreaChart>
             </ResponsiveContainer>
