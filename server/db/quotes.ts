@@ -429,7 +429,7 @@ export async function updateQuoteStatus(quoteId: number, status: string, employe
             quantity, "pricePerUnit", "promisedDeliveryDays", status, "createdAt", "updatedAt"
           ) VALUES (
             ${quoteId}, ${item.id}, ${item.supplierId}, ${customerId}, ${item.sizeQuantityId},
-            ${item.quantity}, ${item.supplierCost || '0'}, ${item.deliveryDays || 3}, 'pending', NOW(), NOW()
+            ${item.quantity}, ${item.supplierCost || '0'}, ${item.deliveryDays || 3}, 'in_progress', NOW(), NOW()
           )
         `);
       }

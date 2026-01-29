@@ -252,7 +252,7 @@ export const customerPortalRouter = router({
               quantity: item.quantity,
               pricePerUnit: item.supplierCost?.toString() || "0",
               promisedDeliveryDays: item.deliveryDays || 3,
-              status: "pending",
+              status: "in_progress",
             });
           }
         }

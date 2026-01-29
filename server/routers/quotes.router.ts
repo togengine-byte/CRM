@@ -209,7 +209,7 @@ export const quotesRouter = router({
             quantity, "pricePerUnit", "promisedDeliveryDays", status, "createdAt", "updatedAt"
           ) VALUES (
             ${input.quoteId}, ${typedItem.id}, ${input.supplierId}, ${customerId}, ${typedItem.sizeQuantityId},
-            ${typedItem.quantity}, ${pricePerUnit}, ${deliveryDays}, 'pending', NOW(), NOW()
+            ${typedItem.quantity}, ${pricePerUnit}, ${deliveryDays}, 'in_progress', NOW(), NOW()
           )
         `);
       }
