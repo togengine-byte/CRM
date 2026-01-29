@@ -36,6 +36,8 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 
 interface QuoteItem {
   id: number;
@@ -72,6 +74,7 @@ export default function CustomerApproved() {
   const [showRecommendationsByQuote, setShowRecommendationsByQuote] = useState<Record<number, boolean>>({});
   const [recommendationsByQuote, setRecommendationsByQuote] = useState<Record<number, SupplierRecommendation[]>>({});
   const [loadingRecommendations, setLoadingRecommendations] = useState<Record<number, boolean>>({});
+  const [notesForSupplierByQuote, setNotesForSupplierByQuote] = useState<Record<number, string>>({});
 
   const utils = trpc.useUtils();
 
@@ -160,6 +163,7 @@ export default function CustomerApproved() {
     moveToProductionMutation.mutate({
       quoteId,
       status: "in_production",
+      notesForSupplier: notesForSupplierByQuote[quoteId] || undefined,
     });
   };
 
@@ -400,6 +404,20 @@ export default function CustomerApproved() {
                                 {hasAllSuppliers ? (
                                   /* All suppliers assigned - Show "Send to Production" button + option to change supplier */
                                   <div className="space-y-4">
+                                    {/* Notes for Supplier */}
+                                    <div className="space-y-2">
+                                      <Label htmlFor={`notes-${quote.id}`} className="text-sm font-medium">
+                                        הערות לספק (אופציונלי)
+                                      </Label>
+                                      <Textarea
+                                        id={`notes-${quote.id}`}
+                                        placeholder="הוסף הערות לספק לגבי העבודה..."
+                                        value={notesForSupplierByQuote[quote.id] || ''}
+                                        onChange={(e) => setNotesForSupplierByQuote(prev => ({ ...prev, [quote.id]: e.target.value }))}
+                                        className="min-h-[80px]"
+                                      />
+                                    </div>
+                                    
                                     <div className="flex items-center gap-4">
                                       <Button
                                         size="lg"

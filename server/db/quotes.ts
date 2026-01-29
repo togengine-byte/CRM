@@ -421,7 +421,7 @@ export async function reviseQuote(data: ReviseQuoteRequest) {
  * Update quote status
  * When moving to in_production, creates supplier_jobs for items with assigned suppliers
  */
-export async function updateQuoteStatus(quoteId: number, status: string, employeeId: number) {
+export async function updateQuoteStatus(quoteId: number, status: string, employeeId: number, notesForSupplier?: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
@@ -451,10 +451,10 @@ export async function updateQuoteStatus(quoteId: number, status: string, employe
         await db.execute(sql`
           INSERT INTO supplier_jobs (
             "quoteId", "quoteItemId", "supplierId", "customerId", "sizeQuantityId",
-            quantity, "pricePerUnit", "promisedDeliveryDays", status, "createdAt", "updatedAt"
+            quantity, "pricePerUnit", "promisedDeliveryDays", status, "notesForSupplier", "createdAt", "updatedAt"
           ) VALUES (
             ${quoteId}, ${item.id}, ${item.supplierId}, ${customerId}, ${item.sizeQuantityId},
-            ${item.quantity}, ${item.supplierCost || '0'}, ${item.deliveryDays || 3}, 'in_progress', NOW(), NOW()
+            ${item.quantity}, ${item.supplierCost || '0'}, ${item.deliveryDays || 3}, 'in_progress', ${notesForSupplier || null}, NOW(), NOW()
           )
         `);
       }

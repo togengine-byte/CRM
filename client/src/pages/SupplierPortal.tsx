@@ -74,6 +74,7 @@ interface PendingOrder {
   sizeName: string | null;
   dimensions: string | null;
   productId: number;
+  notesForSupplier: string | null;
 }
 
 interface ActiveJob {
@@ -405,6 +406,12 @@ function PendingOrdersTab({ supplierId }: { supplierId: number }) {
                         <Calendar className="h-4 w-4" />
                         <span>זמן אספקה מובטח: {order.promisedDeliveryDays} ימים</span>
                       </div>
+                      {order.notesForSupplier && (
+                        <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                          <p className="text-sm font-medium text-yellow-800 mb-1">הערות מהמנהל:</p>
+                          <p className="text-sm text-yellow-700">{order.notesForSupplier}</p>
+                        </div>
+                      )}
                     </div>
                     <Button
                       onClick={() => acceptJobMutation.mutate({ jobId: order.id })}

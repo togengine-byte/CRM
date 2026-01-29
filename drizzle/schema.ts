@@ -257,6 +257,9 @@ export const supplierJobs = pgTable("supplier_jobs", {
   promisedDeliveryDays: integer("promisedDeliveryDays").default(3),
   fileValidationWarnings: jsonb("fileValidationWarnings").default('[]'),
   
+  // Notes for supplier (הערות לספק)
+  notesForSupplier: text("notesForSupplier"),
+  
   // Pickup and delivery tracking
   pickedUpAt: timestamp("pickedUpAt"),
   deliveredAt: timestamp("deliveredAt"),

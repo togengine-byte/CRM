@@ -115,13 +115,14 @@ export const quotesRouter = router({
     .input(z.object({
       quoteId: z.number(),
       status: z.enum(['draft', 'sent', 'approved', 'rejected', 'superseded', 'in_production', 'ready', 'delivered']),
+      notesForSupplier: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       if (!ctx.user) throw new Error("Not authenticated");
       if (ctx.user.role !== 'admin' && ctx.user.role !== 'employee') {
         throw new Error("Only employees can update quote status");
       }
-      return await updateQuoteStatus(input.quoteId, input.status, ctx.user.id);
+      return await updateQuoteStatus(input.quoteId, input.status, ctx.user.id, input.notesForSupplier);
     }),
 
   reject: protectedProcedure
