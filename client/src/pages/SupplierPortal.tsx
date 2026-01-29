@@ -546,6 +546,12 @@ function NewJobsTab({ supplierId }: { supplierId: number }) {
                     <span>כמות: <strong>{job.quantity}</strong></span>
                     <span>מחיר: <strong>₪{job.pricePerUnit?.toFixed(2) || '0.00'}</strong></span>
                   </div>
+                  {job.notesForSupplier && (
+                    <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <p className="text-sm font-medium text-yellow-800 mb-1">הערות מהמנהל:</p>
+                      <p className="text-sm text-yellow-700">{job.notesForSupplier}</p>
+                    </div>
+                  )}
                 </div>
                 <Button
                   onClick={() => acceptJobMutation.mutate({ jobId: job.id })}

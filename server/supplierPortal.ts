@@ -614,7 +614,7 @@ export const supplierPortalRouter = router({
 
       // Verify job exists and belongs to supplier (or admin)
       const jobResult = await db.execute(sql`
-        SELECT id, "supplierId", status, "isCancelled" FROM supplier_jobs WHERE id = ${input.jobId}
+        SELECT id, "supplierId", status, "isCancelled", "isAccepted" FROM supplier_jobs WHERE id = ${input.jobId}
       `);
 
       if (!jobResult.rows || jobResult.rows.length === 0) {
@@ -631,7 +631,13 @@ export const supplierPortalRouter = router({
         throw new Error("לא ניתן לאשר עבודה מבוטלת");
       }
 
-      if (job.status !== 'pending') {
+      // Check if job is already accepted
+      if (job.isAccepted === true) {
+        throw new Error("עבודה זו כבר אושרה");
+      }
+      
+      // Job can be accepted if status is pending or in_progress (before supplier acceptance)
+      if (job.status !== 'pending' && job.status !== 'in_progress') {
         throw new Error("עבודה זו כבר אושרה או בסטטוס אחר");
       }
 
@@ -678,7 +684,7 @@ export const supplierPortalRouter = router({
 
       // Verify job exists and belongs to supplier
       const jobResult = await db.execute(sql`
-        SELECT id, "supplierId", status, "isCancelled" FROM supplier_jobs WHERE id = ${input.jobId}
+        SELECT id, "supplierId", status, "isCancelled", "isAccepted" FROM supplier_jobs WHERE id = ${input.jobId}
       `);
 
       if (!jobResult.rows || jobResult.rows.length === 0) {
@@ -950,7 +956,8 @@ export const supplierPortalRouter = router({
           customer."companyName" as "customerCompany",
           ps.name as "sizeName",
           ps.dimensions as "dimensions",
-          bp.name as "productName"
+          bp.name as "productName",
+          sj."notesForSupplier"
         FROM supplier_jobs sj
         LEFT JOIN users customer ON sj."customerId" = customer.id
         LEFT JOIN size_quantities sq ON sj."sizeQuantityId" = sq.id
@@ -975,6 +982,7 @@ export const supplierPortalRouter = router({
         productName: row.productName || 'מוצר',
         sizeName: row.sizeName,
         dimensions: row.dimensions,
+        notesForSupplier: row.notesForSupplier,
       }));
     }),
 
