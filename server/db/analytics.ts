@@ -168,7 +168,8 @@ export async function getAllCustomersAnalytics(startDate?: Date, endDate?: Date)
   if (!db) return [];
 
   try {
-    const start = startDate || new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+    // Default to last month if no dates provided
+    const start = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const end = endDate || new Date();
 
     const results = await db.execute(sql`
@@ -193,7 +194,6 @@ export async function getAllCustomersAnalytics(startDate?: Date, endDate?: Date)
       WHERE u.role = 'customer' AND u.status = 'active'
       GROUP BY u.id, u.name, u."companyName"
       ORDER BY total_revenue DESC
-      LIMIT 100
     `);
 
     return (results.rows as any[]).map(row => ({
@@ -656,7 +656,8 @@ export async function getRevenueReport(startDate?: Date, endDate?: Date) {
   const db = await getDb();
   if (!db) return { totalRevenue: 0, totalCost: 0, profit: 0, margin: 0, byMonth: [] };
 
-  const start = startDate || new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+  // Default to last month if no dates provided
+  const start = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const end = endDate || new Date();
 
   const summary = await db.select({
