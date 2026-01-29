@@ -9,7 +9,7 @@ import {
   getAnalyticsSummary,
   getProductPerformance,
   getSupplierPerformance,
-  getCustomerAnalytics,
+  getAllCustomersAnalytics,
   getRevenueReport,
 } from "../db";
 
@@ -59,7 +59,7 @@ export const analyticsRouter = router({
       if (ctx.user.role !== 'admin' && ctx.user.role !== 'employee') {
         throw new Error("Only employees can view customer analytics");
       }
-      return await getCustomerAnalytics(input?.startDate, input?.endDate);
+      return await getAllCustomersAnalytics(input?.startDate, input?.endDate);
     }),
 
   revenueReport: protectedProcedure

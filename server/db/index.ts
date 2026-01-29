@@ -179,6 +179,7 @@ export {
 export {
   getRevenueAnalytics,
   getCustomerAnalytics,
+  getAllCustomersAnalytics,
   getSupplierAnalytics,
   getDashboardAnalytics,
   getProductAnalytics,

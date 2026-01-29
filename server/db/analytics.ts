@@ -161,6 +161,47 @@ export async function getCustomerAnalytics(customerId: number) {
 }
 
 /**
+ * Get all customers analytics (for analytics page)
+ */
+export async function getAllCustomersAnalytics(startDate?: Date, endDate?: Date) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const start = startDate || new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+  const end = endDate || new Date();
+
+  const results = await db.execute(sql`
+    SELECT 
+      u.id as customer_id,
+      u.name as customer_name,
+      u."companyName" as company_name,
+      COUNT(DISTINCT q.id) as total_quotes,
+      COALESCE(SUM(CASE WHEN q.status IN ('approved', 'in_production', 'ready', 'delivered') THEN CAST(q."finalValue" AS DECIMAL) ELSE 0 END), 0) as total_revenue,
+      SUM(CASE WHEN q.status IN ('approved', 'in_production', 'ready', 'delivered') THEN 1 ELSE 0 END) as approved_quotes,
+      CASE 
+        WHEN COUNT(q.id) > 0 
+        THEN (SUM(CASE WHEN q.status IN ('approved', 'in_production', 'ready', 'delivered') THEN 1 ELSE 0 END)::float / COUNT(q.id)::float) * 100
+        ELSE 0 
+      END as conversion_rate
+    FROM users u
+    LEFT JOIN quotes q ON q."customerId" = u.id AND q."createdAt" BETWEEN ${start} AND ${end}
+    WHERE u.role = 'customer' AND u.status = 'active'
+    GROUP BY u.id, u.name, u."companyName"
+    ORDER BY total_revenue DESC
+  `);
+
+  return (results.rows as any[]).map(row => ({
+    customerId: row.customer_id,
+    customerName: row.customer_name || row.company_name || 'לא ידוע',
+    companyName: row.company_name,
+    totalQuotes: Number(row.total_quotes),
+    totalRevenue: Number(row.total_revenue),
+    approvedQuotes: Number(row.approved_quotes),
+    conversionRate: Number(row.conversion_rate),
+  }));
+}
+
+/**
  * Get supplier analytics
  */
 export async function getSupplierAnalytics(supplierId: number) {
