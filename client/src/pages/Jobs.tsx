@@ -376,7 +376,10 @@ export default function Jobs() {
                         setSelectedJobId(job.id);
                         setIsDetailsOpen(selectedJobId === job.id ? !isDetailsOpen : true);
                       }}
-                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      className={cn(
+                        "cursor-pointer hover:bg-muted/50 transition-colors",
+                        !job.isAccepted && "opacity-50 bg-gray-100"
+                      )}
                     >
                       <TableCell>{job.id}</TableCell>
                       <TableCell className="font-medium">{job.customerName || "-"}</TableCell>

@@ -913,4 +913,127 @@ export const supplierPortalRouter = router({
         message: null,
       };
     }),
+
+  // ==================== PENDING JOBS (עבודות חדשות לאישור) ====================
+  pendingJobs: protectedProcedure
+    .input(z.object({ supplierId: z.number().optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      if (!ctx.user) throw new Error("Not authenticated");
+      if (ctx.user.role !== "supplier" && ctx.user.role !== "admin" && ctx.user.role !== "employee") {
+        throw new Error("Only suppliers can access supplier portal");
+      }
+
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+
+      const isAdminOrEmployee = ctx.user.role === "admin" || ctx.user.role === "employee";
+      
+      let targetSupplierId = ctx.user.id;
+      if (isAdminOrEmployee && input?.supplierId) {
+        targetSupplierId = input.supplierId;
+      } else if (input?.supplierId && input.supplierId !== ctx.user.id) {
+        throw new Error("Access denied: You can only view your own data");
+      }
+
+      // Get jobs with status 'in_progress' but not yet accepted by supplier (isAccepted = false)
+      const result = await db.execute(sql`
+        SELECT 
+          sj.id,
+          sj."quoteId",
+          sj.quantity,
+          sj."pricePerUnit",
+          sj."createdAt",
+          sj.status,
+          customer.name as "customerName",
+          customer."companyName" as "customerCompany",
+          ps.name as "sizeName",
+          ps.dimensions as "dimensions",
+          bp.name as "productName"
+        FROM supplier_jobs sj
+        LEFT JOIN users customer ON sj."customerId" = customer.id
+        LEFT JOIN size_quantities sq ON sj."sizeQuantityId" = sq.id
+        LEFT JOIN product_sizes ps ON sq.size_id = ps.id
+        LEFT JOIN base_products bp ON ps.product_id = bp.id
+        WHERE sj."supplierId" = ${targetSupplierId}
+          AND sj.status = 'in_progress'
+          AND (sj."isAccepted" = false OR sj."isAccepted" IS NULL)
+          AND sj."isCancelled" = false
+        ORDER BY sj."createdAt" DESC
+      `);
+
+      return result.rows.map((row: any) => ({
+        id: row.id,
+        quoteId: row.quoteId,
+        quantity: row.quantity,
+        pricePerUnit: parseFloat(row.pricePerUnit) || 0,
+        createdAt: row.createdAt,
+        status: row.status,
+        customerName: row.customerName || 'לקוח לא מזוהה',
+        customerCompany: row.customerCompany,
+        productName: row.productName || 'מוצר',
+        sizeName: row.sizeName,
+        dimensions: row.dimensions,
+      }));
+    }),
+
+  // ==================== READY JOBS (עבודות מוכנות לאיסוף) ====================
+  readyJobs: protectedProcedure
+    .input(z.object({ supplierId: z.number().optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      if (!ctx.user) throw new Error("Not authenticated");
+      if (ctx.user.role !== "supplier" && ctx.user.role !== "admin" && ctx.user.role !== "employee") {
+        throw new Error("Only suppliers can access supplier portal");
+      }
+
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+
+      const isAdminOrEmployee = ctx.user.role === "admin" || ctx.user.role === "employee";
+      
+      let targetSupplierId = ctx.user.id;
+      if (isAdminOrEmployee && input?.supplierId) {
+        targetSupplierId = input.supplierId;
+      } else if (input?.supplierId && input.supplierId !== ctx.user.id) {
+        throw new Error("Access denied: You can only view your own data");
+      }
+
+      // Get jobs with status 'ready'
+      const result = await db.execute(sql`
+        SELECT 
+          sj.id,
+          sj."quoteId",
+          sj.quantity,
+          sj."pricePerUnit",
+          sj."supplierReadyAt",
+          sj."createdAt",
+          customer.name as "customerName",
+          customer."companyName" as "customerCompany",
+          ps.name as "sizeName",
+          ps.dimensions as "dimensions",
+          bp.name as "productName"
+        FROM supplier_jobs sj
+        LEFT JOIN users customer ON sj."customerId" = customer.id
+        LEFT JOIN size_quantities sq ON sj."sizeQuantityId" = sq.id
+        LEFT JOIN product_sizes ps ON sq.size_id = ps.id
+        LEFT JOIN base_products bp ON ps.product_id = bp.id
+        WHERE sj."supplierId" = ${targetSupplierId}
+          AND sj.status = 'ready'
+          AND sj."isCancelled" = false
+        ORDER BY sj."supplierReadyAt" DESC
+      `);
+
+      return result.rows.map((row: any) => ({
+        id: row.id,
+        quoteId: row.quoteId,
+        quantity: row.quantity,
+        pricePerUnit: parseFloat(row.pricePerUnit) || 0,
+        readyAt: row.supplierReadyAt,
+        createdAt: row.createdAt,
+        customerName: row.customerName || 'לקוח לא מזוהה',
+        customerCompany: row.customerCompany,
+        productName: row.productName || 'מוצר',
+        sizeName: row.sizeName,
+        dimensions: row.dimensions,
+      }));
+    }),
 });

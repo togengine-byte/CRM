@@ -239,13 +239,7 @@ function DashboardTab({ supplierId }: { supplierId: number }) {
                 {dashboard.supplier.phone && <span>• {dashboard.supplier.phone}</span>}
               </CardDescription>
             </div>
-            {dashboard.rating.average && (
-              <div className="mr-auto flex items-center gap-1 bg-yellow-50 px-3 py-1 rounded-full">
-                <Star className="h-5 w-5 text-yellow-500 fill-yellow-500" />
-                <span className="font-bold text-yellow-700">{dashboard.rating.average}</span>
-                <span className="text-sm text-yellow-600">({dashboard.rating.totalRatings} דירוגים)</span>
-              </div>
-            )}
+
           </div>
         </CardHeader>
       </Card>
@@ -308,11 +302,17 @@ function DashboardTab({ supplierId }: { supplierId: number }) {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            <Button variant="outline" className="h-auto py-4 flex flex-col items-center gap-2">
-              <Package className="h-6 w-6 text-orange-500" />
-              <span>הזמנות חדשות ({dashboard.stats.pendingOrders})</span>
+            <Button 
+              variant="outline" 
+              className={`h-auto py-4 flex flex-col items-center gap-2 ${dashboard.stats.pendingOrders > 0 ? 'animate-pulse border-2 border-red-500 bg-red-50' : ''}`}
+            >
+              <Package className={`h-6 w-6 ${dashboard.stats.pendingOrders > 0 ? 'text-red-500' : 'text-orange-500'}`} />
+              <span>עבודות חדשות ({dashboard.stats.pendingOrders})</span>
             </Button>
-            <Button variant="outline" className="h-auto py-4 flex flex-col items-center gap-2">
+            <Button 
+              variant="outline" 
+              className={`h-auto py-4 flex flex-col items-center gap-2 ${dashboard.stats.inProgress > 0 ? 'border-2 border-blue-500 bg-blue-50' : ''}`}
+            >
               <Clock className="h-6 w-6 text-blue-500" />
               <span>עבודות בביצוע ({dashboard.stats.inProgress})</span>
             </Button>
@@ -463,6 +463,159 @@ function PendingOrdersTab({ supplierId }: { supplierId: number }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// New Jobs Tab Component (עבודה חדשה - לאישור קבלה)
+function NewJobsTab({ supplierId }: { supplierId: number }) {
+  const utils = trpc.useUtils();
+  const { data: jobs = [], isLoading } = trpc.supplierPortal.pendingJobs.useQuery(
+    { supplierId },
+    { enabled: !!supplierId }
+  );
+
+  const acceptJobMutation = trpc.supplierPortal.acceptJob.useMutation({
+    onSuccess: () => {
+      toast.success("העבודה אושרה ועברה לביצוע!");
+      utils.supplierPortal.invalidate();
+    },
+    onError: (error) => {
+      toast.error(error.message || "שגיאה באישור העבודה");
+    },
+  });
+
+  if (isLoading) {
+    return <div className="p-8 text-center text-slate-400">טוען עבודות חדשות...</div>;
+  }
+
+  if (jobs.length === 0) {
+    return (
+      <Card>
+        <CardContent className="p-8 text-center text-slate-400">
+          <Package className="h-12 w-12 mx-auto mb-3 text-slate-300" />
+          <p>אין עבודות חדשות כרגע</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold flex items-center gap-2">
+        <Package className="h-5 w-5 text-orange-500" />
+        עבודות חדשות לאישור ({jobs.length})
+      </h3>
+
+      <div className="space-y-3">
+        {jobs.map((job: any) => (
+          <Card key={job.id} className="hover:shadow-md transition-shadow border-orange-200 bg-orange-50/30">
+            <CardContent className="p-4">
+              <div className="flex items-start justify-between">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
+                      עבודה #{job.id}
+                    </Badge>
+                    <Badge variant="secondary">הזמנה #{job.quoteId}</Badge>
+                    <span className="text-sm text-slate-500">
+                      {new Date(job.createdAt).toLocaleDateString('he-IL')}
+                    </span>
+                  </div>
+                  <h4 className="font-semibold text-lg">{job.productName}</h4>
+                  {job.sizeName && (
+                    <p className="text-sm text-slate-600">
+                      גודל: {job.sizeName} {job.dimensions && `(${job.dimensions})`}
+                    </p>
+                  )}
+                  <div className="flex items-center gap-4 text-sm">
+                    <span className="flex items-center gap-1">
+                      <User className="h-4 w-4 text-slate-400" />
+                      {job.customerName}
+                      {job.customerCompany && ` - ${job.customerCompany}`}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-4 text-sm text-slate-600">
+                    <span>כמות: <strong>{job.quantity}</strong></span>
+                    <span>מחיר: <strong>₪{job.pricePerUnit?.toFixed(2) || '0.00'}</strong></span>
+                  </div>
+                </div>
+                <Button
+                  onClick={() => acceptJobMutation.mutate({ jobId: job.id })}
+                  disabled={acceptJobMutation.isPending}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  <CheckCircle className="h-4 w-4 ml-2" />
+                  אשר קבלה והעבר לביצוע
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Ready For Pickup Tab Component (מוכן לאיסוף)
+function ReadyForPickupTab({ supplierId }: { supplierId: number }) {
+  const { data: jobs = [], isLoading } = trpc.supplierPortal.readyJobs.useQuery(
+    { supplierId },
+    { enabled: !!supplierId }
+  );
+
+  if (isLoading) {
+    return <div className="p-8 text-center text-slate-400">טוען עבודות...</div>;
+  }
+
+  if (jobs.length === 0) {
+    return (
+      <Card>
+        <CardContent className="p-8 text-center text-slate-400">
+          <CheckCircle className="h-12 w-12 mx-auto mb-3 text-slate-300" />
+          <p>אין עבודות מוכנות לאיסוף</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold flex items-center gap-2">
+        <CheckCircle className="h-5 w-5 text-green-500" />
+        מוכן לאיסוף ({jobs.length})
+      </h3>
+
+      <Card>
+        <CardContent className="p-0">
+          <div className="divide-y">
+            {jobs.map((job: any) => (
+              <div key={job.id} className="p-4 hover:bg-green-50/50">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-green-100 text-green-700">מוכן</Badge>
+                      <span className="text-sm text-slate-500">עבודה #{job.id}</span>
+                      <span className="text-sm text-slate-500">הזמנה #{job.quoteId}</span>
+                    </div>
+                    <p className="font-medium">
+                      {job.productName}
+                      {job.sizeName && <span className="text-slate-500"> - {job.sizeName}</span>}
+                    </p>
+                    <p className="text-sm text-slate-500">
+                      {job.customerName} • כמות: {job.quantity}
+                    </p>
+                  </div>
+                  <div className="text-left">
+                    <p className="font-semibold">₪{job.pricePerUnit?.toFixed(2) || '0.00'}</p>
+                    <p className="text-sm text-green-600">ממתין לשליח</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -1078,18 +1231,22 @@ function SupplierPortalView({ supplier, onBack }: { supplier: Supplier; onBack: 
 
       {/* Main Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-5 mb-6">
+        <TabsList className="grid w-full grid-cols-7 mb-6">
           <TabsTrigger value="dashboard" className="gap-2">
             <BarChart3 className="h-4 w-4" />
             דשבורד
+          </TabsTrigger>
+          <TabsTrigger value="newjobs" className="gap-2">
+            <Package className="h-4 w-4" />
+            עבודה חדשה
           </TabsTrigger>
           <TabsTrigger value="jobs" className="gap-2">
             <Clock className="h-4 w-4" />
             בביצוע
           </TabsTrigger>
-          <TabsTrigger value="pricelist" className="gap-2">
-            <DollarSign className="h-4 w-4" />
-            מחירון
+          <TabsTrigger value="ready" className="gap-2">
+            <CheckCircle className="h-4 w-4" />
+            מוכן לאיסוף
           </TabsTrigger>
           <TabsTrigger value="collected" className="gap-2">
             <Truck className="h-4 w-4" />
@@ -1099,18 +1256,26 @@ function SupplierPortalView({ supplier, onBack }: { supplier: Supplier; onBack: 
             <FileText className="h-4 w-4" />
             היסטוריה
           </TabsTrigger>
+          <TabsTrigger value="pricelist" className="gap-2">
+            <DollarSign className="h-4 w-4" />
+            מחירון
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="dashboard">
           <DashboardTab supplierId={supplier.id} />
         </TabsContent>
 
+        <TabsContent value="newjobs">
+          <NewJobsTab supplierId={supplier.id} />
+        </TabsContent>
+
         <TabsContent value="jobs">
           <ActiveJobsTab supplierId={supplier.id} />
         </TabsContent>
 
-        <TabsContent value="pricelist">
-          <PricelistTab supplierId={supplier.id} />
+        <TabsContent value="ready">
+          <ReadyForPickupTab supplierId={supplier.id} />
         </TabsContent>
 
         <TabsContent value="collected">
@@ -1119,6 +1284,10 @@ function SupplierPortalView({ supplier, onBack }: { supplier: Supplier; onBack: 
 
         <TabsContent value="history">
           <HistoryTab supplierId={supplier.id} />
+        </TabsContent>
+
+        <TabsContent value="pricelist">
+          <PricelistTab supplierId={supplier.id} />
         </TabsContent>
       </Tabs>
     </div>
