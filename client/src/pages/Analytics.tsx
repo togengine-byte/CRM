@@ -315,7 +315,7 @@ export default function Analytics() {
         </Card>
       </div>
 
-      {/* Revenue Chart - Google Analytics Style */}
+      {/* Revenue Chart - Line Chart with dots */}
       <Card className="bg-white border-gray-200 shadow-sm">
         <CardHeader className="pb-0 flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium text-gray-700">מגמת הכנסות ורווח</CardTitle>
@@ -332,55 +332,70 @@ export default function Analytics() {
         </CardHeader>
         <CardContent className="pt-4">
           {filteredRevenueData.length > 0 ? (
-            <div className="space-y-4">
-              {/* Chart visualization with bars */}
-              <div className="flex items-end justify-between gap-2 h-[200px] px-2">
-                {filteredRevenueData.slice().reverse().map((item: any, index: number) => {
-                  const maxRevenue = Math.max(...filteredRevenueData.map((d: any) => d.revenue || 0));
-                  const revenueHeight = maxRevenue > 0 ? ((item.revenue || 0) / maxRevenue) * 160 : 0;
-                  const profitHeight = maxRevenue > 0 ? ((item.profit || 0) / maxRevenue) * 160 : 0;
-                  const monthNames = ['', 'ינו', 'פבר', 'מרץ', 'אפר', 'מאי', 'יוני', 'יולי', 'אוג', 'ספט', 'אוק', 'נוב', 'דצמ'];
-                  const monthNum = item.month ? parseInt(item.month.split('-')[1]) : 0;
-                  
-                  return (
-                    <div key={index} className="flex-1 flex flex-col items-center gap-1">
-                      <div className="text-[10px] text-gray-500 font-medium">
-                        {formatShortCurrency(item.revenue || 0)}
-                      </div>
-                      <div className="flex gap-1 items-end">
-                        <div 
-                          className="w-4 bg-blue-500 rounded-t transition-all"
-                          style={{ height: `${Math.max(revenueHeight, 4)}px` }}
-                        />
-                        <div 
-                          className="w-4 bg-emerald-500 rounded-t transition-all"
-                          style={{ height: `${Math.max(profitHeight, 4)}px` }}
-                        />
-                      </div>
-                      <div className="text-[10px] text-gray-400 mt-1">
-                        {monthNames[monthNum] || ''}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              
-              {/* Summary row */}
-              <div className="flex justify-center gap-8 pt-2 border-t border-gray-100">
-                <div className="text-center">
-                  <div className="text-xs text-gray-400">סה"כ הכנסות</div>
-                  <div className="text-lg font-semibold text-gray-900">
-                    {formatCurrency(filteredRevenueData.reduce((sum: number, m: any) => sum + (m.revenue || 0), 0))}
-                  </div>
-                </div>
-                <div className="text-center">
-                  <div className="text-xs text-gray-400">סה"כ רווח</div>
-                  <div className="text-lg font-semibold text-emerald-600">
-                    {formatCurrency(filteredRevenueData.reduce((sum: number, m: any) => sum + (m.profit || 0), 0))}
-                  </div>
-                </div>
-              </div>
-            </div>
+            <ResponsiveContainer width="100%" height={280}>
+              <LineChart 
+                data={filteredRevenueData.slice().reverse()} 
+                margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                <XAxis 
+                  dataKey="month" 
+                  tick={{ fontSize: 11, fill: '#9ca3af' }} 
+                  tickFormatter={(value) => {
+                    if (!value) return '';
+                    const parts = value.split('-');
+                    const monthNames = ['', 'ינו', 'פבר', 'מרץ', 'אפר', 'מאי', 'יוני', 'יולי', 'אוג', 'ספט', 'אוק', 'נוב', 'דצמ'];
+                    return monthNames[parseInt(parts[1])] || parts[1];
+                  }}
+                  axisLine={{ stroke: '#e5e7eb' }}
+                  tickLine={false}
+                />
+                <YAxis 
+                  tick={{ fontSize: 11, fill: '#9ca3af' }} 
+                  tickFormatter={(value) => formatShortCurrency(value)} 
+                  width={60}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <Tooltip 
+                  formatter={(value: number, name: string) => [
+                    formatCurrency(value), 
+                    name === 'revenue' ? 'הכנסות' : 'רווח'
+                  ]}
+                  labelFormatter={(label) => {
+                    if (!label) return '';
+                    const parts = label.split('-');
+                    const monthNames = ['', 'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
+                    return `${monthNames[parseInt(parts[1])] || parts[1]} ${parts[0]}`;
+                  }}
+                  contentStyle={{ 
+                    borderRadius: '8px', 
+                    border: '1px solid #e5e7eb',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                    fontSize: '12px',
+                    padding: '8px 12px'
+                  }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="revenue" 
+                  name="revenue"
+                  stroke="#3b82f6" 
+                  strokeWidth={1.5}
+                  dot={{ r: 5, fill: '#3b82f6', strokeWidth: 2, stroke: '#fff' }}
+                  activeDot={{ r: 7, fill: '#3b82f6', strokeWidth: 2, stroke: '#fff' }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="profit" 
+                  name="profit"
+                  stroke="#10b981" 
+                  strokeWidth={1.5}
+                  dot={{ r: 5, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }}
+                  activeDot={{ r: 7, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
           ) : (
             <div className="h-[280px] flex items-center justify-center text-gray-400 text-sm">
               אין נתונים לתקופה זו
@@ -411,73 +426,59 @@ export default function Analytics() {
           
           {expandedSection === 'products' && (
             <div className="px-5 pb-5 border-t border-gray-100">
-              <div className="grid lg:grid-cols-2 gap-6 pt-4">
-                {/* Products Table */}
-                <div>
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-gray-500 text-xs">
-                        <th className="text-right pb-3 font-medium">מוצר</th>
-                        <th className="text-center pb-3 font-medium">הזמנות</th>
-                        <th className="text-left pb-3 font-medium">הכנסות</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {productPerformance?.slice(0, 10).map((product: any, index: number) => (
-                        <tr key={index} className="border-t border-gray-50">
-                          <td className="py-2.5 text-gray-900">{product.productName}</td>
-                          <td className="py-2.5 text-center text-gray-500">{product.totalQuotes || 0}</td>
-                          <td className="py-2.5 text-left text-gray-900 font-medium">
-                            {formatCurrency(Number(product.totalRevenue || 0))}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                
-                {/* Products Chart */}
-                <div>
-                  {productPerformance && productPerformance.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={200}>
-                      <BarChart data={productPerformance.slice(0, 6)} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
-                        <XAxis 
-                          dataKey="productName"
-                          tick={{ fontSize: 9, fill: '#9ca3af' }} 
-                          tickFormatter={(value) => value && value.length > 8 ? value.slice(0, 8) + '..' : value}
-                          axisLine={false}
-                          tickLine={false}
-                          interval={0}
-                          angle={-20}
-                          textAnchor="end"
-                          height={50}
+              {/* Top Products Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-4 mb-6">
+                {productPerformance?.slice(0, 4).map((product: any, index: number) => {
+                  const colors = ['bg-blue-500', 'bg-emerald-500', 'bg-violet-500', 'bg-amber-500'];
+                  const maxRevenue = Math.max(...(productPerformance?.map((p: any) => Number(p.totalRevenue || 0)) || [1]));
+                  const percentage = Math.round((Number(product.totalRevenue || 0) / maxRevenue) * 100);
+                  return (
+                    <div key={index} className="bg-gray-50 rounded-lg p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className={`w-2 h-2 rounded-full ${colors[index]}`}></div>
+                        <span className="text-xs text-gray-500 truncate">{product.productName}</span>
+                      </div>
+                      <div className="text-lg font-semibold text-gray-900">
+                        {formatCurrency(Number(product.totalRevenue || 0))}
+                      </div>
+                      <div className="mt-2 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full ${colors[index]} rounded-full transition-all`}
+                          style={{ width: `${percentage}%` }}
                         />
-                        <YAxis 
-                          tick={{ fontSize: 9, fill: '#9ca3af' }} 
-                          tickFormatter={(value) => formatShortCurrency(value)}
-                          axisLine={false}
-                          tickLine={false}
-                          width={50}
-                        />
-                        <Tooltip 
-                          formatter={(value: number) => formatCurrency(value)}
-                          labelFormatter={(label) => label}
-                          contentStyle={{ 
-                            borderRadius: '6px', 
-                            border: '1px solid #e5e7eb',
-                            fontSize: '11px'
-                          }}
-                        />
-                        <Bar dataKey="totalRevenue" fill="#6b7280" radius={[3, 3, 0, 0]} barSize={32} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div className="h-[200px] flex items-center justify-center text-gray-400 text-sm">
-                      אין נתונים
+                      </div>
+                      <div className="text-[10px] text-gray-400 mt-1">{product.totalQuotes || 0} הזמנות</div>
                     </div>
-                  )}
-                </div>
+                  );
+                })}
+              </div>
+              
+              {/* Products List */}
+              <div className="space-y-2">
+                {productPerformance?.slice(0, 8).map((product: any, index: number) => {
+                  const maxRevenue = Math.max(...(productPerformance?.map((p: any) => Number(p.totalRevenue || 0)) || [1]));
+                  const percentage = Math.round((Number(product.totalRevenue || 0) / maxRevenue) * 100);
+                  return (
+                    <div key={index} className="flex items-center gap-4 py-2">
+                      <div className="w-6 text-center text-xs text-gray-400 font-medium">#{index + 1}</div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm text-gray-700">{product.productName}</span>
+                          <span className="text-sm font-semibold text-gray-900">
+                            {formatCurrency(Number(product.totalRevenue || 0))}
+                          </span>
+                        </div>
+                        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-blue-500 rounded-full transition-all"
+                            style={{ width: `${percentage}%` }}
+                          />
+                        </div>
+                      </div>
+                      <div className="text-xs text-gray-400 w-16 text-left">{product.totalQuotes || 0} הזמנות</div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -503,82 +504,68 @@ export default function Analytics() {
           
           {expandedSection === 'suppliers' && (
             <div className="px-5 pb-5 border-t border-gray-100">
-              <div className="grid lg:grid-cols-2 gap-6 pt-4">
-                {/* Suppliers Table */}
-                <div>
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-gray-500 text-xs">
-                        <th className="text-right pb-3 font-medium">ספק</th>
-                        <th className="text-center pb-3 font-medium">עבודות</th>
-                        <th className="text-center pb-3 font-medium">ימי אספקה</th>
-                        <th className="text-left pb-3 font-medium">סה"כ</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredSupplierData?.slice(0, 10).map((supplier: any, index: number) => (
-                        <tr key={index} className="border-t border-gray-50">
-                          <td className="py-2.5 text-gray-900">
-                            {supplier.supplierName || supplier.supplierCompany || 'לא ידוע'}
-                          </td>
-                          <td className="py-2.5 text-center text-gray-500">{supplier.totalJobs || 0}</td>
-                          <td className="py-2.5 text-center text-gray-500">
-                            {Number(supplier.avgDeliveryDays || 0).toFixed(1)}
-                          </td>
-                          <td className="py-2.5 text-left text-gray-900 font-medium">
-                            {formatCurrency(Number(supplier.totalRevenue || 0))}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                
-                {/* Suppliers Chart */}
-                <div>
-                  {filteredSupplierData && filteredSupplierData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={200}>
-                      <BarChart data={filteredSupplierData.slice(0, 6)} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
-                        <XAxis 
-                          dataKey="supplierName"
-                          tick={{ fontSize: 9, fill: '#9ca3af' }} 
-                          tickFormatter={(value) => {
-                            const name = value || 'לא ידוע';
-                            return name.length > 8 ? name.slice(0, 8) + '..' : name;
-                          }}
-                          axisLine={false}
-                          tickLine={false}
-                          interval={0}
-                          angle={-20}
-                          textAnchor="end"
-                          height={50}
+              {/* Top Suppliers Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-4 mb-6">
+                {filteredSupplierData?.slice(0, 4).map((supplier: any, index: number) => {
+                  const colors = ['bg-indigo-500', 'bg-cyan-500', 'bg-rose-500', 'bg-orange-500'];
+                  const maxRevenue = Math.max(...(filteredSupplierData?.map((s: any) => Number(s.totalRevenue || 0)) || [1]));
+                  const percentage = Math.round((Number(supplier.totalRevenue || 0) / maxRevenue) * 100);
+                  return (
+                    <div key={index} className="bg-gray-50 rounded-lg p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className={`w-2 h-2 rounded-full ${colors[index]}`}></div>
+                        <span className="text-xs text-gray-500 truncate">
+                          {supplier.supplierName || supplier.supplierCompany || 'לא ידוע'}
+                        </span>
+                      </div>
+                      <div className="text-lg font-semibold text-gray-900">
+                        {formatCurrency(Number(supplier.totalRevenue || 0))}
+                      </div>
+                      <div className="mt-2 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full ${colors[index]} rounded-full transition-all`}
+                          style={{ width: `${percentage}%` }}
                         />
-                        <YAxis 
-                          tick={{ fontSize: 9, fill: '#9ca3af' }} 
-                          tickFormatter={(value) => formatShortCurrency(value)}
-                          axisLine={false}
-                          tickLine={false}
-                          width={50}
-                        />
-                        <Tooltip 
-                          formatter={(value: number) => formatCurrency(value)}
-                          labelFormatter={(label) => label}
-                          contentStyle={{ 
-                            borderRadius: '6px', 
-                            border: '1px solid #e5e7eb',
-                            fontSize: '11px'
-                          }}
-                        />
-                        <Bar dataKey="totalRevenue" fill="#6b7280" radius={[3, 3, 0, 0]} barSize={32} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div className="h-[200px] flex items-center justify-center text-gray-400 text-sm">
-                      אין נתונים
+                      </div>
+                      <div className="flex justify-between text-[10px] text-gray-400 mt-1">
+                        <span>{supplier.totalJobs || 0} עבודות</span>
+                        <span>{Number(supplier.avgDeliveryDays || 0).toFixed(0)} ימים</span>
+                      </div>
                     </div>
-                  )}
-                </div>
+                  );
+                })}
+              </div>
+              
+              {/* Suppliers List */}
+              <div className="space-y-2">
+                {filteredSupplierData?.slice(0, 8).map((supplier: any, index: number) => {
+                  const maxRevenue = Math.max(...(filteredSupplierData?.map((s: any) => Number(s.totalRevenue || 0)) || [1]));
+                  const percentage = Math.round((Number(supplier.totalRevenue || 0) / maxRevenue) * 100);
+                  return (
+                    <div key={index} className="flex items-center gap-4 py-2">
+                      <div className="w-6 text-center text-xs text-gray-400 font-medium">#{index + 1}</div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm text-gray-700">
+                            {supplier.supplierName || supplier.supplierCompany || 'לא ידוע'}
+                          </span>
+                          <span className="text-sm font-semibold text-gray-900">
+                            {formatCurrency(Number(supplier.totalRevenue || 0))}
+                          </span>
+                        </div>
+                        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-indigo-500 rounded-full transition-all"
+                            style={{ width: `${percentage}%` }}
+                          />
+                        </div>
+                      </div>
+                      <div className="text-xs text-gray-400 w-20 text-left">
+                        {supplier.totalJobs || 0} עבודות · {Number(supplier.avgDeliveryDays || 0).toFixed(0)}י'
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -604,89 +591,77 @@ export default function Analytics() {
           
           {expandedSection === 'customers' && (
             <div className="px-5 pb-5 border-t border-gray-100">
-              <div className="grid lg:grid-cols-2 gap-6 pt-4">
-                {/* Customers Table */}
-                <div>
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-gray-500 text-xs">
-                        <th className="text-right pb-3 font-medium">לקוח</th>
-                        <th className="text-center pb-3 font-medium">הזמנות</th>
-                        <th className="text-center pb-3 font-medium">המרה</th>
-                        <th className="text-left pb-3 font-medium">הכנסות</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredCustomerData && filteredCustomerData.length > 0 ? (
-                        filteredCustomerData.slice(0, 10).map((customer: any, index: number) => (
-                          <tr key={index} className="border-t border-gray-50">
-                            <td className="py-2.5 text-gray-900">{customer.customerName || 'לא ידוע'}</td>
-                            <td className="py-2.5 text-center text-gray-500">{customer.totalQuotes || 0}</td>
-                            <td className="py-2.5 text-center text-gray-500">
-                              {Number(customer.conversionRate || 0).toFixed(0)}%
-                            </td>
-                            <td className="py-2.5 text-left text-gray-900 font-medium">
-                              {formatCurrency(Number(customer.totalRevenue || 0))}
-                            </td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={4} className="py-8 text-center text-gray-400">
-                            אין נתוני לקוחות
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+              {filteredCustomerData && filteredCustomerData.length > 0 ? (
+                <>
+                  {/* Top Customers Cards */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-4 mb-6">
+                    {filteredCustomerData.slice(0, 4).map((customer: any, index: number) => {
+                      const colors = ['bg-teal-500', 'bg-purple-500', 'bg-pink-500', 'bg-lime-500'];
+                      const maxRevenue = Math.max(...(filteredCustomerData?.map((c: any) => Number(c.totalRevenue || 0)) || [1]));
+                      const percentage = Math.round((Number(customer.totalRevenue || 0) / maxRevenue) * 100);
+                      return (
+                        <div key={index} className="bg-gray-50 rounded-lg p-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className={`w-2 h-2 rounded-full ${colors[index]}`}></div>
+                            <span className="text-xs text-gray-500 truncate">
+                              {customer.customerName || 'לא ידוע'}
+                            </span>
+                          </div>
+                          <div className="text-lg font-semibold text-gray-900">
+                            {formatCurrency(Number(customer.totalRevenue || 0))}
+                          </div>
+                          <div className="mt-2 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                            <div 
+                              className={`h-full ${colors[index]} rounded-full transition-all`}
+                              style={{ width: `${percentage}%` }}
+                            />
+                          </div>
+                          <div className="flex justify-between text-[10px] text-gray-400 mt-1">
+                            <span>{customer.totalQuotes || 0} הזמנות</span>
+                            <span>{Number(customer.conversionRate || 0).toFixed(0)}% המרה</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  
+                  {/* Customers List */}
+                  <div className="space-y-2">
+                    {filteredCustomerData.slice(0, 8).map((customer: any, index: number) => {
+                      const maxRevenue = Math.max(...(filteredCustomerData?.map((c: any) => Number(c.totalRevenue || 0)) || [1]));
+                      const percentage = Math.round((Number(customer.totalRevenue || 0) / maxRevenue) * 100);
+                      return (
+                        <div key={index} className="flex items-center gap-4 py-2">
+                          <div className="w-6 text-center text-xs text-gray-400 font-medium">#{index + 1}</div>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-sm text-gray-700">
+                                {customer.customerName || 'לא ידוע'}
+                              </span>
+                              <span className="text-sm font-semibold text-gray-900">
+                                {formatCurrency(Number(customer.totalRevenue || 0))}
+                              </span>
+                            </div>
+                            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-teal-500 rounded-full transition-all"
+                                style={{ width: `${percentage}%` }}
+                              />
+                            </div>
+                          </div>
+                          <div className="text-xs text-gray-400 w-24 text-left">
+                            {customer.totalQuotes || 0} הזמנות · {Number(customer.conversionRate || 0).toFixed(0)}%
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              ) : (
+                <div className="py-12 text-center text-gray-400">
+                  אין נתוני לקוחות
                 </div>
-                
-                {/* Customers Chart */}
-                <div>
-                  {filteredCustomerData && filteredCustomerData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={200}>
-                      <BarChart data={filteredCustomerData.slice(0, 6)} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
-                        <XAxis 
-                          dataKey="customerName"
-                          tick={{ fontSize: 9, fill: '#9ca3af' }} 
-                          tickFormatter={(value) => {
-                            const name = value || 'לא ידוע';
-                            return name.length > 8 ? name.slice(0, 8) + '..' : name;
-                          }}
-                          axisLine={false}
-                          tickLine={false}
-                          interval={0}
-                          angle={-20}
-                          textAnchor="end"
-                          height={50}
-                        />
-                        <YAxis 
-                          tick={{ fontSize: 9, fill: '#9ca3af' }} 
-                          tickFormatter={(value) => formatShortCurrency(value)}
-                          axisLine={false}
-                          tickLine={false}
-                          width={50}
-                        />
-                        <Tooltip 
-                          formatter={(value: number) => formatCurrency(value)}
-                          labelFormatter={(label) => label}
-                          contentStyle={{ 
-                            borderRadius: '6px', 
-                            border: '1px solid #e5e7eb',
-                            fontSize: '11px'
-                          }}
-                        />
-                        <Bar dataKey="totalRevenue" fill="#9ca3af" radius={[3, 3, 0, 0]} barSize={32} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div className="h-[200px] flex items-center justify-center text-gray-400 text-sm">
-                      אין נתונים
-                    </div>
-                  )}
-                </div>
-              </div>
+              )}
             </div>
           )}
         </Card>
