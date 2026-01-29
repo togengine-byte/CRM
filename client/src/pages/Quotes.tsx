@@ -71,7 +71,7 @@ import { getStatusBadge, getSizeQuantityName } from "@/utils/quotes";
 import type { QuoteStatus, QuoteItem } from "@/types/quotes";
 
 export default function Quotes() {
-  const [statusFilter, setStatusFilter] = useState<QuoteStatus | "all">("all");
+  const [statusFilter, setStatusFilter] = useState<QuoteStatus | "all">("draft");
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedQuoteId, setExpandedQuoteId] = useState<number | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
