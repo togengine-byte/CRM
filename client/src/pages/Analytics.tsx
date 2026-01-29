@@ -47,6 +47,7 @@ export default function Analytics() {
   const [appliedCustomerFilter, setAppliedCustomerFilter] = useState<string>('all');
   
   const applyFilters = () => {
+    console.log('Apply filters clicked:', { dateFilter, supplierFilter, customerFilter });
     setAppliedDateFilter(dateFilter);
     setAppliedSupplierFilter(supplierFilter);
     setAppliedCustomerFilter(customerFilter);
@@ -236,9 +237,14 @@ export default function Analytics() {
           </Select>
 
           <Button 
+            type="button"
             size="sm" 
-            className="h-9 text-sm bg-gray-800 hover:bg-gray-700 text-white"
-            onClick={applyFilters}
+            className="h-9 text-sm bg-gray-800 hover:bg-gray-700 text-white cursor-pointer"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              applyFilters();
+            }}
           >
             הצג
           </Button>
