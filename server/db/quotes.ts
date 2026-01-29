@@ -111,22 +111,47 @@ export async function getQuoteById(quoteId: number) {
 
   if (!quote) return null;
 
-  const items = await db.select({
-    id: quoteItems.id,
-    sizeQuantityId: quoteItems.sizeQuantityId,
-    quantity: quoteItems.quantity,
-    priceAtTimeOfQuote: quoteItems.priceAtTimeOfQuote,
-    isManualPrice: quoteItems.isManualPrice,
-    isUpsell: quoteItems.isUpsell,
-    supplierId: quoteItems.supplierId,
-    supplierCost: quoteItems.supplierCost,
-    deliveryDays: quoteItems.deliveryDays,
-    supplierName: users.name,
-    supplierCompany: users.companyName,
-  })
-  .from(quoteItems)
-  .leftJoin(users, eq(quoteItems.supplierId, users.id))
-  .where(eq(quoteItems.quoteId, quoteId));
+  // Get items with product names
+  const itemsResult = await db.execute(sql`
+    SELECT 
+      qi.id,
+      qi."sizeQuantityId",
+      qi.quantity,
+      qi."priceAtTimeOfQuote",
+      qi."isManualPrice",
+      qi."isUpsell",
+      qi."supplierId",
+      qi."supplierCost",
+      qi."deliveryDays",
+      u.name as "supplierName",
+      u."companyName" as "supplierCompany",
+      bp.name as "productName",
+      ps.name as "sizeName",
+      ps.dimensions as "dimensions"
+    FROM quote_items qi
+    LEFT JOIN users u ON qi."supplierId" = u.id
+    LEFT JOIN size_quantities sq ON qi."sizeQuantityId" = sq.id
+    LEFT JOIN product_sizes ps ON sq.size_id = ps.id
+    LEFT JOIN base_products bp ON ps.product_id = bp.id
+    WHERE qi."quoteId" = ${quoteId}
+  `);
+  
+  const items = itemsResult.rows.map((row: any) => ({
+    id: row.id,
+    sizeQuantityId: row.sizeQuantityId,
+    quantity: row.quantity,
+    priceAtTimeOfQuote: row.priceAtTimeOfQuote,
+    isManualPrice: row.isManualPrice,
+    isUpsell: row.isUpsell,
+    supplierId: row.supplierId,
+    supplierCost: row.supplierCost,
+    deliveryDays: row.deliveryDays,
+    supplierName: row.supplierName,
+    supplierCompany: row.supplierCompany,
+    productName: row.productName,
+    sizeName: row.sizeName,
+    dimensions: row.dimensions,
+  }));
 
   const attachments = await db.select()
   .from(quoteAttachments)
