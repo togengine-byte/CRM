@@ -570,7 +570,8 @@ export async function markJobPickedUp(jobId: number, courierId: number) {
 
   await db.update(supplierJobs)
     .set({ 
-      status: 'in_transit',
+      status: 'picked_up',
+      pickedUpAt: new Date(),
       updatedAt: new Date(),
     })
     .where(eq(supplierJobs.id, jobId));
@@ -590,6 +591,7 @@ export async function markJobDelivered(jobId: number, courierId: number) {
   await db.update(supplierJobs)
     .set({ 
       status: 'delivered',
+      deliveredAt: new Date(),
       updatedAt: new Date(),
     })
     .where(eq(supplierJobs.id, jobId));

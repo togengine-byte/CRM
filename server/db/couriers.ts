@@ -330,6 +330,8 @@ export async function getCourierReadyJobs() {
       sj."sizeQuantityId",
       sj.quantity,
       sj.status,
+      sj."pickedUpAt",
+      sj."deliveredAt",
       sj."createdAt",
       supplier.name as "supplierName",
       supplier."companyName" as "supplierCompany",
@@ -374,6 +376,10 @@ export async function getCourierReadyJobs() {
     customerAddress: job.customerAddress,
     customerPhone: job.customerPhone,
     status: job.status,
+    pickedUp: job.status === 'picked_up' || job.status === 'delivered',
+    pickedUpAt: job.pickedUpAt,
+    delivered: job.status === 'delivered',
+    deliveredAt: job.deliveredAt,
     createdAt: job.createdAt,
   }));
 }
