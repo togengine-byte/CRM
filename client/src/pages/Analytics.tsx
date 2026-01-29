@@ -326,73 +326,55 @@ export default function Analytics() {
         </CardHeader>
         <CardContent className="pt-4">
           {filteredRevenueData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={280}>
-              <LineChart 
-                data={filteredRevenueData.slice().reverse()} 
-                margin={{ top: 20, right: 30, left: 10, bottom: 10 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
-                <XAxis 
-                  dataKey="month" 
-                  tick={{ fontSize: 11, fill: '#6b7280' }} 
-                  tickFormatter={(value) => {
-                    if (!value) return '';
-                    const parts = value.split('-');
-                    const monthNames = ['', 'ינו', 'פבר', 'מרץ', 'אפר', 'מאי', 'יוני', 'יולי', 'אוג', 'ספט', 'אוק', 'נוב', 'דצמ'];
-                    return monthNames[parseInt(parts[1])] || parts[1];
-                  }}
-                  axisLine={{ stroke: '#e5e7eb' }}
-                  tickLine={false}
-                  dy={10}
-                />
-                <YAxis 
-                  tick={{ fontSize: 11, fill: '#6b7280' }} 
-                  tickFormatter={(value) => formatShortCurrency(value)} 
-                  width={70}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <Tooltip 
-                  formatter={(value: number, name: string) => [
-                    formatCurrency(value), 
-                    name === 'revenue' ? 'הכנסות' : 'רווח'
-                  ]}
-                  labelFormatter={(label) => {
-                    if (!label) return '';
-                    const parts = label.split('-');
-                    const monthNames = ['', 'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
-                    return `${monthNames[parseInt(parts[1])] || parts[1]} ${parts[0]}`;
-                  }}
-                  contentStyle={{ 
-                    borderRadius: '8px', 
-                    border: 'none',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                    fontSize: '12px',
-                    padding: '10px 14px'
-                  }}
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="revenue" 
-                  name="revenue"
-                  stroke="#3b82f6" 
-                  strokeWidth={2.5}
-                  dot={{ r: 4, fill: '#3b82f6', strokeWidth: 0 }}
-                  activeDot={{ r: 6, fill: '#3b82f6', strokeWidth: 3, stroke: '#fff' }}
-                  connectNulls
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="profit" 
-                  name="profit"
-                  stroke="#10b981" 
-                  strokeWidth={2.5}
-                  dot={{ r: 4, fill: '#10b981', strokeWidth: 0 }}
-                  activeDot={{ r: 6, fill: '#10b981', strokeWidth: 3, stroke: '#fff' }}
-                  connectNulls
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            <div className="space-y-4">
+              {/* Chart visualization with bars */}
+              <div className="flex items-end justify-between gap-2 h-[200px] px-2">
+                {filteredRevenueData.slice().reverse().map((item: any, index: number) => {
+                  const maxRevenue = Math.max(...filteredRevenueData.map((d: any) => d.revenue || 0));
+                  const revenueHeight = maxRevenue > 0 ? ((item.revenue || 0) / maxRevenue) * 160 : 0;
+                  const profitHeight = maxRevenue > 0 ? ((item.profit || 0) / maxRevenue) * 160 : 0;
+                  const monthNames = ['', 'ינו', 'פבר', 'מרץ', 'אפר', 'מאי', 'יוני', 'יולי', 'אוג', 'ספט', 'אוק', 'נוב', 'דצמ'];
+                  const monthNum = item.month ? parseInt(item.month.split('-')[1]) : 0;
+                  
+                  return (
+                    <div key={index} className="flex-1 flex flex-col items-center gap-1">
+                      <div className="text-[10px] text-gray-500 font-medium">
+                        {formatShortCurrency(item.revenue || 0)}
+                      </div>
+                      <div className="flex gap-1 items-end">
+                        <div 
+                          className="w-4 bg-blue-500 rounded-t transition-all"
+                          style={{ height: `${Math.max(revenueHeight, 4)}px` }}
+                        />
+                        <div 
+                          className="w-4 bg-emerald-500 rounded-t transition-all"
+                          style={{ height: `${Math.max(profitHeight, 4)}px` }}
+                        />
+                      </div>
+                      <div className="text-[10px] text-gray-400 mt-1">
+                        {monthNames[monthNum] || ''}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              
+              {/* Summary row */}
+              <div className="flex justify-center gap-8 pt-2 border-t border-gray-100">
+                <div className="text-center">
+                  <div className="text-xs text-gray-400">סה"כ הכנסות</div>
+                  <div className="text-lg font-semibold text-gray-900">
+                    {formatCurrency(filteredRevenueData.reduce((sum: number, m: any) => sum + (m.revenue || 0), 0))}
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="text-xs text-gray-400">סה"כ רווח</div>
+                  <div className="text-lg font-semibold text-emerald-600">
+                    {formatCurrency(filteredRevenueData.reduce((sum: number, m: any) => sum + (m.profit || 0), 0))}
+                  </div>
+                </div>
+              </div>
+            </div>
           ) : (
             <div className="h-[280px] flex items-center justify-center text-gray-400 text-sm">
               אין נתונים לתקופה זו
