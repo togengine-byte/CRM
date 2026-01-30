@@ -141,8 +141,9 @@ function UrgentAlertsBar() {
 
   React.useEffect(() => {
     if (visibleAlerts.length > 0 && !hasPlayedSound) {
-      const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleQAqj9PQpXQAGILO0KpxABd/zM+rcQAXf8zPq3EAF3/Mz6txABd/zM+rcQAXf8zPq3E=');
-      audio.volume = 0.2;
+      // Soft, rounded notification sound - longer and more pleasant
+      const audio = new Audio('data:audio/wav;base64,UklGRl4HAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YToHAACAf4GDhYeJi42PkZOVl5mbnZ+ho6WnqautrK2sq6qpqKelpKOioaCfnp2cm5qZmJeWlZSTkpGQj46NjIuKiYiHhoWEg4KBgH9+fXx7enl4d3Z1dHNycXBvbm1sa2ppaGdmZWRjYmFgX15dXFtaWVhXVlVUU1JRUE9OTUxLSklIR0ZFRENCQUA/Pj08Ozo5ODc2NTQzMjEwLy4tLCsqKSgnJiUkIyIhIB8eHRwbGhkYFxYVFBMSERAPDg0MCwoJCAcGBQQDAgEAAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkqKywtLi8wMTIzNDU2Nzg5Ojs8PT4/QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl9gYWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXp7fH1+f4CBgoOEhYaHiImKi4yNjo+QkZKTlJWWl5iZmpucnZ6foKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr/AwcLDxMXGx8jJysvMzc7P0NHS09TV1tfY2drb3N3e3+Dh4uPk5ebn6Onq6+zt7u/w8fLz9PX29/j5+vv8/f7/AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gISIjJCUmJygpKissLS4vMDEyMzQ1Njc4OTo7PD0+P0BBQkNERUZHSElKS0xNTk9QUVJTVFVWV1hZWltcXV5fYGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn+AgYKDhIWGh4iJiouMjY6PkJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq+wsbKztLW2t7i5uru8vb6/wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t/g4eLj5OXm5+jp6uvs7e7v8PHy8/T19vf4+fr7/P3+/wABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fICEiIyQl');
+      audio.volume = 0.25;
       audio.play().catch(() => {});
       setHasPlayedSound(true);
     }
@@ -421,7 +422,7 @@ function SalesProgressBar({ status, compact = false }: { status: string; compact
 
 function SalesPipelineCard({ isLoading: parentLoading }: { isLoading: boolean }) {
   const { data: quotes, isLoading } = trpc.quotes.list.useQuery();
-  const [showAllQuotes, setShowAllQuotes] = React.useState(false);
+  const [isExpanded, setIsExpanded] = React.useState(false);
   const loading = parentLoading || isLoading;
   
   // Active quotes (not approved/rejected/superseded)
@@ -429,113 +430,83 @@ function SalesPipelineCard({ isLoading: parentLoading }: { isLoading: boolean })
     ['draft', 'sent'].includes(quote.status)
   ) || [];
   
-  const displayQuotes = activeQuotes.slice(0, 5);
+  const displayQuotes = isExpanded ? activeQuotes : activeQuotes.slice(0, 5);
 
   return (
-    <>
-      <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-200 bg-white">
-        <CardHeader className="pb-2 pt-3 px-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="h-7 w-7 rounded-lg bg-amber-50 flex items-center justify-center">
-                <FileText className="h-4 w-4 text-amber-600" />
-              </div>
-              <CardTitle className="text-sm font-medium text-slate-900">מכירות בתהליך</CardTitle>
+    <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 bg-white">
+      <CardHeader className="pb-2 pt-3 px-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="h-7 w-7 rounded-lg bg-amber-50 flex items-center justify-center">
+              <FileText className="h-4 w-4 text-amber-600" />
             </div>
+            <CardTitle className="text-sm font-medium text-slate-900">מכירות בתהליך</CardTitle>
+          </div>
+          <div className="flex items-center gap-2">
             {activeQuotes.length > 0 && (
               <Badge className="text-[10px] px-2 py-0.5 h-5 bg-amber-100 text-amber-700 border-0">
                 {activeQuotes.length}
               </Badge>
             )}
+            {activeQuotes.length > 5 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0"
+                onClick={() => setIsExpanded(!isExpanded)}
+              >
+                <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+              </Button>
+            )}
           </div>
-        </CardHeader>
-        <CardContent className="px-4 pb-3">
-          {loading ? (
-            <div className="space-y-2 animate-pulse">
-              {[...Array(3)].map((_, i) => (
-                <Skeleton key={i} className="h-14 w-full rounded-lg" />
-              ))}
-            </div>
-          ) : displayQuotes.length === 0 ? (
-            <div className="flex items-center justify-center py-4 text-center">
-              <p className="text-xs text-slate-400">אין הצעות ממתינות</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {displayQuotes.map((quote: any) => (
-                <div 
-                  key={quote.id}
-                  className="p-3 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer"
-                  onClick={() => setShowAllQuotes(true)}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-xs font-medium text-slate-700 truncate">
-                        {quote.customerName || 'לקוח לא מזוהה'}
-                      </span>
-                    </div>
-                    <span className="text-xs text-amber-600 font-medium shrink-0">
-                      {formatCurrency(quote.totalPrice || 0)}
-                    </span>
-                  </div>
-                  <SalesProgressBar status={quote.status} compact />
-                </div>
-              ))}
-              {activeQuotes.length > 5 && (
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  className="w-full text-xs text-slate-500 h-7 mt-1"
-                  onClick={() => setShowAllQuotes(true)}
-                >
-                  הצג הכל ({activeQuotes.length})
-                </Button>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* All Quotes Modal */}
-      <Dialog open={showAllQuotes} onOpenChange={setShowAllQuotes}>
-        <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-hidden" dir="rtl">
-          <DialogHeader>
-            <DialogTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-              <FileText className="h-5 w-5 text-amber-600" />
-              כל המכירות בתהליך
-            </DialogTitle>
-            <DialogDescription className="text-slate-500">
-              {activeQuotes.length} הצעות ממתינות לאישור
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="overflow-y-auto max-h-[60vh] space-y-3 pr-1">
-            {activeQuotes.map((quote: any) => (
+        </div>
+      </CardHeader>
+      <CardContent className="px-4 pb-3">
+        {loading ? (
+          <div className="space-y-2 animate-pulse">
+            {[...Array(3)].map((_, i) => (
+              <Skeleton key={i} className="h-14 w-full rounded-lg" />
+            ))}
+          </div>
+        ) : displayQuotes.length === 0 ? (
+          <div className="flex items-center justify-center py-4 text-center">
+            <p className="text-xs text-slate-400">אין הצעות ממתינות</p>
+          </div>
+        ) : (
+          <div className={`space-y-2 transition-all duration-300 ${isExpanded ? 'max-h-[600px]' : 'max-h-[400px]'} overflow-y-auto`}>
+            {displayQuotes.map((quote: any) => (
               <div 
                 key={quote.id}
-                className="p-4 rounded-lg border border-slate-200 bg-white hover:border-slate-300 transition-colors"
+                className="p-3 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors"
               >
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <p className="text-sm font-medium text-slate-800">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-xs font-medium text-slate-700 truncate">
                       {quote.customerName || 'לקוח לא מזוהה'}
-                    </p>
-                    <p className="text-xs text-slate-500">הצעה #{quote.id}</p>
+                    </span>
+                    <span className="text-[10px] text-slate-400">הצעה #{quote.id}</span>
                   </div>
-                  <div className="text-left">
-                    <p className="text-sm font-medium text-amber-600">{formatCurrency(quote.totalPrice || 0)}</p>
-                    <p className="text-xs text-slate-400">
-                      {quote.status === 'draft' ? 'טיוטה' : 'נשלחה'}
-                    </p>
-                  </div>
+                  <span className="text-xs text-amber-600 font-medium shrink-0">
+                    {formatCurrency(quote.totalPrice || 0)}
+                  </span>
                 </div>
                 <SalesProgressBar status={quote.status} />
               </div>
             ))}
           </div>
-        </DialogContent>
-      </Dialog>
-    </>
+        )}
+        {activeQuotes.length > 5 && (
+          <Button 
+            variant="ghost" 
+            size="sm"
+            className="w-full text-xs text-slate-500 h-7 mt-2"
+            onClick={() => setIsExpanded(!isExpanded)}
+          >
+            {isExpanded ? 'הצג פחות' : `הצג הכל (${activeQuotes.length})`}
+          </Button>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -600,7 +571,7 @@ function JobProgressBar({ status, compact = false }: { status: string; compact?:
 
 function JobsInProductionCard({ isLoading: parentLoading }: { isLoading: boolean }) {
   const { data: jobs, isLoading } = trpc.jobs.list.useQuery();
-  const [showAllJobs, setShowAllJobs] = React.useState(false);
+  const [isExpanded, setIsExpanded] = React.useState(false);
   const loading = parentLoading || isLoading;
   
   // All active jobs (not delivered or cancelled)
@@ -608,110 +579,84 @@ function JobsInProductionCard({ isLoading: parentLoading }: { isLoading: boolean
     !['delivered', 'cancelled'].includes(job.status)
   ) || [];
   
-  // Jobs to show in card (first 5)
-  const displayJobs = activeJobs.slice(0, 5);
+  // Jobs to show in card
+  const displayJobs = isExpanded ? activeJobs : activeJobs.slice(0, 5);
 
   return (
-    <>
-      <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-200 bg-white">
-        <CardHeader className="pb-2 pt-3 px-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="h-7 w-7 rounded-lg bg-blue-50 flex items-center justify-center">
-                <Factory className="h-4 w-4 text-blue-600" />
-              </div>
-              <CardTitle className="text-sm font-medium text-slate-900">עבודות פעילות</CardTitle>
+    <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 bg-white">
+      <CardHeader className="pb-2 pt-3 px-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="h-7 w-7 rounded-lg bg-blue-50 flex items-center justify-center">
+              <Factory className="h-4 w-4 text-blue-600" />
             </div>
+            <CardTitle className="text-sm font-medium text-slate-900">עבודות פעילות</CardTitle>
+          </div>
+          <div className="flex items-center gap-2">
             {activeJobs.length > 0 && (
               <Badge className="text-[10px] px-2 py-0.5 h-5 bg-blue-100 text-blue-700 border-0">
                 {activeJobs.length}
               </Badge>
             )}
+            {activeJobs.length > 5 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0"
+                onClick={() => setIsExpanded(!isExpanded)}
+              >
+                <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+              </Button>
+            )}
           </div>
-        </CardHeader>
-        <CardContent className="px-4 pb-3">
-          {loading ? (
-            <div className="space-y-2 animate-pulse">
-              {[...Array(3)].map((_, i) => (
-                <Skeleton key={i} className="h-12 w-full rounded-lg" />
-              ))}
-            </div>
-          ) : displayJobs.length === 0 ? (
-            <div className="flex items-center justify-center py-4 text-center">
-              <p className="text-xs text-slate-400">אין עבודות פעילות</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {displayJobs.map((job: any) => (
-                <div 
-                  key={job.id}
-                  className="p-2 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer"
-                  onClick={() => setShowAllJobs(true)}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Package className="h-3.5 w-3.5 text-slate-500 shrink-0" />
-                      <span className="text-xs font-medium text-slate-700 truncate">{job.productName}</span>
-                    </div>
-                    <span className="text-[10px] text-slate-500 shrink-0">{job.supplierName}</span>
-                  </div>
-                  <JobProgressBar status={job.status} compact />
-                </div>
-              ))}
-              {activeJobs.length > 5 && (
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  className="w-full text-xs text-slate-500 h-7 mt-1"
-                  onClick={() => setShowAllJobs(true)}
-                >
-                  הצג הכל ({activeJobs.length})
-                </Button>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* All Jobs Modal */}
-      <Dialog open={showAllJobs} onOpenChange={setShowAllJobs}>
-        <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-hidden" dir="rtl">
-          <DialogHeader>
-            <DialogTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-              <Factory className="h-5 w-5 text-blue-600" />
-              כל העבודות הפעילות
-            </DialogTitle>
-            <DialogDescription className="text-slate-500">
-              {activeJobs.length} עבודות בתהליך
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="overflow-y-auto max-h-[60vh] space-y-3 pr-1">
-            {activeJobs.map((job: any) => (
+        </div>
+      </CardHeader>
+      <CardContent className="px-4 pb-3">
+        {loading ? (
+          <div className="space-y-2 animate-pulse">
+            {[...Array(3)].map((_, i) => (
+              <Skeleton key={i} className="h-12 w-full rounded-lg" />
+            ))}
+          </div>
+        ) : displayJobs.length === 0 ? (
+          <div className="flex items-center justify-center py-4 text-center">
+            <p className="text-xs text-slate-400">אין עבודות פעילות</p>
+          </div>
+        ) : (
+          <div className={`space-y-2 transition-all duration-300 ${isExpanded ? 'max-h-[600px]' : 'max-h-[400px]'} overflow-y-auto`}>
+            {displayJobs.map((job: any) => (
               <div 
                 key={job.id}
-                className="p-4 rounded-lg border border-slate-200 bg-white hover:border-slate-300 transition-colors"
+                className="p-3 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors"
               >
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <p className="text-sm font-medium text-slate-800">{job.productName}</p>
-                    <p className="text-xs text-slate-500">ספק: {job.supplierName}</p>
-                    {job.customerName && (
-                      <p className="text-xs text-slate-500">לקוח: {job.customerName}</p>
-                    )}
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Package className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+                    <span className="text-xs font-medium text-slate-700 truncate">{job.productName}</span>
+                    <span className="text-[10px] text-slate-400">עבודה #{job.id}</span>
                   </div>
-                  <div className="text-left">
-                    <p className="text-xs text-slate-500">כמות: {formatNumber(job.quantity)}</p>
-                    <p className="text-xs text-slate-400">עבודה #{job.id}</p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-slate-500 shrink-0">{job.supplierName}</span>
+                    <span className="text-[10px] text-slate-400">כמות: {formatNumber(job.quantity)}</span>
                   </div>
                 </div>
                 <JobProgressBar status={job.status} />
               </div>
             ))}
           </div>
-        </DialogContent>
-      </Dialog>
-    </>
+        )}
+        {activeJobs.length > 5 && (
+          <Button 
+            variant="ghost" 
+            size="sm"
+            className="w-full text-xs text-slate-500 h-7 mt-2"
+            onClick={() => setIsExpanded(!isExpanded)}
+          >
+            {isExpanded ? 'הצג פחות' : `הצג הכל (${activeJobs.length})`}
+          </Button>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
