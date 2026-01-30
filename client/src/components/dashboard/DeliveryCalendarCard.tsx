@@ -262,47 +262,33 @@ export function DeliveryCalendarCard({ isLoading: parentLoading }: { isLoading: 
                   </div>
                   
                   {selectedDateItems.length > 0 ? (
-                    <div className="max-h-[220px] overflow-y-auto space-y-2 pr-2">
+                    <div className="space-y-1">
                       {selectedDateItems.map((item) => (
                         <div 
                           key={`${item.type}-${item.id}`}
-                          className={`p-3 rounded-lg border ${
+                          className={`flex items-center gap-2 px-2 py-1.5 rounded text-xs ${
                             item.isOverdue 
-                              ? 'bg-red-50 border-red-200' 
-                              : 'bg-slate-50 border-slate-200'
+                              ? 'bg-red-50 border-r-2 border-red-500' 
+                              : 'bg-slate-50 border-r-2 border-slate-300'
                           }`}
                         >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className={`text-xs px-2 py-0.5 rounded-full ${
-                                  item.type === 'job' 
-                                    ? 'bg-blue-100 text-blue-700' 
-                                    : 'bg-amber-100 text-amber-700'
-                                }`}>
-                                  {item.type === 'job' ? 'עבודה' : 'הצעה'}
-                                </span>
-                                <span className="text-xs text-slate-500">#{item.id}</span>
-                              </div>
-                              <p className="text-sm font-medium text-slate-800 mt-1">
-                                {item.name}
-                              </p>
-                              {item.customerName && item.type === 'job' && (
-                                <p className="text-xs text-slate-500 mt-0.5">
-                                  לקוח: {item.customerName}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                          <div className={`mt-2 pt-2 border-t ${
-                            item.isOverdue ? 'border-red-200' : 'border-slate-200'
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                            item.type === 'job' 
+                              ? 'bg-blue-100 text-blue-700' 
+                              : 'bg-amber-100 text-amber-700'
                           }`}>
-                            <span className={`text-sm font-bold ${
-                              item.isOverdue ? 'text-red-600' : 'text-indigo-600'
-                            }`}>
-                              ▶ {item.action}
-                            </span>
-                          </div>
+                            {item.type === 'job' ? 'עבודה' : 'הצעה'}
+                          </span>
+                          <span className="text-slate-400">#{item.id}</span>
+                          <span className="font-medium text-slate-700 truncate flex-1">{item.name}</span>
+                          {item.customerName && item.type === 'job' && (
+                            <span className="text-slate-400 truncate max-w-[80px]">{item.customerName}</span>
+                          )}
+                          <span className={`font-semibold whitespace-nowrap ${
+                            item.isOverdue ? 'text-red-600' : 'text-indigo-600'
+                          }`}>
+                            {item.action}
+                          </span>
                         </div>
                       ))}
                     </div>
