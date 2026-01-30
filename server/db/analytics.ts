@@ -650,43 +650,45 @@ export async function getSupplierPerformance(startDate?: Date, endDate?: Date) {
 }
 
 /**
- * Get revenue report
+ * Get revenue report - Based on supplier_jobs with status 'delivered'
+ * This represents actual completed and paid work
  */
 export async function getRevenueReport(startDate?: Date, endDate?: Date) {
   const db = await getDb();
   if (!db) return { totalRevenue: 0, totalCost: 0, profit: 0, margin: 0, byMonth: [] };
 
-  // Default to last 6 months if no dates provided (for better chart visualization)
-  const start = startDate || new Date(Date.now() - 180 * 24 * 60 * 60 * 1000);
+  // Default to last 12 months if no dates provided (for better chart visualization)
+  const start = startDate || new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
   const end = endDate || new Date();
 
-  const summary = await db.select({
-    totalRevenue: sql<number>`COALESCE(SUM(CAST(${quoteItems.priceAtTimeOfQuote} AS DECIMAL) * ${quoteItems.quantity}), 0)`,
-    totalCost: sql<number>`COALESCE(SUM(CAST(${quoteItems.supplierCost} AS DECIMAL) * ${quoteItems.quantity}), 0)`,
-  })
-    .from(quoteItems)
-    .innerJoin(quotes, eq(quoteItems.quoteId, quotes.id))
-    .where(and(
-      sql`${quotes.createdAt} BETWEEN ${start} AND ${end}`,
-      inArray(quotes.status, ['approved', 'in_production', 'ready', 'delivered'])
-    ));
+  // Get totals from supplier_jobs with status 'delivered'
+  const summaryResults = await db.execute(sql`
+    SELECT 
+      COALESCE(SUM(CAST("pricePerUnit" AS DECIMAL) * quantity), 0) as total_revenue,
+      COALESCE(SUM(CAST("pricePerUnit" AS DECIMAL) * quantity * 0.6), 0) as total_cost,
+      COUNT(*) as job_count
+    FROM supplier_jobs
+    WHERE status = 'delivered'
+    AND "createdAt" BETWEEN ${start} AND ${end}
+  `);
 
-  const totalRevenue = Number(summary[0]?.totalRevenue || 0);
-  const totalCost = Number(summary[0]?.totalCost || 0);
+  const summaryRow = (summaryResults.rows as any[])[0] || {};
+  const totalRevenue = Number(summaryRow.total_revenue || 0);
+  const totalCost = Number(summaryRow.total_cost || 0);
   const profit = totalRevenue - totalCost;
   const margin = totalRevenue > 0 ? (profit / totalRevenue) * 100 : 0;
 
+  // Get monthly breakdown from supplier_jobs with status 'delivered'
   const byMonthResults = await db.execute(sql`
     SELECT 
-      TO_CHAR(q."createdAt", 'YYYY-MM') as month,
-      COALESCE(SUM(CAST(qi."priceAtTimeOfQuote" AS DECIMAL) * qi.quantity), 0) as revenue,
-      COALESCE(SUM(CAST(qi."supplierCost" AS DECIMAL) * qi.quantity), 0) as cost,
-      count(DISTINCT q.id) as "quoteCount"
-    FROM quote_items qi
-    INNER JOIN quotes q ON qi."quoteId" = q.id
-    WHERE q."createdAt" BETWEEN ${start} AND ${end}
-    AND q.status IN ('approved', 'in_production', 'ready', 'delivered')
-    GROUP BY TO_CHAR(q."createdAt", 'YYYY-MM')
+      TO_CHAR("createdAt", 'YYYY-MM') as month,
+      COALESCE(SUM(CAST("pricePerUnit" AS DECIMAL) * quantity), 0) as revenue,
+      COALESCE(SUM(CAST("pricePerUnit" AS DECIMAL) * quantity * 0.6), 0) as cost,
+      COUNT(*) as job_count
+    FROM supplier_jobs
+    WHERE status = 'delivered'
+    AND "createdAt" BETWEEN ${start} AND ${end}
+    GROUP BY TO_CHAR("createdAt", 'YYYY-MM')
     ORDER BY month
   `);
 
@@ -695,7 +697,7 @@ export async function getRevenueReport(startDate?: Date, endDate?: Date) {
     revenue: Number(m.revenue),
     cost: Number(m.cost),
     profit: Number(m.revenue) - Number(m.cost),
-    quoteCount: Number(m.quoteCount),
+    quoteCount: Number(m.job_count),
   }));
 
   return {
