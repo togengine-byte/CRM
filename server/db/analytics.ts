@@ -168,29 +168,24 @@ export async function getAllCustomersAnalytics(startDate?: Date, endDate?: Date)
   if (!db) return [];
 
   try {
-    // Default to last month if no dates provided
-    const start = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    // Default to last year if no dates provided
+    const start = startDate || new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
     const end = endDate || new Date();
 
+    // Get customer analytics from supplier_jobs with status 'delivered'
     const results = await db.execute(sql`
       SELECT 
         u.id as customer_id,
         u.name as customer_name,
         u."companyName" as company_name,
-        COUNT(DISTINCT q.id) as total_quotes,
-        COALESCE(SUM(
-          CASE WHEN q.status IN ('approved', 'in_production', 'ready', 'delivered') 
-          THEN COALESCE(NULLIF(q."finalValue", '')::numeric, 0) 
-          ELSE 0 END
-        ), 0) as total_revenue,
-        COALESCE(SUM(CASE WHEN q.status IN ('approved', 'in_production', 'ready', 'delivered') THEN 1 ELSE 0 END), 0) as approved_quotes,
-        CASE 
-          WHEN COUNT(q.id) > 0 
-          THEN ROUND((COALESCE(SUM(CASE WHEN q.status IN ('approved', 'in_production', 'ready', 'delivered') THEN 1 ELSE 0 END), 0)::numeric / COUNT(q.id)::numeric) * 100, 1)
-          ELSE 0 
-        END as conversion_rate
+        COUNT(sj.id) as total_quotes,
+        COALESCE(SUM(CAST(sj."pricePerUnit" AS DECIMAL) * sj.quantity), 0) as total_revenue,
+        COUNT(sj.id) as approved_quotes,
+        100 as conversion_rate
       FROM users u
-      LEFT JOIN quotes q ON q."customerId" = u.id AND q."createdAt" >= ${start} AND q."createdAt" <= ${end}
+      LEFT JOIN supplier_jobs sj ON sj."customerId" = u.id 
+        AND sj.status = 'delivered'
+        AND sj."createdAt" BETWEEN ${start} AND ${end}
       WHERE u.role = 'customer' AND u.status = 'active'
       GROUP BY u.id, u.name, u."companyName"
       ORDER BY total_revenue DESC
@@ -591,62 +586,80 @@ export async function getProductPerformance(startDate?: Date, endDate?: Date) {
   const db = await getDb();
   if (!db) return [];
 
-  const start = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const start = startDate || new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
   const end = endDate || new Date();
 
-  const results = await db.select({
-    productId: baseProducts.id,
-    productName: baseProducts.name,
-    category: baseProducts.category,
-    totalQuotes: sql<number>`count(DISTINCT ${quoteItems.quoteId})`,
-    totalQuantity: sql<number>`COALESCE(SUM(${quoteItems.quantity}), 0)`,
-    totalRevenue: sql<number>`COALESCE(SUM(CAST(${quoteItems.priceAtTimeOfQuote} AS DECIMAL) * ${quoteItems.quantity}), 0)`,
-    avgUnitPrice: sql<number>`COALESCE(AVG(CAST(${quoteItems.priceAtTimeOfQuote} AS DECIMAL)), 0)`,
-  })
-    .from(baseProducts)
-    .leftJoin(productSizes, eq(productSizes.productId, baseProducts.id))
-    .leftJoin(sizeQuantities, eq(sizeQuantities.sizeId, productSizes.id))
-    .leftJoin(quoteItems, eq(quoteItems.sizeQuantityId, sizeQuantities.id))
-    .leftJoin(quotes, and(
-      eq(quoteItems.quoteId, quotes.id),
-      sql`${quotes.createdAt} BETWEEN ${start} AND ${end}`
-    ))
-    .where(eq(baseProducts.isActive, true))
-    .groupBy(baseProducts.id, baseProducts.name, baseProducts.category);
+  // Get product performance from supplier_jobs with status 'delivered'
+  // Join through sizeQuantityId -> size_quantities -> product_sizes -> base_products
+  const results = await db.execute(sql`
+    SELECT 
+      bp.id as product_id,
+      bp.name as product_name,
+      bp.category as category,
+      COUNT(DISTINCT sj.id) as total_quotes,
+      COALESCE(SUM(sj.quantity), 0) as total_quantity,
+      COALESCE(SUM(CAST(sj."pricePerUnit" AS DECIMAL) * sj.quantity), 0) as total_revenue,
+      COALESCE(AVG(CAST(sj."pricePerUnit" AS DECIMAL)), 0) as avg_unit_price
+    FROM base_products bp
+    LEFT JOIN product_sizes ps ON ps.product_id = bp.id
+    LEFT JOIN size_quantities sq ON sq.size_id = ps.id
+    LEFT JOIN supplier_jobs sj ON sj."sizeQuantityId" = sq.id
+      AND sj.status = 'delivered'
+      AND sj."createdAt" BETWEEN ${start} AND ${end}
+    WHERE bp."isActive" = true
+    GROUP BY bp.id, bp.name, bp.category
+    ORDER BY total_revenue DESC
+  `);
 
-  return results.sort((a, b) => Number(b.totalRevenue) - Number(a.totalRevenue));
+  return (results.rows as any[]).map(row => ({
+    productId: row.product_id,
+    productName: row.product_name,
+    category: row.category,
+    totalQuotes: Number(row.total_quotes) || 0,
+    totalQuantity: Number(row.total_quantity) || 0,
+    totalRevenue: Number(row.total_revenue) || 0,
+    avgUnitPrice: Number(row.avg_unit_price) || 0,
+  }));
 }
 
 /**
- * Get supplier performance
+ * Get supplier performance - Based on supplier_jobs with status 'delivered'
  */
 export async function getSupplierPerformance(startDate?: Date, endDate?: Date) {
   const db = await getDb();
   if (!db) return [];
 
-  const start = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const start = startDate || new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
   const end = endDate || new Date();
 
-  const results = await db.select({
-    supplierId: users.id,
-    supplierName: users.name,
-    supplierCompany: users.companyName,
-    totalJobs: sql<number>`count(DISTINCT ${quoteItems.id})`,
-    totalRevenue: sql<number>`COALESCE(SUM(CAST(${quoteItems.supplierCost} AS DECIMAL) * ${quoteItems.quantity}), 0)`,
-    avgDeliveryDays: sql<number>`COALESCE(AVG(${quoteItems.deliveryDays}), 0)`,
-    completedJobs: sql<number>`count(DISTINCT ${quoteItems.id})`,
-    onTimeDelivery: sql<number>`100`,
-  })
-    .from(users)
-    .leftJoin(quoteItems, eq(quoteItems.supplierId, users.id))
-    .leftJoin(quotes, and(
-      eq(quoteItems.quoteId, quotes.id),
-      sql`${quotes.createdAt} BETWEEN ${start} AND ${end}`
-    ))
-    .where(eq(users.role, 'supplier'))
-    .groupBy(users.id, users.name, users.companyName);
+  const results = await db.execute(sql`
+    SELECT 
+      u.id as supplier_id,
+      u.name as supplier_name,
+      u."companyName" as supplier_company,
+      COUNT(sj.id) as total_jobs,
+      COALESCE(SUM(CAST(sj."pricePerUnit" AS DECIMAL) * sj.quantity), 0) as total_revenue,
+      COALESCE(AVG(sj."promisedDeliveryDays"), 0) as avg_delivery_days,
+      COUNT(CASE WHEN sj.status = 'delivered' THEN 1 END) as completed_jobs
+    FROM users u
+    LEFT JOIN supplier_jobs sj ON sj."supplierId" = u.id 
+      AND sj.status = 'delivered'
+      AND sj."createdAt" BETWEEN ${start} AND ${end}
+    WHERE u.role = 'supplier'
+    GROUP BY u.id, u.name, u."companyName"
+    ORDER BY total_revenue DESC
+  `);
 
-  return results.sort((a, b) => Number(b.totalJobs) - Number(a.totalJobs));
+  return (results.rows as any[]).map(row => ({
+    supplierId: row.supplier_id,
+    supplierName: row.supplier_name,
+    supplierCompany: row.supplier_company,
+    totalJobs: Number(row.total_jobs) || 0,
+    totalRevenue: Number(row.total_revenue) || 0,
+    avgDeliveryDays: Number(row.avg_delivery_days) || 0,
+    completedJobs: Number(row.completed_jobs) || 0,
+    onTimeDelivery: 100,
+  }));
 }
 
 /**
