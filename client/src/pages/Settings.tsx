@@ -11,6 +11,7 @@ import {
   Key,
   ExternalLink,
   ShoppingBag,
+  Database,
 } from "lucide-react";
 import { useAuthContext } from "@/contexts/AuthContext";
 
@@ -24,6 +25,7 @@ import {
   ValidationProfilesSettings,
   PortalsSettings,
   GmailSettings,
+  BackupSettings,
 } from "@/components/settings";
 
 export default function Settings() {
@@ -40,7 +42,7 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="staff" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-8 lg:w-[1000px]">
+        <TabsList className="grid w-full grid-cols-9 lg:w-[1100px]">
           <TabsTrigger value="staff" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             עובדים
@@ -72,6 +74,10 @@ export default function Settings() {
           <TabsTrigger value="pricelists" className="flex items-center gap-2">
             <ShoppingBag className="h-4 w-4" />
             מחירונים
+          </TabsTrigger>
+          <TabsTrigger value="backup" className="flex items-center gap-2">
+            <Database className="h-4 w-4" />
+            גיבוי
           </TabsTrigger>
         </TabsList>
 
@@ -140,6 +146,20 @@ export default function Settings() {
               <CardContent className="py-8 text-center text-gray-500">
                 <Shield className="h-12 w-12 mx-auto mb-4 text-gray-300" />
                 <p>רק מנהל מערכת יכול לגשת להגדרות מחירונים</p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* Backup Tab */}
+        <TabsContent value="backup" className="space-y-6">
+          {isAdmin ? (
+            <BackupSettings />
+          ) : (
+            <Card>
+              <CardContent className="py-8 text-center text-gray-500">
+                <Shield className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                <p>רק מנהל מערכת יכול לגשת להגדרות גיבוי</p>
               </CardContent>
             </Card>
           )}

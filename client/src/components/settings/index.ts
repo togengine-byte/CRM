@@ -7,6 +7,7 @@ export { StaffManagementSettings } from "./StaffManagementSettings";
 export { ValidationProfilesSettings } from "./ValidationProfilesSettings";
 export { PortalsSettings } from "./PortalsSettings";
 export { GmailSettings } from "./GmailSettings";
+export { BackupSettings } from "./BackupSettings";
 
 // Types and Constants
 export * from "./types";

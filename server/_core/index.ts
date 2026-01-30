@@ -6,6 +6,7 @@ import path from "path";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers/index";
+import { startBackupScheduler } from "../db/backup";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 
@@ -276,6 +277,10 @@ async function startServer() {
 
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
+    
+    // Start backup scheduler
+    startBackupScheduler();
+    console.log('[Backup] Automatic backup scheduler started');
   });
 }
 
