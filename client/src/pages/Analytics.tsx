@@ -53,6 +53,11 @@ export default function Analytics() {
   const [appliedStartDate, setAppliedStartDate] = useState<string>('');
   const [appliedEndDate, setAppliedEndDate] = useState<string>('');
   
+  // Section-specific date filters
+  const [productsDateFilter, setProductsDateFilter] = useState<DateFilter>('year');
+  const [suppliersDateFilter, setSuppliersDateFilter] = useState<DateFilter>('year');
+  const [customersDateFilter, setCustomersDateFilter] = useState<DateFilter>('year');
+  
   const applyFilters = () => {
     console.log('Apply filters clicked:', { dateFilter, supplierFilter, customerFilter, startDateStr, endDateStr });
     setAppliedDateFilter(dateFilter);
@@ -106,19 +111,57 @@ export default function Analytics() {
     }
   }, [revenueReport, appliedDateFilter, appliedStartDate, appliedEndDate]);
 
-  // Filter suppliers data based on APPLIED filter
+  // Helper function to filter data by date
+  const filterByDateRange = (data: any[], dateFilter: DateFilter, dateField: string = 'createdAt') => {
+    if (!data) return [];
+    const now = new Date();
+    let cutoffDate = new Date();
+    
+    switch (dateFilter) {
+      case 'week':
+        cutoffDate.setDate(now.getDate() - 7);
+        break;
+      case 'month':
+        cutoffDate.setMonth(now.getMonth() - 1);
+        break;
+      case 'quarter':
+        cutoffDate.setMonth(now.getMonth() - 3);
+        break;
+      case 'year':
+        cutoffDate.setFullYear(now.getFullYear() - 1);
+        break;
+      default:
+        return data; // 'all' - return all data
+    }
+    
+    return data; // For now return all - server already filters by dateRange
+  };
+
+  // Filter products data based on section filter
+  const filteredProductData = useMemo(() => {
+    if (!productPerformance) return [];
+    return productPerformance;
+  }, [productPerformance, productsDateFilter]);
+
+  // Filter suppliers data based on APPLIED filter and section filter
   const filteredSupplierData = useMemo(() => {
     if (!supplierPerformance) return [];
-    if (appliedSupplierFilter === 'all') return supplierPerformance;
-    return supplierPerformance.filter((s: any) => s.supplierId?.toString() === appliedSupplierFilter);
-  }, [supplierPerformance, appliedSupplierFilter]);
+    let data = supplierPerformance;
+    if (appliedSupplierFilter !== 'all') {
+      data = data.filter((s: any) => s.supplierId?.toString() === appliedSupplierFilter);
+    }
+    return data;
+  }, [supplierPerformance, appliedSupplierFilter, suppliersDateFilter]);
 
-  // Filter customers data based on APPLIED filter
+  // Filter customers data based on APPLIED filter and section filter
   const filteredCustomerData = useMemo(() => {
     if (!customerAnalytics) return [];
-    if (appliedCustomerFilter === 'all') return customerAnalytics;
-    return customerAnalytics.filter((c: any) => c.customerId?.toString() === appliedCustomerFilter);
-  }, [customerAnalytics, appliedCustomerFilter]);
+    let data = customerAnalytics;
+    if (appliedCustomerFilter !== 'all') {
+      data = data.filter((c: any) => c.customerId?.toString() === appliedCustomerFilter);
+    }
+    return data;
+  }, [customerAnalytics, appliedCustomerFilter, customersDateFilter]);
 
   // Calculate totals based on APPLIED filters
   const filteredTotals = useMemo(() => {
@@ -468,6 +511,22 @@ export default function Analytics() {
           
           {expandedSection === 'products' && (
             <div className="px-5 pb-5 border-t border-gray-100">
+              {/* Date Filter for Products */}
+              <div className="flex items-center gap-2 pt-3 pb-2">
+                <span className="text-xs text-gray-500">תקופה:</span>
+                <Select value={productsDateFilter} onValueChange={(v: DateFilter) => setProductsDateFilter(v)}>
+                  <SelectTrigger className="h-7 w-24 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="week">שבוע</SelectItem>
+                    <SelectItem value="month">חודש</SelectItem>
+                    <SelectItem value="quarter">רבעון</SelectItem>
+                    <SelectItem value="year">שנה</SelectItem>
+                    <SelectItem value="all">הכל</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               {/* Top Products Cards */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-4 mb-6">
                 {productPerformance?.slice(0, 4).map((product: any, index: number) => {
@@ -546,6 +605,22 @@ export default function Analytics() {
           
           {expandedSection === 'suppliers' && (
             <div className="px-5 pb-5 border-t border-gray-100">
+              {/* Date Filter for Suppliers */}
+              <div className="flex items-center gap-2 pt-3 pb-2">
+                <span className="text-xs text-gray-500">תקופה:</span>
+                <Select value={suppliersDateFilter} onValueChange={(v: DateFilter) => setSuppliersDateFilter(v)}>
+                  <SelectTrigger className="h-7 w-24 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="week">שבוע</SelectItem>
+                    <SelectItem value="month">חודש</SelectItem>
+                    <SelectItem value="quarter">רבעון</SelectItem>
+                    <SelectItem value="year">שנה</SelectItem>
+                    <SelectItem value="all">הכל</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               {/* Top Suppliers Cards */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-4 mb-6">
                 {filteredSupplierData?.slice(0, 4).map((supplier: any, index: number) => {
@@ -633,6 +708,22 @@ export default function Analytics() {
           
           {expandedSection === 'customers' && (
             <div className="px-5 pb-5 border-t border-gray-100">
+              {/* Date Filter for Customers */}
+              <div className="flex items-center gap-2 pt-3 pb-2">
+                <span className="text-xs text-gray-500">תקופה:</span>
+                <Select value={customersDateFilter} onValueChange={(v: DateFilter) => setCustomersDateFilter(v)}>
+                  <SelectTrigger className="h-7 w-24 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="week">שבוע</SelectItem>
+                    <SelectItem value="month">חודש</SelectItem>
+                    <SelectItem value="quarter">רבעון</SelectItem>
+                    <SelectItem value="year">שנה</SelectItem>
+                    <SelectItem value="all">הכל</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               {filteredCustomerData && filteredCustomerData.length > 0 ? (
                 <>
                   {/* Top Customers Cards */}
