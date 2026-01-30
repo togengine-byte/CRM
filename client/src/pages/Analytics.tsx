@@ -449,7 +449,7 @@ export default function Analytics() {
                   }}
                 />
                 <Line 
-                  type="monotone" 
+                  type="linear" 
                   dataKey="revenue" 
                   name="revenue"
                   stroke="#3b82f6" 
@@ -458,7 +458,7 @@ export default function Analytics() {
                   activeDot={{ r: 7, fill: '#3b82f6', strokeWidth: 2, stroke: '#fff' }}
                 />
                 <Line 
-                  type="monotone" 
+                  type="linear" 
                   dataKey="profit" 
                   name="profit"
                   stroke="#10b981" 
