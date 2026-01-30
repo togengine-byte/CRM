@@ -1088,8 +1088,8 @@ function UnifiedPipelineCard({ isLoading: parentLoading }: { isLoading: boolean 
                     <span className="text-[10px] text-slate-400">#{item.id}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    {/* כפתור WhatsApp לספק - רק בשלבים שרלוונטיים לספק (לא בשלב נאסף) */}
-                    {item.type === 'job' && item.supplierPhone && item.jobStatus !== 'picked_up' && (
+                    {/* כפתור WhatsApp לספק - רק בשורות אדומות (באיחור) ולא בשלב נאסף */}
+                    {item.type === 'job' && item.supplierPhone && item.isOverdue && item.jobStatus !== 'picked_up' && (
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
