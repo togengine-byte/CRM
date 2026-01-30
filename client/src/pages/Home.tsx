@@ -796,7 +796,7 @@ function getWhatsAppMessage(jobId: number, productName: string, status: string):
     case 'in_progress':
     case 'in_production':
     case 'accepted':
-      return `${baseMsg} - ${productName}\nהעבודה עדיין לא בוצעה.\nהיה אמור כבר להיאסף.\nמה המצב?`;
+      return `${baseMsg} - ${productName}\nהעבודה עדיין לא בוצעה.\nהיה אמור כבר להיאסף.\nמה קורה עם זה?`;
     case 'ready':
       return `${baseMsg} - ${productName}\nהעבודה מוכנה לאיסוף.\nהשליח שלנו בדרך לאסוף.`;
     case 'picked_up':
@@ -1088,8 +1088,8 @@ function UnifiedPipelineCard({ isLoading: parentLoading }: { isLoading: boolean 
                     <span className="text-[10px] text-slate-400">#{item.id}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    {/* כפתור WhatsApp לעבודות באיחור */}
-                    {item.type === 'job' && item.supplierPhone && (
+                    {/* כפתור WhatsApp לספק - רק בשלבים שרלוונטיים לספק (לא בשלב נאסף) */}
+                    {item.type === 'job' && item.supplierPhone && item.jobStatus !== 'picked_up' && (
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
