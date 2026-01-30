@@ -7,7 +7,7 @@
  * - Daily email backup to admin
  */
 
-import { db } from './connection';
+import { getDb } from './connection';
 import { 
   users, customers, suppliers, products, quotes, quoteItems, 
   jobs, notes, activity, systemSettings, couriers, courierDeliveries,
@@ -34,6 +34,11 @@ function ensureBackupDir() {
  */
 async function getAllData() {
   try {
+    const db = await getDb();
+    if (!db) {
+      throw new Error('Database not available');
+    }
+    
     const data = {
       timestamp: new Date().toISOString(),
       version: '1.0',
