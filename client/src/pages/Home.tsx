@@ -93,6 +93,8 @@ function KPICard({
   trend, 
   trendValue,
   icon: Icon,
+  iconColor = 'text-slate-400',
+  iconBgColor = 'bg-slate-50',
   isLoading 
 }: { 
   title: string; 
@@ -100,13 +102,15 @@ function KPICard({
   trend: 'up' | 'down' | 'neutral';
   trendValue: string;
   icon: any;
+  iconColor?: string;
+  iconBgColor?: string;
   isLoading?: boolean;
 }) {
   return (
-    <Card className="border border-slate-200 shadow-none bg-white">
-      <CardContent className="p-3">
+    <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-200 bg-white">
+      <CardContent className="p-4">
         {isLoading ? (
-          <div className="space-y-2">
+          <div className="space-y-2 animate-pulse">
             <Skeleton className="h-3 w-16" />
             <Skeleton className="h-6 w-20" />
           </div>
@@ -125,8 +129,8 @@ function KPICard({
                 <span>{trendValue}</span>
               </div>
             </div>
-            <div className="h-8 w-8 rounded bg-slate-50 flex items-center justify-center">
-              <Icon className="h-4 w-4 text-slate-400" />
+            <div className={`h-10 w-10 rounded-lg ${iconBgColor} flex items-center justify-center`}>
+              <Icon className={`h-5 w-5 ${iconColor}`} />
             </div>
           </div>
         )}
@@ -145,15 +149,17 @@ function JobsInProductionCard({ isLoading: parentLoading }: { isLoading: boolean
   const inProductionJobs = jobs?.filter((job: any) => ['pending', 'in_progress', 'in_production'].includes(job.status)).slice(0, 5) || [];
 
   return (
-    <Card className="border border-slate-200 shadow-none bg-white">
+    <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-200 bg-white">
       <CardHeader className="pb-2 pt-3 px-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Factory className="h-4 w-4 text-blue-600" />
+            <div className="h-7 w-7 rounded-lg bg-blue-50 flex items-center justify-center">
+              <Factory className="h-4 w-4 text-blue-600" />
+            </div>
             <CardTitle className="text-sm font-medium text-slate-900">בייצור</CardTitle>
           </div>
           {inProductionJobs.length > 0 && (
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-5">
+            <Badge className="text-[10px] px-2 py-0.5 h-5 bg-blue-100 text-blue-700 border-0">
               {inProductionJobs.length}
             </Badge>
           )}
@@ -161,9 +167,9 @@ function JobsInProductionCard({ isLoading: parentLoading }: { isLoading: boolean
       </CardHeader>
       <CardContent className="px-4 pb-3">
         {loading ? (
-          <div className="space-y-2">
+          <div className="space-y-2 animate-pulse">
             {[...Array(3)].map((_, i) => (
-              <Skeleton key={i} className="h-10 w-full" />
+              <Skeleton key={i} className="h-10 w-full rounded-lg" />
             ))}
           </div>
         ) : inProductionJobs.length === 0 ? (
@@ -212,15 +218,17 @@ function ReadyForPickupCard({ isLoading: parentLoading }: { isLoading: boolean }
   const loading = parentLoading || isLoading;
 
   return (
-    <Card className="border border-slate-200 shadow-none bg-white">
+    <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-200 bg-white">
       <CardHeader className="pb-2 pt-3 px-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Truck className="h-4 w-4 text-emerald-600" />
+            <div className="h-7 w-7 rounded-lg bg-emerald-50 flex items-center justify-center">
+              <Truck className="h-4 w-4 text-emerald-600" />
+            </div>
             <CardTitle className="text-sm font-medium text-slate-900">מוכן לאיסוף</CardTitle>
           </div>
           {pickups && pickups.length > 0 && (
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-5">
+            <Badge className="text-[10px] px-2 py-0.5 h-5 bg-emerald-100 text-emerald-700 border-0">
               {pickups.length}
             </Badge>
           )}
@@ -228,9 +236,9 @@ function ReadyForPickupCard({ isLoading: parentLoading }: { isLoading: boolean }
       </CardHeader>
       <CardContent className="px-4 pb-3">
         {loading ? (
-          <div className="space-y-2">
+          <div className="space-y-2 animate-pulse">
             {[...Array(2)].map((_, i) => (
-              <Skeleton key={i} className="h-10 w-full" />
+              <Skeleton key={i} className="h-10 w-full rounded-lg" />
             ))}
           </div>
         ) : !pickups || pickups.length === 0 ? (
@@ -396,15 +404,17 @@ function PendingSignupsCard({
 
   return (
     <>
-      <Card className="border border-slate-200 shadow-none bg-white">
+      <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-200 bg-white">
         <CardHeader className="pb-2 pt-3 px-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Inbox className="h-4 w-4 text-amber-600" />
+              <div className="h-7 w-7 rounded-lg bg-amber-50 flex items-center justify-center">
+                <Inbox className="h-4 w-4 text-amber-600" />
+              </div>
               <CardTitle className="text-sm font-medium text-slate-900">בקשות חדשות</CardTitle>
             </div>
             {signups.length > 0 && (
-              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-5">
+              <Badge className="text-[10px] px-2 py-0.5 h-5 bg-amber-100 text-amber-700 border-0">
                 {signups.length}
               </Badge>
             )}
@@ -412,9 +422,9 @@ function PendingSignupsCard({
         </CardHeader>
         <CardContent className="px-4 pb-3">
           {isLoading ? (
-            <div className="space-y-2">
+            <div className="space-y-2 animate-pulse">
               {[...Array(3)].map((_, i) => (
-                <Skeleton key={i} className="h-10 w-full" />
+                <Skeleton key={i} className="h-10 w-full rounded-lg" />
               ))}
             </div>
           ) : signups.length === 0 ? (
@@ -878,6 +888,8 @@ export default function Home() {
           trend={(kpis?.totalQuotes || 0) > 0 ? "up" : "neutral"}
           trendValue={(kpis?.totalQuotes || 0) > 0 ? `${kpis?.quotesThisMonth || 0} החודש` : "אין נתונים"}
           icon={FileText}
+          iconColor="text-blue-600"
+          iconBgColor="bg-blue-50"
           isLoading={kpisLoading}
         />
         <KPICard 
@@ -886,6 +898,8 @@ export default function Home() {
           trend={(kpis?.activeCustomers || 0) > 0 ? "up" : "neutral"}
           trendValue={(kpis?.pendingApprovals || 0) > 0 ? `${kpis?.pendingApprovals} ממתינים` : "מעודכן"}
           icon={Users}
+          iconColor="text-violet-600"
+          iconBgColor="bg-violet-50"
           isLoading={kpisLoading}
         />
         <KPICard 
@@ -894,6 +908,8 @@ export default function Home() {
           trend={(kpis?.totalRevenue || 0) > 0 ? "up" : "neutral"}
           trendValue={(kpis?.avgDealValue || 0) > 0 ? `ממוצע ${formatCurrency(kpis?.avgDealValue || 0)}` : "אין נתונים"}
           icon={TrendingUp}
+          iconColor="text-emerald-600"
+          iconBgColor="bg-emerald-50"
           isLoading={kpisLoading}
         />
         <KPICard 
@@ -902,6 +918,8 @@ export default function Home() {
           trend={(kpis?.conversionRate || 0) >= 50 ? "up" : (kpis?.conversionRate || 0) > 0 ? "neutral" : "down"}
           trendValue={(kpis?.conversionRate || 0) >= 50 ? "טוב" : (kpis?.conversionRate || 0) > 0 ? "סביר" : "אין נתונים"}
           icon={Activity}
+          iconColor="text-amber-600"
+          iconBgColor="bg-amber-50"
           isLoading={kpisLoading}
         />
       </div>

@@ -188,11 +188,13 @@ export function ActivityFeedCompact({ activities, isLoading }: ActivityFeedProps
 
   return (
     <>
-      <Card className="border border-slate-200 shadow-none bg-white">
+      <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-200 bg-white">
         <CardHeader className="pb-2 pt-3 px-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Activity className="h-4 w-4 text-slate-600" />
+              <div className="h-7 w-7 rounded-lg bg-slate-100 flex items-center justify-center">
+                <Activity className="h-4 w-4 text-slate-600" />
+              </div>
               <CardTitle className="text-sm font-medium text-slate-900">יומן פעילות</CardTitle>
             </div>
             <Button
@@ -208,9 +210,9 @@ export function ActivityFeedCompact({ activities, isLoading }: ActivityFeedProps
         </CardHeader>
         <CardContent className="px-4 pb-3">
           {isLoading ? (
-            <div className="space-y-2">
+            <div className="space-y-2 animate-pulse">
               {[...Array(5)].map((_, i) => (
-                <Skeleton key={i} className="h-10 w-full" />
+                <Skeleton key={i} className="h-10 w-full rounded-lg" />
               ))}
             </div>
           ) : activities.length === 0 ? (
