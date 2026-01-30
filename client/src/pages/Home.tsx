@@ -364,12 +364,187 @@ function KPICard({
   );
 }
 
+// ==================== SALES PROGRESS BAR ====================
+
+const SALES_STAGES = [
+  { key: 'draft', label: 'טיוטה', shortLabel: 'טיוטה' },
+  { key: 'sent', label: 'נשלחה ללקוח', shortLabel: 'נשלחה' },
+  { key: 'approved', label: 'אושרה', shortLabel: 'אושרה' },
+];
+
+function getSalesStageIndex(status: string): number {
+  const statusMap: Record<string, number> = {
+    'draft': 0,
+    'sent': 1,
+    'approved': 2,
+    'in_production': 2,
+    'ready': 2,
+  };
+  return statusMap[status] ?? 0;
+}
+
+function SalesProgressBar({ status, compact = false }: { status: string; compact?: boolean }) {
+  const currentStage = getSalesStageIndex(status);
+  
+  return (
+    <div className="w-full">
+      <div className="flex items-center justify-between mb-1">
+        {SALES_STAGES.map((stage, index) => (
+          <div key={stage.key} className="flex flex-col items-center flex-1">
+            <div className={`h-2 w-2 rounded-full transition-colors ${
+              index <= currentStage 
+                ? index === currentStage ? 'bg-amber-500' : 'bg-emerald-500'
+                : 'bg-slate-200'
+            }`} />
+            {!compact && (
+              <span className={`text-[9px] mt-1 ${
+                index <= currentStage ? 'text-slate-600' : 'text-slate-400'
+              }`}>
+                {stage.shortLabel}
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center">
+        {SALES_STAGES.slice(0, -1).map((_, index) => (
+          <div key={index} className={`flex-1 h-0.5 ${
+            index < currentStage ? 'bg-emerald-500' : 'bg-slate-200'
+          }`} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ==================== SALES PIPELINE CARD ====================
+
+function SalesPipelineCard({ isLoading: parentLoading }: { isLoading: boolean }) {
+  const { data: quotes, isLoading } = trpc.quotes.list.useQuery();
+  const [showAllQuotes, setShowAllQuotes] = React.useState(false);
+  const loading = parentLoading || isLoading;
+  
+  // Active quotes (not approved/rejected/superseded)
+  const activeQuotes = quotes?.filter((quote: any) => 
+    ['draft', 'sent'].includes(quote.status)
+  ) || [];
+  
+  const displayQuotes = activeQuotes.slice(0, 5);
+
+  return (
+    <>
+      <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-200 bg-white">
+        <CardHeader className="pb-2 pt-3 px-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="h-7 w-7 rounded-lg bg-amber-50 flex items-center justify-center">
+                <FileText className="h-4 w-4 text-amber-600" />
+              </div>
+              <CardTitle className="text-sm font-medium text-slate-900">מכירות בתהליך</CardTitle>
+            </div>
+            {activeQuotes.length > 0 && (
+              <Badge className="text-[10px] px-2 py-0.5 h-5 bg-amber-100 text-amber-700 border-0">
+                {activeQuotes.length}
+              </Badge>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="px-4 pb-3">
+          {loading ? (
+            <div className="space-y-2 animate-pulse">
+              {[...Array(3)].map((_, i) => (
+                <Skeleton key={i} className="h-14 w-full rounded-lg" />
+              ))}
+            </div>
+          ) : displayQuotes.length === 0 ? (
+            <div className="flex items-center justify-center py-4 text-center">
+              <p className="text-xs text-slate-400">אין הצעות ממתינות</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {displayQuotes.map((quote: any) => (
+                <div 
+                  key={quote.id}
+                  className="p-3 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer"
+                  onClick={() => setShowAllQuotes(true)}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-xs font-medium text-slate-700 truncate">
+                        {quote.customerName || 'לקוח לא מזוהה'}
+                      </span>
+                    </div>
+                    <span className="text-xs text-amber-600 font-medium shrink-0">
+                      {formatCurrency(quote.totalPrice || 0)}
+                    </span>
+                  </div>
+                  <SalesProgressBar status={quote.status} compact />
+                </div>
+              ))}
+              {activeQuotes.length > 5 && (
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  className="w-full text-xs text-slate-500 h-7 mt-1"
+                  onClick={() => setShowAllQuotes(true)}
+                >
+                  הצג הכל ({activeQuotes.length})
+                </Button>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* All Quotes Modal */}
+      <Dialog open={showAllQuotes} onOpenChange={setShowAllQuotes}>
+        <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-hidden" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+              <FileText className="h-5 w-5 text-amber-600" />
+              כל המכירות בתהליך
+            </DialogTitle>
+            <DialogDescription className="text-slate-500">
+              {activeQuotes.length} הצעות ממתינות לאישור
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="overflow-y-auto max-h-[60vh] space-y-3 pr-1">
+            {activeQuotes.map((quote: any) => (
+              <div 
+                key={quote.id}
+                className="p-4 rounded-lg border border-slate-200 bg-white hover:border-slate-300 transition-colors"
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <p className="text-sm font-medium text-slate-800">
+                      {quote.customerName || 'לקוח לא מזוהה'}
+                    </p>
+                    <p className="text-xs text-slate-500">הצעה #{quote.id}</p>
+                  </div>
+                  <div className="text-left">
+                    <p className="text-sm font-medium text-amber-600">{formatCurrency(quote.totalPrice || 0)}</p>
+                    <p className="text-xs text-slate-400">
+                      {quote.status === 'draft' ? 'טיוטה' : 'נשלחה'}
+                    </p>
+                  </div>
+                </div>
+                <SalesProgressBar status={quote.status} />
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 // ==================== JOB PROGRESS BAR ====================
 
 const JOB_STAGES = [
-  { key: 'pending', label: 'ממתין לאישור', shortLabel: 'ממתין' },
-  { key: 'accepted', label: 'בייצור', shortLabel: 'בייצור' },
-  { key: 'ready', label: 'מוכן לאיסוף', shortLabel: 'מוכן' },
+  { key: 'pending', label: 'ממתין לאישור ספק', shortLabel: 'ממתין לספק' },
+  { key: 'in_production', label: 'בייצור', shortLabel: 'בייצור' },
+  { key: 'ready', label: 'ממתין לאיסוף', shortLabel: 'ממתין לאיסוף' },
   { key: 'picked_up', label: 'נאסף', shortLabel: 'נאסף' },
   { key: 'delivered', label: 'נמסר', shortLabel: 'נמסר' },
 ];
@@ -1256,9 +1431,14 @@ export default function Home() {
         />
       </div>
 
-      {/* Main Content Grid - 4 columns for compact view */}
-      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-        <JobsInProductionCard isLoading={kpisLoading} />
+      {/* Sales Pipeline - Full Width */}
+      <SalesPipelineCard isLoading={kpisLoading} />
+
+      {/* Jobs Pipeline - Full Width */}
+      <JobsInProductionCard isLoading={kpisLoading} />
+
+      {/* Secondary Content Grid - 3 columns */}
+      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
         <ReadyForPickupCard isLoading={kpisLoading} />
         <PendingSignupsCard 
           signups={signups || []} 
