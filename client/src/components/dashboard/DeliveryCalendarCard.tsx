@@ -282,7 +282,7 @@ export function DeliveryCalendarCard({ isLoading: parentLoading }: { isLoading: 
                           }`}>
                             {item.type === 'job' ? 'עבודה' : 'הצעה'}
                           </span>
-                          <span className="text-slate-400">#{item.id}</span>
+                          <span className="font-medium text-slate-900">{item.id}</span>
                           <span className="font-medium text-slate-700 truncate flex-1">{item.name}</span>
                           {item.customerName && item.type === 'job' && (
                             <span className="text-slate-400 truncate max-w-[80px]">{item.customerName}</span>
