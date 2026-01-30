@@ -29,6 +29,8 @@ export interface UrgentAlert {
   supplierName?: string;
   createdAt: Date;
   hoursOverdue?: number;
+  currentStatus?: string;
+  issue?: string;
 }
 
 /**
@@ -66,19 +68,35 @@ export async function getUrgentAlerts(): Promise<UrgentAlert[]> {
     ORDER BY "hoursOverdue" DESC
   `);
 
+  // Helper function to translate status to Hebrew
+  const getStatusLabel = (status: string): string => {
+    const statusMap: Record<string, string> = {
+      'pending': 'ממתין לאישור ספק',
+      'in_progress': 'בייצור',
+      'ready': 'מוכן לאיסוף',
+      'picked_up': 'נאסף',
+      'in_transit': 'בדרך ללקוח',
+      'delivered': 'נמסר',
+      'cancelled': 'בוטל'
+    };
+    return statusMap[status] || status;
+  };
+
   for (const row of overdueJobsResult.rows as any[]) {
     alerts.push({
       id: `overdue_${row.id}`,
       type: 'overdue_job',
       severity: 'high',
       title: 'עבודה באיחור',
-      description: `${row.productName || 'עבודה'} - עברה את מועד האספקה`,
+      description: `${row.productName || 'עבודה'}`,
       itemId: row.id,
       itemName: row.productName || 'עבודה',
       customerName: row.customerName,
       supplierName: row.supplierName,
       createdAt: new Date(row.createdAt),
-      hoursOverdue: Math.round(Number(row.hoursOverdue) || 0)
+      hoursOverdue: Math.round(Number(row.hoursOverdue) || 0),
+      currentStatus: getStatusLabel(row.status),
+      issue: 'עדיין לא נמסר'
     });
   }
 

@@ -106,6 +106,8 @@ interface UrgentAlert {
   supplierName?: string;
   createdAt: Date;
   hoursOverdue?: number;
+  currentStatus?: string;
+  issue?: string;
 }
 
 function UrgentAlertsBar() {
@@ -264,12 +266,23 @@ function UrgentAlertsBar() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm text-slate-800 truncate">
-                    {alert.title}
+                    <span className="font-medium">עבודה #{alert.itemId}</span>
+                    <span className="mx-1">-</span>
+                    {alert.description}
                     {alert.severity === 'high' && (
                       <span className="mr-2 text-[10px] text-red-600 font-medium">דחוף</span>
                     )}
                   </p>
-                  <p className="text-xs text-slate-500 truncate">{alert.description}</p>
+                  <p className="text-xs text-slate-500 truncate">
+                    {alert.currentStatus && (
+                      <span className="text-blue-600 font-medium">{alert.currentStatus}</span>
+                    )}
+                    {alert.currentStatus && alert.issue && <span className="mx-1">•</span>}
+                    {alert.issue && (
+                      <span className="text-red-600">{alert.issue}</span>
+                    )}
+                    {!alert.currentStatus && !alert.issue && alert.title}
+                  </p>
                 </div>
               </div>
               
