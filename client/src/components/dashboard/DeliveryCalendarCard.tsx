@@ -186,16 +186,39 @@ export function DeliveryCalendarCard({ isLoading: parentLoading }: { isLoading: 
                   {selectedDate.toLocaleDateString('he-IL', { weekday: 'long', day: 'numeric', month: 'short' })}
                 </p>
                 <div className="max-h-[80px] overflow-y-auto space-y-1">
-                  {selectedDateJobs.map((job: any) => (
-                    <div 
-                      key={job.id}
-                      className={`p-1.5 rounded text-[10px] ${
-                        job.isOverdue ? 'bg-red-50 text-red-700' : 'bg-slate-50 text-slate-600'
-                      }`}
-                    >
-                      <span className="font-medium">עבודה {job.id}</span> - {job.productName || 'ללא שם'}
-                    </div>
-                  ))}
+                  {selectedDateJobs.map((job: any) => {
+                    // קביעת הפעולה הנדרשת לפי סטטוס
+                    let action = '';
+                    if (job.status === 'ready') {
+                      action = 'לאסוף מהספק';
+                    } else if (job.status === 'picked_up') {
+                      action = 'למסור ללקוח';
+                    } else if (job.status === 'in_progress') {
+                      action = 'בייצור אצל הספק';
+                    } else if (job.status === 'pending') {
+                      action = 'ממתין לספק';
+                    } else {
+                      action = 'לאסוף ולמסור';
+                    }
+                    
+                    return (
+                      <div 
+                        key={job.id}
+                        className={`p-1.5 rounded text-[10px] ${
+                          job.isOverdue ? 'bg-red-50 text-red-700' : 'bg-slate-50 text-slate-600'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span>
+                            <span className="font-medium">עבודה {job.id}</span> - {job.productName || 'ללא שם'}
+                          </span>
+                        </div>
+                        <div className={`font-bold mt-0.5 ${job.isOverdue ? 'text-red-600' : 'text-indigo-600'}`}>
+                          ▶ {action}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
