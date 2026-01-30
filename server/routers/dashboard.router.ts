@@ -13,6 +13,7 @@ import {
   getPendingApprovals,
   getActiveJobs,
   getJobsReadyForPickup,
+  getUrgentAlerts,
 } from "../db";
 
 export const dashboardRouter = router({
@@ -49,5 +50,10 @@ export const dashboardRouter = router({
   // Jobs ready for courier pickup
   readyForPickup: protectedProcedure.query(async () => {
     return await getJobsReadyForPickup();
+  }),
+
+  // Urgent alerts for dashboard
+  urgentAlerts: protectedProcedure.query(async () => {
+    return await getUrgentAlerts();
   }),
 });

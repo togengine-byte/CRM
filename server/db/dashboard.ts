@@ -15,10 +15,154 @@ import {
   baseProducts
 } from "../../drizzle/schema";
 
+// ==================== URGENT ALERTS ====================
+
+export interface UrgentAlert {
+  id: string;
+  type: 'overdue_job' | 'pending_quote' | 'supplier_not_accepted';
+  severity: 'high' | 'medium';
+  title: string;
+  description: string;
+  itemId: number;
+  itemName: string;
+  customerName?: string;
+  supplierName?: string;
+  createdAt: Date;
+  hoursOverdue?: number;
+}
+
+/**
+ * Get urgent alerts for dashboard
+ * 1. Overdue jobs - passed promised delivery date (high severity - red)
+ * 2. Pending quotes - waiting for customer approval > 3 hours (medium severity - orange)
+ * 3. Supplier not accepted - jobs sent to supplier not accepted within 24 hours (medium severity - orange)
+ */
+export async function getUrgentAlerts(): Promise<UrgentAlert[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  const alerts: UrgentAlert[] = [];
+  const now = new Date();
+
+  // 1. Overdue jobs - jobs that passed their promised delivery date
+  const overdueJobsResult = await db.execute(sql`
+    SELECT 
+      sj.id,
+      sj."createdAt",
+      sj."promisedDeliveryDays",
+      sj.status,
+      bp.name as "productName",
+      customer.name as "customerName",
+      supplier.name as "supplierName",
+      EXTRACT(EPOCH FROM (NOW() - (sj."createdAt" + (sj."promisedDeliveryDays" || ' days')::interval))) / 3600 as "hoursOverdue"
+    FROM supplier_jobs sj
+    LEFT JOIN users customer ON sj."customerId" = customer.id
+    LEFT JOIN users supplier ON sj."supplierId" = supplier.id
+    LEFT JOIN size_quantities sq ON sj."sizeQuantityId" = sq.id
+    LEFT JOIN product_sizes ps ON sq.size_id = ps.id
+    LEFT JOIN base_products bp ON ps.product_id = bp.id
+    WHERE sj.status NOT IN ('delivered', 'cancelled')
+      AND sj."createdAt" + (sj."promisedDeliveryDays" || ' days')::interval < NOW()
+    ORDER BY "hoursOverdue" DESC
+  `);
+
+  for (const row of overdueJobsResult.rows as any[]) {
+    alerts.push({
+      id: `overdue_${row.id}`,
+      type: 'overdue_job',
+      severity: 'high',
+      title: 'עבודה באיחור',
+      description: `${row.productName || 'עבודה'} - עברה את מועד האספקה`,
+      itemId: row.id,
+      itemName: row.productName || 'עבודה',
+      customerName: row.customerName,
+      supplierName: row.supplierName,
+      createdAt: new Date(row.createdAt),
+      hoursOverdue: Math.round(Number(row.hoursOverdue) || 0)
+    });
+  }
+
+  // 2. Pending quotes - waiting for customer approval > 3 hours
+  const pendingQuotesResult = await db.execute(sql`
+    SELECT 
+      q.id,
+      q."createdAt",
+      q."finalValue",
+      customer.name as "customerName",
+      EXTRACT(EPOCH FROM (NOW() - q."createdAt")) / 3600 as "hoursWaiting"
+    FROM quotes q
+    LEFT JOIN users customer ON q."customerId" = customer.id
+    WHERE q.status = 'sent'
+      AND q."createdAt" < NOW() - INTERVAL '3 hours'
+    ORDER BY q."createdAt" ASC
+  `);
+
+  for (const row of pendingQuotesResult.rows as any[]) {
+    alerts.push({
+      id: `pending_quote_${row.id}`,
+      type: 'pending_quote',
+      severity: 'medium',
+      title: 'הצעה ממתינה לאישור',
+      description: `הצעה #${row.id} ל${row.customerName || 'לקוח'} - ממתינה ${Math.round(Number(row.hoursWaiting))} שעות`,
+      itemId: row.id,
+      itemName: `הצעה #${row.id}`,
+      customerName: row.customerName,
+      createdAt: new Date(row.createdAt),
+      hoursOverdue: Math.round(Number(row.hoursWaiting) || 0)
+    });
+  }
+
+  // 3. Supplier not accepted - jobs sent to supplier not accepted within 24 hours
+  const notAcceptedResult = await db.execute(sql`
+    SELECT 
+      sj.id,
+      sj."createdAt",
+      bp.name as "productName",
+      customer.name as "customerName",
+      supplier.name as "supplierName",
+      EXTRACT(EPOCH FROM (NOW() - sj."createdAt")) / 3600 as "hoursWaiting"
+    FROM supplier_jobs sj
+    LEFT JOIN users customer ON sj."customerId" = customer.id
+    LEFT JOIN users supplier ON sj."supplierId" = supplier.id
+    LEFT JOIN size_quantities sq ON sj."sizeQuantityId" = sq.id
+    LEFT JOIN product_sizes ps ON sq.size_id = ps.id
+    LEFT JOIN base_products bp ON ps.product_id = bp.id
+    WHERE sj.status = 'pending'
+      AND sj."createdAt" < NOW() - INTERVAL '24 hours'
+    ORDER BY sj."createdAt" ASC
+  `);
+
+  for (const row of notAcceptedResult.rows as any[]) {
+    alerts.push({
+      id: `not_accepted_${row.id}`,
+      type: 'supplier_not_accepted',
+      severity: 'medium',
+      title: 'ספק לא אישר עבודה',
+      description: `${row.productName || 'עבודה'} - ${row.supplierName || 'ספק'} לא אישר כבר ${Math.round(Number(row.hoursWaiting))} שעות`,
+      itemId: row.id,
+      itemName: row.productName || 'עבודה',
+      customerName: row.customerName,
+      supplierName: row.supplierName,
+      createdAt: new Date(row.createdAt),
+      hoursOverdue: Math.round(Number(row.hoursWaiting) || 0)
+    });
+  }
+
+  // Sort by severity (high first) then by hours overdue
+  alerts.sort((a, b) => {
+    if (a.severity !== b.severity) {
+      return a.severity === 'high' ? -1 : 1;
+    }
+    return (b.hoursOverdue || 0) - (a.hoursOverdue || 0);
+  });
+
+  return alerts;
+}
+
 // ==================== DASHBOARD KPIs ====================
 
 /**
- * Get dashboard KPIs
+ * Get dashboard KPIs - Based on supplier_jobs with status 'delivered'
  */
 export async function getDashboardKPIs() {
   const db = await getDb();
@@ -35,54 +179,65 @@ export async function getDashboardKPIs() {
     };
   }
 
+  // Total quotes count
   const [quotesCount] = await db.select({ count: count() }).from(quotes);
   
-  const [customersCount] = await db.select({ count: count() })
-    .from(users)
-    .where(and(eq(users.role, "customer"), eq(users.status, "active")));
+  // Active customers - customers with at least one delivered job
+  const activeCustomersResult = await db.execute(sql`
+    SELECT COUNT(DISTINCT "customerId") as count
+    FROM supplier_jobs
+    WHERE status = 'delivered' AND "customerId" IS NOT NULL
+  `);
+  const activeCustomers = Number((activeCustomersResult.rows[0] as any)?.count || 0);
 
+  // Pending approvals
   const [pendingCount] = await db.select({ count: count() })
     .from(users)
     .where(eq(users.status, "pending_approval"));
 
-  const [approvedQuotes] = await db.select({ count: count() })
-    .from(quotes)
-    .where(eq(quotes.status, "approved"));
-
-  const [revenueResult] = await db.select({ 
-    total: sql<string>`COALESCE(SUM(${quotes.finalValue}), 0)` 
-  })
-    .from(quotes)
-    .where(eq(quotes.status, "approved"));
+  // Total revenue from delivered jobs
+  const revenueResult = await db.execute(sql`
+    SELECT 
+      COALESCE(SUM(CAST("pricePerUnit" AS DECIMAL) * quantity), 0) as total_revenue,
+      COUNT(*) as total_jobs
+    FROM supplier_jobs
+    WHERE status = 'delivered'
+  `);
+  const totalRevenue = Number((revenueResult.rows[0] as any)?.total_revenue || 0);
+  const totalDeliveredJobs = Number((revenueResult.rows[0] as any)?.total_jobs || 0);
 
   // This month's stats
   const startOfMonth = new Date();
   startOfMonth.setDate(1);
   startOfMonth.setHours(0, 0, 0, 0);
 
-  const [monthlyStats] = await db.select({
-    count: count(),
-    revenue: sql<string>`COALESCE(SUM(${quotes.finalValue}), 0)`
-  })
-    .from(quotes)
-    .where(and(
-      eq(quotes.status, "approved"),
-      sql`${quotes.createdAt} >= ${startOfMonth}`
-    ));
+  const monthlyResult = await db.execute(sql`
+    SELECT 
+      COALESCE(SUM(CAST("pricePerUnit" AS DECIMAL) * quantity), 0) as revenue,
+      COUNT(*) as count
+    FROM supplier_jobs
+    WHERE status = 'delivered'
+      AND "createdAt" >= ${startOfMonth}
+  `);
+  const revenueThisMonth = Number((monthlyResult.rows[0] as any)?.revenue || 0);
+  const jobsThisMonth = Number((monthlyResult.rows[0] as any)?.count || 0);
 
-  const totalQuotesNum = Number(quotesCount?.count || 0);
-  const approvedQuotesNum = Number(approvedQuotes?.count || 0);
-  const totalRevenue = parseFloat(revenueResult?.total || '0');
-  
+  // Conversion rate: delivered jobs / total jobs (excluding cancelled)
+  const totalJobsResult = await db.execute(sql`
+    SELECT COUNT(*) as count FROM supplier_jobs WHERE status != 'cancelled'
+  `);
+  const totalJobs = Number((totalJobsResult.rows[0] as any)?.count || 0);
+  const conversionRate = totalJobs > 0 ? Math.round((totalDeliveredJobs / totalJobs) * 100) : 0;
+
   return {
-    totalQuotes: totalQuotesNum,
-    activeCustomers: Number(customersCount?.count || 0),
+    totalQuotes: Number(quotesCount?.count || 0),
+    activeCustomers: activeCustomers,
     totalRevenue: totalRevenue,
-    conversionRate: totalQuotesNum > 0 ? Math.round((approvedQuotesNum / totalQuotesNum) * 100) : 0,
+    conversionRate: conversionRate,
     pendingApprovals: Number(pendingCount?.count || 0),
-    quotesThisMonth: Number(monthlyStats?.count || 0),
-    revenueThisMonth: parseFloat(monthlyStats?.revenue || '0'),
-    avgDealValue: approvedQuotesNum > 0 ? Math.round(totalRevenue / approvedQuotesNum) : 0
+    quotesThisMonth: jobsThisMonth,
+    revenueThisMonth: revenueThisMonth,
+    avgDealValue: totalDeliveredJobs > 0 ? Math.round(totalRevenue / totalDeliveredJobs) : 0
   };
 }
 

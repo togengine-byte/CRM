@@ -43,7 +43,12 @@ import {
   XCircle,
   Eye,
   AlertTriangle,
-  Download
+  Download,
+  Bell,
+  X,
+  ChevronDown,
+  ChevronUp,
+  Volume2
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -83,6 +88,203 @@ function formatFullDate(dateString: string): string {
     hour: '2-digit',
     minute: '2-digit',
   }).format(date);
+}
+
+// ==================== URGENT ALERTS BAR ====================
+
+interface UrgentAlert {
+  id: string;
+  type: 'overdue_job' | 'pending_quote' | 'supplier_not_accepted';
+  severity: 'high' | 'medium';
+  title: string;
+  description: string;
+  itemId: number;
+  itemName: string;
+  customerName?: string;
+  supplierName?: string;
+  createdAt: Date;
+  hoursOverdue?: number;
+}
+
+function UrgentAlertsBar() {
+  const [, navigate] = useLocation();
+  const [isExpanded, setIsExpanded] = React.useState(false);
+  const [dismissedAlerts, setDismissedAlerts] = React.useState<Set<string>>(() => {
+    // Load dismissed alerts from localStorage
+    const saved = localStorage.getItem('dismissedAlerts');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        // Filter out expired dismissals (older than 24 hours)
+        const now = Date.now();
+        const valid = Object.entries(parsed)
+          .filter(([_, timestamp]) => now - (timestamp as number) < 24 * 60 * 60 * 1000)
+          .map(([id]) => id);
+        return new Set(valid);
+      } catch {
+        return new Set();
+      }
+    }
+    return new Set();
+  });
+  const [hasPlayedSound, setHasPlayedSound] = React.useState(false);
+
+  const { data: alerts, isLoading } = trpc.dashboard.urgentAlerts.useQuery(undefined, {
+    refetchInterval: 60000, // Refresh every minute
+  });
+
+  // Filter out dismissed alerts
+  const visibleAlerts = React.useMemo(() => {
+    if (!alerts) return [];
+    return alerts.filter(alert => !dismissedAlerts.has(alert.id));
+  }, [alerts, dismissedAlerts]);
+
+  // Play sound when new alerts appear
+  React.useEffect(() => {
+    if (visibleAlerts.length > 0 && !hasPlayedSound) {
+      // Play a subtle notification sound
+      const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleQAqj9PQpXQAGILO0KpxABd/zM+rcQAXf8zPq3EAF3/Mz6txABd/zM+rcQAXf8zPq3E=');
+      audio.volume = 0.3;
+      audio.play().catch(() => {}); // Ignore errors if autoplay is blocked
+      setHasPlayedSound(true);
+    }
+    if (visibleAlerts.length === 0) {
+      setHasPlayedSound(false);
+    }
+  }, [visibleAlerts.length, hasPlayedSound]);
+
+  const handleDismiss = (alertId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newDismissed = new Set(dismissedAlerts);
+    newDismissed.add(alertId);
+    setDismissedAlerts(newDismissed);
+    
+    // Save to localStorage with timestamp
+    const saved = localStorage.getItem('dismissedAlerts');
+    const parsed = saved ? JSON.parse(saved) : {};
+    parsed[alertId] = Date.now();
+    localStorage.setItem('dismissedAlerts', JSON.stringify(parsed));
+    
+    toast.success('ההתראה הוסתרה ל-24 שעות');
+  };
+
+  const handleAlertClick = (alert: UrgentAlert) => {
+    if (alert.type === 'overdue_job' || alert.type === 'supplier_not_accepted') {
+      navigate('/jobs');
+    } else if (alert.type === 'pending_quote') {
+      navigate('/quotes');
+    }
+  };
+
+  const getAlertIcon = (type: string) => {
+    switch (type) {
+      case 'overdue_job':
+        return <Clock className="h-4 w-4" />;
+      case 'pending_quote':
+        return <FileText className="h-4 w-4" />;
+      case 'supplier_not_accepted':
+        return <Factory className="h-4 w-4" />;
+      default:
+        return <AlertTriangle className="h-4 w-4" />;
+    }
+  };
+
+  // Don't render if no alerts or loading
+  if (isLoading || visibleAlerts.length === 0) {
+    return null;
+  }
+
+  const highSeverityCount = visibleAlerts.filter(a => a.severity === 'high').length;
+  const hasHighSeverity = highSeverityCount > 0;
+
+  return (
+    <div className={`rounded-lg border transition-all duration-200 ${
+      hasHighSeverity 
+        ? 'bg-red-50 border-red-200' 
+        : 'bg-amber-50 border-amber-200'
+    }`}>
+      {/* Header - Always visible */}
+      <div 
+        className="flex items-center justify-between p-3 cursor-pointer"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <div className="flex items-center gap-3">
+          <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${
+            hasHighSeverity ? 'bg-red-100' : 'bg-amber-100'
+          }`}>
+            <Bell className={`h-4 w-4 ${hasHighSeverity ? 'text-red-600' : 'text-amber-600'}`} />
+          </div>
+          <div>
+            <p className={`text-sm font-medium ${hasHighSeverity ? 'text-red-800' : 'text-amber-800'}`}>
+              {visibleAlerts.length} התראות דורשות טיפול
+            </p>
+            <p className={`text-xs ${hasHighSeverity ? 'text-red-600' : 'text-amber-600'}`}>
+              {highSeverityCount > 0 && `${highSeverityCount} דחופות`}
+              {highSeverityCount > 0 && visibleAlerts.length - highSeverityCount > 0 && ' • '}
+              {visibleAlerts.length - highSeverityCount > 0 && `${visibleAlerts.length - highSeverityCount} בינוניות`}
+            </p>
+          </div>
+        </div>
+        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+          {isExpanded ? (
+            <ChevronUp className={`h-4 w-4 ${hasHighSeverity ? 'text-red-600' : 'text-amber-600'}`} />
+          ) : (
+            <ChevronDown className={`h-4 w-4 ${hasHighSeverity ? 'text-red-600' : 'text-amber-600'}`} />
+          )}
+        </Button>
+      </div>
+
+      {/* Expanded Content */}
+      {isExpanded && (
+        <div className="px-3 pb-3 space-y-2">
+          {visibleAlerts.map((alert) => (
+            <div
+              key={alert.id}
+              className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors ${
+                alert.severity === 'high'
+                  ? 'bg-red-100 hover:bg-red-150 border border-red-200'
+                  : 'bg-amber-100 hover:bg-amber-150 border border-amber-200'
+              }`}
+              onClick={() => handleAlertClick(alert)}
+            >
+              <div className="flex items-center gap-3">
+                <div className={`h-7 w-7 rounded-full flex items-center justify-center ${
+                  alert.severity === 'high' ? 'bg-red-200' : 'bg-amber-200'
+                }`}>
+                  {getAlertIcon(alert.type)}
+                </div>
+                <div>
+                  <p className={`text-sm font-medium ${
+                    alert.severity === 'high' ? 'text-red-800' : 'text-amber-800'
+                  }`}>
+                    {alert.title}
+                  </p>
+                  <p className={`text-xs ${
+                    alert.severity === 'high' ? 'text-red-600' : 'text-amber-600'
+                  }`}>
+                    {alert.description}
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className={`h-7 px-2 text-xs ${
+                  alert.severity === 'high' 
+                    ? 'text-red-600 hover:text-red-700 hover:bg-red-200' 
+                    : 'text-amber-600 hover:text-amber-700 hover:bg-amber-200'
+                }`}
+                onClick={(e) => handleDismiss(alert.id, e)}
+              >
+                <X className="h-3 w-3 ml-1" />
+                הסתר 24 שעות
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ==================== KPI CARD ====================
@@ -879,6 +1081,9 @@ export default function Home() {
           {new Date().toLocaleDateString('he-IL', { weekday: 'long', day: 'numeric', month: 'long' })}
         </p>
       </div>
+
+      {/* Urgent Alerts Bar - Only shows when there are alerts */}
+      <UrgentAlertsBar />
 
       {/* KPIs Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
