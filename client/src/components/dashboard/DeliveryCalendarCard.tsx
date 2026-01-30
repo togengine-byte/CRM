@@ -36,9 +36,12 @@ export function DeliveryCalendarCard({ isLoading: parentLoading }: { isLoading: 
         .forEach((job: any) => {
           if (job.createdAt && job.promisedDeliveryDays) {
             const createdDate = new Date(job.createdAt);
-            const deliveryDate = new Date(createdDate.getTime() + job.promisedDeliveryDays * 24 * 60 * 60 * 1000);
-            const dateKey = deliveryDate.toISOString().split('T')[0];
-            const isOverdue = today > deliveryDate;
+            const originalDeliveryDate = new Date(createdDate.getTime() + job.promisedDeliveryDays * 24 * 60 * 60 * 1000);
+            const isOverdue = today > originalDeliveryDate;
+            
+            // אם המשימה באיחור - מציג אותה ביום הנוכחי (לא נאבד משימות)
+            const displayDate = isOverdue ? today : originalDeliveryDate;
+            const dateKey = displayDate.toISOString().split('T')[0];
             
             // קביעת הפעולה הנדרשת לפי סטטוס
             let action = '';
@@ -65,7 +68,7 @@ export function DeliveryCalendarCard({ isLoading: parentLoading }: { isLoading: 
               status: job.status,
               action,
               isOverdue,
-              date: deliveryDate
+              date: displayDate
             });
           }
         });
