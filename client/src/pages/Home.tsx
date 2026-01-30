@@ -597,7 +597,7 @@ function SalesPipelineCard({ isLoading: parentLoading }: { isLoading: boolean })
             <p className="text-xs text-slate-400">אין הצעות ממתינות</p>
           </div>
         ) : (
-          <div className={`space-y-2 transition-all duration-300 ${isExpanded ? 'max-h-[600px]' : 'max-h-[400px]'} overflow-y-auto`}>
+          <div className={`space-y-2 transition-all duration-300 ${isExpanded ? 'max-h-[600px] overflow-y-auto' : ''}`}>
             {displayQuotes.map((quote: any) => (
               <div 
                 key={quote.id}
@@ -881,7 +881,7 @@ function JobsInProductionCard({ isLoading: parentLoading }: { isLoading: boolean
             <p className="text-xs text-slate-400">אין עבודות פעילות</p>
           </div>
         ) : (
-          <div className={`space-y-2 transition-all duration-300 ${isExpanded ? 'max-h-[600px]' : 'max-h-[400px]'} overflow-y-auto`}>
+          <div className={`space-y-2 transition-all duration-300 ${isExpanded ? 'max-h-[600px] overflow-y-auto' : ''}`}>
             {displayJobs.map((job: any) => (
               <div 
                 key={job.id}
@@ -1067,7 +1067,7 @@ function UnifiedPipelineCard({ isLoading: parentLoading }: { isLoading: boolean 
             <p className="text-xs text-slate-400">אין פריטים פעילים</p>
           </div>
         ) : (
-          <div className={`space-y-2 transition-all duration-300 ${isExpanded ? 'max-h-[600px]' : 'max-h-[400px]'} overflow-y-auto`}>
+          <div className={`space-y-2 transition-all duration-300 ${isExpanded ? 'max-h-[600px] overflow-y-auto' : ''}`}>
             {displayItems.map((item) => (
               <div 
                 key={`${item.type}-${item.id}`}
