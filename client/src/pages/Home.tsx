@@ -1086,6 +1086,9 @@ function UnifiedPipelineCard({ isLoading: parentLoading }: { isLoading: boolean 
                       {item.type === 'job' ? item.productName : item.customerName}
                     </span>
                     <span className="text-[10px] text-slate-400">#{item.id}</span>
+                    {item.type === 'job' && (
+                      <span className="text-[10px] text-slate-500">| {item.customerName}</span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     {/* כפתור WhatsApp לספק - רק בשורות אדומות (באיחור) ולא בשלב נאסף */}
