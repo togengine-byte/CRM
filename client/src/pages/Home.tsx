@@ -1085,7 +1085,9 @@ function UnifiedPipelineCard({ isLoading: parentLoading }: { isLoading: boolean 
                     <span className="text-xs font-medium text-slate-700 truncate">
                       {item.type === 'job' ? item.productName : item.customerName}
                     </span>
-                    <span className="text-[10px] text-slate-400">#{item.id}</span>
+                    <span className="text-[10px] text-slate-400">
+                      {item.type === 'job' ? `עבודה מס' ${item.id}` : `#${item.id}`}
+                    </span>
                     {item.type === 'job' && (
                       <span className="text-[10px] text-slate-500">| {item.customerName}</span>
                     )}
