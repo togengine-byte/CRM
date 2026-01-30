@@ -31,12 +31,12 @@ import {
   LineChart,
   Line,
   CartesianGrid,
-  Legend,
 } from "recharts";
 
 type DateFilter = 'week' | 'month' | 'quarter' | 'year' | 'all';
 
 export default function Analytics() {
+  // Main filters (affect entire page)
   const [dateFilter, setDateFilter] = useState<DateFilter>('year');
   const [supplierFilter, setSupplierFilter] = useState<string>('all');
   const [customerFilter, setCustomerFilter] = useState<string>('all');
@@ -53,11 +53,7 @@ export default function Analytics() {
   const [appliedStartDate, setAppliedStartDate] = useState<string>('');
   const [appliedEndDate, setAppliedEndDate] = useState<string>('');
   
-  // Section-specific date filters
-  const [productsDateFilter, setProductsDateFilter] = useState<DateFilter>('year');
-  const [suppliersDateFilter, setSuppliersDateFilter] = useState<DateFilter>('year');
-  const [customersDateFilter, setCustomersDateFilter] = useState<DateFilter>('year');
-  
+  // Apply filters function
   const applyFilters = () => {
     console.log('Apply filters clicked:', { dateFilter, supplierFilter, customerFilter, startDateStr, endDateStr });
     setAppliedDateFilter(dateFilter);
@@ -67,14 +63,60 @@ export default function Analytics() {
     setAppliedEndDate(endDateStr);
   };
   
-  // Calculate date range for queries - always fetch full year for chart
+  // Calculate date range for server queries - based on APPLIED filters
   const dateRange = useMemo(() => {
-    const end = new Date();
-    const start = new Date();
-    start.setFullYear(start.getFullYear() - 1);
+    const now = new Date();
+    let start: Date;
+    let end: Date;
+    
+    // Handle custom date range (partial or full)
+    if (appliedStartDate || appliedEndDate) {
+      // If start date provided, use it; otherwise default to 2 years back
+      if (appliedStartDate) {
+        start = new Date(appliedStartDate);
+      } else {
+        start = new Date();
+        start.setFullYear(start.getFullYear() - 2);
+      }
+      
+      // If end date provided, use it; otherwise use today
+      if (appliedEndDate) {
+        end = new Date(appliedEndDate + 'T23:59:59');
+      } else {
+        end = new Date();
+      }
+      
+      return { startDate: start, endDate: end };
+    }
+    
+    // Calculate based on date filter preset
+    end = new Date();
+    start = new Date();
+    
+    switch (appliedDateFilter) {
+      case 'week':
+        start.setDate(end.getDate() - 7);
+        break;
+      case 'month':
+        start.setMonth(end.getMonth() - 1);
+        break;
+      case 'quarter':
+        start.setMonth(end.getMonth() - 3);
+        break;
+      case 'year':
+        start.setFullYear(end.getFullYear() - 1);
+        break;
+      case 'all':
+      default:
+        // Default: 2 years back to include all data
+        start.setFullYear(end.getFullYear() - 2);
+        break;
+    }
+    
     return { startDate: start, endDate: end };
-  }, []);
+  }, [appliedDateFilter, appliedStartDate, appliedEndDate]);
 
+  // Fetch data from server
   const { data: summary, isLoading: summaryLoading } = trpc.analytics.summary.useQuery();
   const { data: productPerformance, isLoading: productsLoading } = trpc.analytics.productPerformance.useQuery(dateRange);
   const { data: supplierPerformance, isLoading: suppliersLoading } = trpc.analytics.supplierPerformance.useQuery(dateRange);
@@ -85,65 +127,13 @@ export default function Analytics() {
 
   const isLoading = summaryLoading || productsLoading || suppliersLoading || customersLoading || revenueLoading;
 
-  // Filter data based on APPLIED filters (only changes when "הצג" is clicked)
+  // Revenue data for chart - directly from server (already filtered by dateRange)
   const filteredRevenueData = useMemo(() => {
     if (!revenueReport?.byMonth || revenueReport.byMonth.length === 0) return [];
-    let months = revenueReport.byMonth;
-    
-    // If custom date range is set, filter by date
-    if (appliedStartDate || appliedEndDate) {
-      months = months.filter((m: any) => {
-        const monthDate = m.month; // Format: "2026-01"
-        if (appliedStartDate && monthDate < appliedStartDate.substring(0, 7)) return false;
-        if (appliedEndDate && monthDate > appliedEndDate.substring(0, 7)) return false;
-        return true;
-      });
-      return months;
-    }
-    
-    // Take from the END of the array (most recent months)
-    switch (appliedDateFilter) {
-      case 'week': return months.slice(-1); // Last month
-      case 'month': return months.slice(-1); // Last month
-      case 'quarter': return months.slice(-3); // Last 3 months
-      case 'year': return months.slice(-12); // Last 12 months
-      default: return months; // All data
-    }
-  }, [revenueReport, appliedDateFilter, appliedStartDate, appliedEndDate]);
+    return revenueReport.byMonth;
+  }, [revenueReport]);
 
-  // Helper function to filter data by date
-  const filterByDateRange = (data: any[], dateFilter: DateFilter, dateField: string = 'createdAt') => {
-    if (!data) return [];
-    const now = new Date();
-    let cutoffDate = new Date();
-    
-    switch (dateFilter) {
-      case 'week':
-        cutoffDate.setDate(now.getDate() - 7);
-        break;
-      case 'month':
-        cutoffDate.setMonth(now.getMonth() - 1);
-        break;
-      case 'quarter':
-        cutoffDate.setMonth(now.getMonth() - 3);
-        break;
-      case 'year':
-        cutoffDate.setFullYear(now.getFullYear() - 1);
-        break;
-      default:
-        return data; // 'all' - return all data
-    }
-    
-    return data; // For now return all - server already filters by dateRange
-  };
-
-  // Filter products data based on section filter
-  const filteredProductData = useMemo(() => {
-    if (!productPerformance) return [];
-    return productPerformance;
-  }, [productPerformance, productsDateFilter]);
-
-  // Filter suppliers data based on APPLIED filter and section filter
+  // Filter suppliers data based on applied supplier filter
   const filteredSupplierData = useMemo(() => {
     if (!supplierPerformance) return [];
     let data = supplierPerformance;
@@ -151,9 +141,9 @@ export default function Analytics() {
       data = data.filter((s: any) => s.supplierId?.toString() === appliedSupplierFilter);
     }
     return data;
-  }, [supplierPerformance, appliedSupplierFilter, suppliersDateFilter]);
+  }, [supplierPerformance, appliedSupplierFilter]);
 
-  // Filter customers data based on APPLIED filter and section filter
+  // Filter customers data based on applied customer filter
   const filteredCustomerData = useMemo(() => {
     if (!customerAnalytics) return [];
     let data = customerAnalytics;
@@ -161,30 +151,25 @@ export default function Analytics() {
       data = data.filter((c: any) => c.customerId?.toString() === appliedCustomerFilter);
     }
     return data;
-  }, [customerAnalytics, appliedCustomerFilter, customersDateFilter]);
+  }, [customerAnalytics, appliedCustomerFilter]);
 
-  // Calculate totals based on APPLIED filters
+  // Calculate totals from revenue report
   const filteredTotals = useMemo(() => {
-    let revenue = revenueReport?.totalRevenue || 0;
-    let cost = revenueReport?.totalCost || 0;
-    let profit = revenueReport?.profit || 0;
+    const revenue = revenueReport?.totalRevenue || 0;
+    const cost = revenueReport?.totalCost || 0;
+    const profit = revenueReport?.profit || 0;
+    const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
+    return { revenue, cost, profit, margin };
+  }, [revenueReport]);
 
-    if (filteredRevenueData.length > 0 && appliedDateFilter !== 'all') {
-      revenue = filteredRevenueData.reduce((sum, m) => sum + (m.revenue || 0), 0);
-      cost = filteredRevenueData.reduce((sum, m) => sum + (m.cost || 0), 0);
-      profit = filteredRevenueData.reduce((sum, m) => sum + (m.profit || 0), 0);
-    }
-
-    return { revenue, cost, profit, margin: revenue > 0 ? (profit / revenue) * 100 : 0 };
-  }, [revenueReport, filteredRevenueData, appliedDateFilter]);
-
-  // Calculate period comparison
+  // Calculate period comparison (current vs previous month)
   const periodComparison = useMemo(() => {
     if (!revenueReport?.byMonth || revenueReport.byMonth.length < 2) return { revenue: 0, profit: 0 };
-    const current = revenueReport.byMonth[0]?.revenue || 0;
-    const previous = revenueReport.byMonth[1]?.revenue || 0;
-    const currentProfit = revenueReport.byMonth[0]?.profit || 0;
-    const previousProfit = revenueReport.byMonth[1]?.profit || 0;
+    const months = revenueReport.byMonth;
+    const current = months[months.length - 1]?.revenue || 0;
+    const previous = months[months.length - 2]?.revenue || 0;
+    const currentProfit = months[months.length - 1]?.profit || 0;
+    const previousProfit = months[months.length - 2]?.profit || 0;
     
     return {
       revenue: previous > 0 ? ((current - previous) / previous) * 100 : 0,
@@ -249,16 +234,26 @@ export default function Analytics() {
     all: 'כל הזמן',
   };
 
+  // Get active filter label for display
+  const getActiveFilterLabel = () => {
+    if (appliedStartDate || appliedEndDate) {
+      const start = appliedStartDate || 'התחלה';
+      const end = appliedEndDate || 'היום';
+      return `${start} - ${end}`;
+    }
+    return dateLabels[appliedDateFilter];
+  };
+
   return (
     <div className="space-y-6 p-4 max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-lg font-medium text-gray-900 dark:text-gray-100">אנליטיקס</h1>
-          <p className="text-sm text-gray-500">{dateLabels[dateFilter]}</p>
+          <p className="text-sm text-gray-500">{getActiveFilterLabel()}</p>
         </div>
         
-        {/* Filters */}
+        {/* Filters - One filter bar for entire page */}
         <div className="flex flex-wrap items-center gap-2">
           <Select value={dateFilter} onValueChange={(v) => setDateFilter(v as DateFilter)}>
             <SelectTrigger className="w-[120px] h-9 text-sm bg-white border-gray-200">
@@ -325,11 +320,7 @@ export default function Analytics() {
             type="button"
             size="sm" 
             className="h-9 text-sm bg-gray-800 hover:bg-gray-700 text-white cursor-pointer"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              applyFilters();
-            }}
+            onClick={applyFilters}
           >
             הצג
           </Button>
@@ -383,9 +374,7 @@ export default function Analytics() {
           <CardContent className="p-5">
             <p className="text-sm text-gray-500 mb-1">עלויות</p>
             <p className="text-2xl font-semibold text-gray-900">{formatCurrency(filteredTotals.cost)}</p>
-            <p className="text-xs text-gray-400 mt-2">
-              {filteredRevenueData[0]?.quoteCount || 0} הזמנות
-            </p>
+            <p className="text-xs text-gray-400 mt-2">{filteredRevenueData.length > 0 ? `${filteredRevenueData.reduce((sum, m) => sum + (m.quoteCount || 0), 0)} הזמנות` : '0 הזמנות'}</p>
           </CardContent>
         </Card>
 
@@ -393,9 +382,7 @@ export default function Analytics() {
           <CardContent className="p-5">
             <p className="text-sm text-gray-500 mb-1">שיעור המרה</p>
             <p className="text-2xl font-semibold text-gray-900">{summary?.avgConversionRate || 0}%</p>
-            <p className="text-xs text-gray-400 mt-2">
-              {summary?.totalCustomers || 0} לקוחות • {summary?.totalSuppliers || 0} ספקים
-            </p>
+            <p className="text-xs text-gray-400 mt-2">{summary?.totalSuppliers || 0} ספקים · {summary?.totalCustomers || 0} לקוחות</p>
           </CardContent>
         </Card>
       </div>
@@ -511,22 +498,6 @@ export default function Analytics() {
           
           {expandedSection === 'products' && (
             <div className="px-5 pb-5 border-t border-gray-100">
-              {/* Date Filter for Products */}
-              <div className="flex items-center gap-2 pt-3 pb-2">
-                <span className="text-xs text-gray-500">תקופה:</span>
-                <Select value={productsDateFilter} onValueChange={(v: DateFilter) => setProductsDateFilter(v)}>
-                  <SelectTrigger className="h-7 w-24 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="week">שבוע</SelectItem>
-                    <SelectItem value="month">חודש</SelectItem>
-                    <SelectItem value="quarter">רבעון</SelectItem>
-                    <SelectItem value="year">שנה</SelectItem>
-                    <SelectItem value="all">הכל</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
               {/* Top Products Cards */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-4 mb-6">
                 {productPerformance?.slice(0, 4).map((product: any, index: number) => {
@@ -605,22 +576,6 @@ export default function Analytics() {
           
           {expandedSection === 'suppliers' && (
             <div className="px-5 pb-5 border-t border-gray-100">
-              {/* Date Filter for Suppliers */}
-              <div className="flex items-center gap-2 pt-3 pb-2">
-                <span className="text-xs text-gray-500">תקופה:</span>
-                <Select value={suppliersDateFilter} onValueChange={(v: DateFilter) => setSuppliersDateFilter(v)}>
-                  <SelectTrigger className="h-7 w-24 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="week">שבוע</SelectItem>
-                    <SelectItem value="month">חודש</SelectItem>
-                    <SelectItem value="quarter">רבעון</SelectItem>
-                    <SelectItem value="year">שנה</SelectItem>
-                    <SelectItem value="all">הכל</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
               {/* Top Suppliers Cards */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-4 mb-6">
                 {filteredSupplierData?.slice(0, 4).map((supplier: any, index: number) => {
@@ -678,7 +633,7 @@ export default function Analytics() {
                         </div>
                       </div>
                       <div className="text-xs text-gray-400 w-20 text-left">
-                        {supplier.totalJobs || 0} עבודות · {Number(supplier.avgDeliveryDays || 0).toFixed(0)}י'
+                        {supplier.totalJobs || 0} עבודות
                       </div>
                     </div>
                   );
@@ -708,22 +663,6 @@ export default function Analytics() {
           
           {expandedSection === 'customers' && (
             <div className="px-5 pb-5 border-t border-gray-100">
-              {/* Date Filter for Customers */}
-              <div className="flex items-center gap-2 pt-3 pb-2">
-                <span className="text-xs text-gray-500">תקופה:</span>
-                <Select value={customersDateFilter} onValueChange={(v: DateFilter) => setCustomersDateFilter(v)}>
-                  <SelectTrigger className="h-7 w-24 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="week">שבוע</SelectItem>
-                    <SelectItem value="month">חודש</SelectItem>
-                    <SelectItem value="quarter">רבעון</SelectItem>
-                    <SelectItem value="year">שנה</SelectItem>
-                    <SelectItem value="all">הכל</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
               {filteredCustomerData && filteredCustomerData.length > 0 ? (
                 <>
                   {/* Top Customers Cards */}
