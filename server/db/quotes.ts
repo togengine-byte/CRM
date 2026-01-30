@@ -47,6 +47,7 @@ export async function getQuotes(filters?: {
     updatedAt: quotes.updatedAt,
     customerName: users.name,
     customerEmail: users.email,
+    customerPhone: users.phone,
   })
   .from(quotes)
   .leftJoin(users, eq(quotes.customerId, users.id))
@@ -64,17 +65,33 @@ export async function getQuotes(filters?: {
   // Fetch items for each quote to check supplier assignment
   const quotesWithItems = await Promise.all(
     filtered.map(async (quote) => {
-      const items = await db.select({
-        id: quoteItems.id,
-        sizeQuantityId: quoteItems.sizeQuantityId,
-        quantity: quoteItems.quantity,
-        priceAtTimeOfQuote: quoteItems.priceAtTimeOfQuote,
-        supplierId: quoteItems.supplierId,
-        supplierCost: quoteItems.supplierCost,
-        deliveryDays: quoteItems.deliveryDays,
-      })
-      .from(quoteItems)
-      .where(eq(quoteItems.quoteId, quote.id));
+      const itemsResult = await db.execute(sql`
+        SELECT 
+          qi.id,
+          qi."sizeQuantityId",
+          qi.quantity,
+          qi."priceAtTimeOfQuote",
+          qi."supplierId",
+          qi."supplierCost",
+          qi."deliveryDays",
+          bp.name as "productName"
+        FROM quote_items qi
+        LEFT JOIN size_quantities sq ON qi."sizeQuantityId" = sq.id
+        LEFT JOIN product_sizes ps ON sq.size_id = ps.id
+        LEFT JOIN base_products bp ON ps.product_id = bp.id
+        WHERE qi."quoteId" = ${quote.id}
+      `);
+      
+      const items = itemsResult.rows.map((row: any) => ({
+        id: row.id,
+        sizeQuantityId: row.sizeQuantityId,
+        quantity: row.quantity,
+        priceAtTimeOfQuote: row.priceAtTimeOfQuote,
+        supplierId: row.supplierId,
+        supplierCost: row.supplierCost,
+        deliveryDays: row.deliveryDays,
+        productName: row.productName,
+      }));
       
       return { ...quote, items };
     })

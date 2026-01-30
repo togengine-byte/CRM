@@ -103,6 +103,23 @@ export function isQuoteOverdue(quote: any): { overdue: boolean; issue: string } 
   return { overdue: false, issue: '' };
 }
 
+// Helper to generate WhatsApp message for overdue quotes
+export function getQuoteWhatsAppMessage(
+  quoteId: number, 
+  productName: string, 
+  quantity: number, 
+  price: number,
+  senderName: string
+): string {
+  const formattedPrice = new Intl.NumberFormat('he-IL', {
+    style: 'currency',
+    currency: 'ILS',
+    minimumFractionDigits: 0,
+  }).format(price);
+  
+  return `שלום, יש לכם אצלנו הצעת מחיר מספר ${quoteId} של ${quantity} ${productName} במחיר של ${formattedPrice}. איך אפשר לקדם אותה?\n${senderName}`;
+}
+
 // Helper to generate WhatsApp message based on job status
 export function getWhatsAppMessage(jobId: number, productName: string, status: string): string {
   const baseMsg = `עבודה מספר ${jobId}`;

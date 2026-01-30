@@ -19,6 +19,7 @@ import {
   getStatusLabel,
   isQuoteOverdue,
   getWhatsAppMessage,
+  getQuoteWhatsAppMessage,
   createWhatsAppUrl,
   UNIFIED_STAGES,
   getUnifiedStageIndex,
@@ -127,7 +128,9 @@ interface PipelineItem {
   id: number;
   type: 'quote' | 'job';
   customerName: string;
+  customerPhone?: string;
   productName?: string;
+  quantity?: number;
   supplierName?: string;
   supplierId?: number;
   quoteStatus: string | null;
@@ -144,6 +147,7 @@ export function UnifiedPipelineCard({ isLoading: parentLoading }: { isLoading: b
   const { data: quotes, isLoading: quotesLoading } = trpc.quotes.list.useQuery();
   const { data: jobs, isLoading: jobsLoading } = trpc.jobs.list.useQuery();
   const { data: suppliers, isLoading: suppliersLoading } = trpc.suppliers.list.useQuery();
+  const { data: currentUser } = trpc.auth.me.useQuery();
   const [isExpanded, setIsExpanded] = React.useState(false);
   const loading = parentLoading || quotesLoading || jobsLoading || suppliersLoading;
   
@@ -163,13 +167,19 @@ export function UnifiedPipelineCard({ isLoading: parentLoading }: { isLoading: b
         .filter((q: any) => ['draft', 'sent'].includes(q.status))
         .forEach((quote: any) => {
           const { overdue, issue } = isQuoteOverdue(quote);
+          // לקחת פרטי מוצר מהפריט הראשון
+          const firstItem = quote.items?.[0];
+          const totalQuantity = quote.items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) || 0;
           items.push({
             id: quote.id,
             type: 'quote',
             customerName: quote.customerName || 'לקוח לא מזוהה',
+            customerPhone: quote.customerPhone,
+            productName: firstItem?.productName || 'מוצר',
+            quantity: totalQuantity,
             quoteStatus: quote.status,
             jobStatus: null,
-            totalPrice: quote.totalPrice,
+            totalPrice: quote.finalValue ? parseFloat(quote.finalValue) : undefined,
             isOverdue: overdue,
             issue: issue,
             createdAt: new Date(quote.createdAt),
@@ -278,6 +288,36 @@ export function UnifiedPipelineCard({ isLoading: parentLoading }: { isLoading: b
                     )}
                   </div>
                   <div className="flex items-center gap-2">
+                    {/* כפתור WhatsApp להצעות מחיר באיחור (נשלחו ולא אושרו תוך 24 שעות) */}
+                    {item.type === 'quote' && item.quoteStatus === 'sent' && item.isOverdue && item.customerPhone && (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <a
+                              href={createWhatsAppUrl(
+                                item.customerPhone,
+                                getQuoteWhatsAppMessage(
+                                  item.id,
+                                  item.productName || 'מוצר',
+                                  item.quantity || 1,
+                                  item.totalPrice || 0,
+                                  currentUser?.name || 'צוות IDI'
+                                )
+                              )}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1 rounded hover:bg-green-100 transition-colors"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <MessageCircle className="h-4 w-4 text-green-600" />
+                            </a>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="text-xs">
+                            שלח הודעה ללקוח
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
                     {/* כפתור WhatsApp לספק - רק בשורות אדומות (באיחור) ולא בשלב נאסף */}
                     {(() => {
                       // לקחת טלפון עדכני מטבלת הספקים (לא מהעבודה)
