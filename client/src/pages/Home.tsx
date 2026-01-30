@@ -48,7 +48,9 @@ import {
   X,
   ChevronDown,
   ChevronUp,
-  Volume2
+  Volume2,
+  Send,
+  ExternalLink
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -109,13 +111,12 @@ interface UrgentAlert {
 function UrgentAlertsBar() {
   const [, navigate] = useLocation();
   const [isExpanded, setIsExpanded] = React.useState(false);
+  const [sendingAlert, setSendingAlert] = React.useState<string | null>(null);
   const [dismissedAlerts, setDismissedAlerts] = React.useState<Set<string>>(() => {
-    // Load dismissed alerts from localStorage
     const saved = localStorage.getItem('dismissedAlerts');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        // Filter out expired dismissals (older than 24 hours)
         const now = Date.now();
         const valid = Object.entries(parsed)
           .filter(([_, timestamp]) => now - (timestamp as number) < 24 * 60 * 60 * 1000)
@@ -130,22 +131,19 @@ function UrgentAlertsBar() {
   const [hasPlayedSound, setHasPlayedSound] = React.useState(false);
 
   const { data: alerts, isLoading } = trpc.dashboard.urgentAlerts.useQuery(undefined, {
-    refetchInterval: 60000, // Refresh every minute
+    refetchInterval: 60000,
   });
 
-  // Filter out dismissed alerts
   const visibleAlerts = React.useMemo(() => {
     if (!alerts) return [];
     return alerts.filter(alert => !dismissedAlerts.has(alert.id));
   }, [alerts, dismissedAlerts]);
 
-  // Play sound when new alerts appear
   React.useEffect(() => {
     if (visibleAlerts.length > 0 && !hasPlayedSound) {
-      // Play a subtle notification sound
       const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleQAqj9PQpXQAGILO0KpxABd/zM+rcQAXf8zPq3EAF3/Mz6txABd/zM+rcQAXf8zPq3E=');
-      audio.volume = 0.3;
-      audio.play().catch(() => {}); // Ignore errors if autoplay is blocked
+      audio.volume = 0.2;
+      audio.play().catch(() => {});
       setHasPlayedSound(true);
     }
     if (visibleAlerts.length === 0) {
@@ -159,13 +157,32 @@ function UrgentAlertsBar() {
     newDismissed.add(alertId);
     setDismissedAlerts(newDismissed);
     
-    // Save to localStorage with timestamp
     const saved = localStorage.getItem('dismissedAlerts');
     const parsed = saved ? JSON.parse(saved) : {};
     parsed[alertId] = Date.now();
     localStorage.setItem('dismissedAlerts', JSON.stringify(parsed));
     
     toast.success('ההתראה הוסתרה ל-24 שעות');
+  };
+
+  const handleSendNotification = async (alert: UrgentAlert, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSendingAlert(alert.id);
+    
+    // Simulate sending notification (in real implementation, this would call an API)
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    let recipient = '';
+    if (alert.type === 'pending_quote') {
+      recipient = alert.customerName || 'הלקוח';
+    } else if (alert.type === 'supplier_not_accepted') {
+      recipient = alert.supplierName || 'הספק';
+    } else {
+      recipient = 'הגורם הרלוונטי';
+    }
+    
+    toast.success(`התראה נשלחה ל${recipient}`);
+    setSendingAlert(null);
   };
 
   const handleAlertClick = (alert: UrgentAlert) => {
@@ -179,111 +196,117 @@ function UrgentAlertsBar() {
   const getAlertIcon = (type: string) => {
     switch (type) {
       case 'overdue_job':
-        return <Clock className="h-4 w-4" />;
+        return <Clock className="h-3.5 w-3.5" />;
       case 'pending_quote':
-        return <FileText className="h-4 w-4" />;
+        return <FileText className="h-3.5 w-3.5" />;
       case 'supplier_not_accepted':
-        return <Factory className="h-4 w-4" />;
+        return <Factory className="h-3.5 w-3.5" />;
       default:
-        return <AlertTriangle className="h-4 w-4" />;
+        return <AlertTriangle className="h-3.5 w-3.5" />;
     }
   };
 
-  // Don't render if no alerts or loading
+  const getRecipientLabel = (alert: UrgentAlert) => {
+    if (alert.type === 'pending_quote') return 'שלח ללקוח';
+    if (alert.type === 'supplier_not_accepted') return 'שלח לספק';
+    return 'שלח התראה';
+  };
+
   if (isLoading || visibleAlerts.length === 0) {
     return null;
   }
 
   const highSeverityCount = visibleAlerts.filter(a => a.severity === 'high').length;
-  const hasHighSeverity = highSeverityCount > 0;
 
   return (
-    <div className={`rounded-lg border transition-all duration-200 ${
-      hasHighSeverity 
-        ? 'bg-red-50 border-red-200' 
-        : 'bg-amber-50 border-amber-200'
-    }`}>
-      {/* Header - Always visible */}
+    <Card className="border border-slate-200 bg-white shadow-sm">
+      {/* Header */}
       <div 
-        className="flex items-center justify-between p-3 cursor-pointer"
+        className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-slate-50 transition-colors"
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <div className="flex items-center gap-3">
-          <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${
-            hasHighSeverity ? 'bg-red-100' : 'bg-amber-100'
-          }`}>
-            <Bell className={`h-4 w-4 ${hasHighSeverity ? 'text-red-600' : 'text-amber-600'}`} />
+          <div className="relative">
+            <Bell className="h-4 w-4 text-slate-600" />
+            <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-red-500" />
           </div>
           <div>
-            <p className={`text-sm font-medium ${hasHighSeverity ? 'text-red-800' : 'text-amber-800'}`}>
+            <p className="text-sm font-medium text-slate-800">
               {visibleAlerts.length} התראות דורשות טיפול
             </p>
-            <p className={`text-xs ${hasHighSeverity ? 'text-red-600' : 'text-amber-600'}`}>
-              {highSeverityCount > 0 && `${highSeverityCount} דחופות`}
+            <p className="text-xs text-slate-500">
+              {highSeverityCount > 0 && <span className="text-red-600 font-medium">{highSeverityCount} דחופות</span>}
               {highSeverityCount > 0 && visibleAlerts.length - highSeverityCount > 0 && ' • '}
               {visibleAlerts.length - highSeverityCount > 0 && `${visibleAlerts.length - highSeverityCount} בינוניות`}
             </p>
           </div>
         </div>
-        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-          {isExpanded ? (
-            <ChevronUp className={`h-4 w-4 ${hasHighSeverity ? 'text-red-600' : 'text-amber-600'}`} />
-          ) : (
-            <ChevronDown className={`h-4 w-4 ${hasHighSeverity ? 'text-red-600' : 'text-amber-600'}`} />
-          )}
-        </Button>
+        <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
       </div>
 
       {/* Expanded Content */}
       {isExpanded && (
-        <div className="px-3 pb-3 space-y-2">
-          {visibleAlerts.map((alert) => (
+        <div className="border-t border-slate-100">
+          {visibleAlerts.map((alert, index) => (
             <div
               key={alert.id}
-              className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors ${
-                alert.severity === 'high'
-                  ? 'bg-red-100 hover:bg-red-150 border border-red-200'
-                  : 'bg-amber-100 hover:bg-amber-150 border border-amber-200'
+              className={`flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition-colors cursor-pointer ${
+                index !== visibleAlerts.length - 1 ? 'border-b border-slate-100' : ''
               }`}
               onClick={() => handleAlertClick(alert)}
             >
-              <div className="flex items-center gap-3">
-                <div className={`h-7 w-7 rounded-full flex items-center justify-center ${
-                  alert.severity === 'high' ? 'bg-red-200' : 'bg-amber-200'
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <div className={`h-6 w-6 rounded flex items-center justify-center shrink-0 ${
+                  alert.severity === 'high' ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-600'
                 }`}>
                   {getAlertIcon(alert.type)}
                 </div>
-                <div>
-                  <p className={`text-sm font-medium ${
-                    alert.severity === 'high' ? 'text-red-800' : 'text-amber-800'
-                  }`}>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm text-slate-800 truncate">
                     {alert.title}
+                    {alert.severity === 'high' && (
+                      <span className="mr-2 text-[10px] text-red-600 font-medium">דחוף</span>
+                    )}
                   </p>
-                  <p className={`text-xs ${
-                    alert.severity === 'high' ? 'text-red-600' : 'text-amber-600'
-                  }`}>
-                    {alert.description}
-                  </p>
+                  <p className="text-xs text-slate-500 truncate">{alert.description}</p>
                 </div>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                className={`h-7 px-2 text-xs ${
-                  alert.severity === 'high' 
-                    ? 'text-red-600 hover:text-red-700 hover:bg-red-200' 
-                    : 'text-amber-600 hover:text-amber-700 hover:bg-amber-200'
-                }`}
-                onClick={(e) => handleDismiss(alert.id, e)}
-              >
-                <X className="h-3 w-3 ml-1" />
-                הסתר 24 שעות
-              </Button>
+              
+              <div className="flex items-center gap-1 shrink-0 mr-2">
+                {/* Send Notification Button */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs text-slate-600 hover:text-blue-600 hover:bg-blue-50"
+                  onClick={(e) => handleSendNotification(alert, e)}
+                  disabled={sendingAlert === alert.id}
+                >
+                  {sendingAlert === alert.id ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <>
+                      <Send className="h-3 w-3 ml-1" />
+                      {getRecipientLabel(alert)}
+                    </>
+                  )}
+                </Button>
+                
+                {/* Dismiss Button */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0 text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                  onClick={(e) => handleDismiss(alert.id, e)}
+                  title="הסתר ל-24 שעות"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </div>
             </div>
           ))}
         </div>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -341,75 +364,179 @@ function KPICard({
   );
 }
 
+// ==================== JOB PROGRESS BAR ====================
+
+const JOB_STAGES = [
+  { key: 'pending', label: 'ממתין לאישור', shortLabel: 'ממתין' },
+  { key: 'accepted', label: 'בייצור', shortLabel: 'בייצור' },
+  { key: 'ready', label: 'מוכן לאיסוף', shortLabel: 'מוכן' },
+  { key: 'picked_up', label: 'נאסף', shortLabel: 'נאסף' },
+  { key: 'delivered', label: 'נמסר', shortLabel: 'נמסר' },
+];
+
+function getStageIndex(status: string): number {
+  const statusMap: Record<string, number> = {
+    'pending': 0,
+    'in_progress': 1,
+    'in_production': 1,
+    'accepted': 1,
+    'ready': 2,
+    'picked_up': 3,
+    'delivered': 4,
+  };
+  return statusMap[status] ?? 0;
+}
+
+function JobProgressBar({ status, compact = false }: { status: string; compact?: boolean }) {
+  const currentStage = getStageIndex(status);
+  
+  return (
+    <div className="w-full">
+      <div className="flex items-center justify-between mb-1">
+        {JOB_STAGES.map((stage, index) => (
+          <div key={stage.key} className="flex flex-col items-center flex-1">
+            <div className={`h-2 w-2 rounded-full transition-colors ${
+              index <= currentStage 
+                ? index === currentStage ? 'bg-blue-600' : 'bg-emerald-500'
+                : 'bg-slate-200'
+            }`} />
+            {!compact && (
+              <span className={`text-[9px] mt-1 ${
+                index <= currentStage ? 'text-slate-600' : 'text-slate-400'
+              }`}>
+                {stage.shortLabel}
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center">
+        {JOB_STAGES.slice(0, -1).map((_, index) => (
+          <div key={index} className={`flex-1 h-0.5 ${
+            index < currentStage ? 'bg-emerald-500' : 'bg-slate-200'
+          }`} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ==================== JOBS IN PRODUCTION ====================
 
 function JobsInProductionCard({ isLoading: parentLoading }: { isLoading: boolean }) {
   const { data: jobs, isLoading } = trpc.jobs.list.useQuery();
-  const [, navigate] = useLocation();
+  const [showAllJobs, setShowAllJobs] = React.useState(false);
   const loading = parentLoading || isLoading;
   
-  const inProductionJobs = jobs?.filter((job: any) => ['pending', 'in_progress', 'in_production'].includes(job.status)).slice(0, 5) || [];
+  // All active jobs (not delivered or cancelled)
+  const activeJobs = jobs?.filter((job: any) => 
+    !['delivered', 'cancelled'].includes(job.status)
+  ) || [];
+  
+  // Jobs to show in card (first 5)
+  const displayJobs = activeJobs.slice(0, 5);
 
   return (
-    <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-200 bg-white">
-      <CardHeader className="pb-2 pt-3 px-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="h-7 w-7 rounded-lg bg-blue-50 flex items-center justify-center">
-              <Factory className="h-4 w-4 text-blue-600" />
-            </div>
-            <CardTitle className="text-sm font-medium text-slate-900">בייצור</CardTitle>
-          </div>
-          {inProductionJobs.length > 0 && (
-            <Badge className="text-[10px] px-2 py-0.5 h-5 bg-blue-100 text-blue-700 border-0">
-              {inProductionJobs.length}
-            </Badge>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent className="px-4 pb-3">
-        {loading ? (
-          <div className="space-y-2 animate-pulse">
-            {[...Array(3)].map((_, i) => (
-              <Skeleton key={i} className="h-10 w-full rounded-lg" />
-            ))}
-          </div>
-        ) : inProductionJobs.length === 0 ? (
-          <div className="flex items-center justify-center py-4 text-center">
-            <p className="text-xs text-slate-400">אין עבודות בייצור</p>
-          </div>
-        ) : (
-          <div className="space-y-1">
-            {inProductionJobs.map((job: any) => (
-              <div 
-                key={job.id}
-                className="flex items-center justify-between py-2 px-2 rounded hover:bg-slate-50 transition-colors cursor-pointer group"
-                onClick={() => navigate('/jobs')}
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <Package className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-slate-700 truncate">{job.productName}</p>
-                    <p className="text-[10px] text-slate-400 truncate">{job.supplierName}</p>
-                  </div>
-                </div>
-                <span className="text-[10px] text-slate-400 shrink-0">{formatNumber(job.quantity)}</span>
+    <>
+      <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-200 bg-white">
+        <CardHeader className="pb-2 pt-3 px-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="h-7 w-7 rounded-lg bg-blue-50 flex items-center justify-center">
+                <Factory className="h-4 w-4 text-blue-600" />
               </div>
-            ))}
-            {jobs && jobs.filter((j: any) => ['pending', 'in_progress', 'in_production'].includes(j.status)).length > 5 && (
-              <Button 
-                variant="ghost" 
-                size="sm"
-                className="w-full text-xs text-slate-500 h-7 mt-1"
-                onClick={() => navigate('/jobs')}
-              >
-                הצג הכל
-              </Button>
+              <CardTitle className="text-sm font-medium text-slate-900">עבודות פעילות</CardTitle>
+            </div>
+            {activeJobs.length > 0 && (
+              <Badge className="text-[10px] px-2 py-0.5 h-5 bg-blue-100 text-blue-700 border-0">
+                {activeJobs.length}
+              </Badge>
             )}
           </div>
-        )}
-      </CardContent>
-    </Card>
+        </CardHeader>
+        <CardContent className="px-4 pb-3">
+          {loading ? (
+            <div className="space-y-2 animate-pulse">
+              {[...Array(3)].map((_, i) => (
+                <Skeleton key={i} className="h-12 w-full rounded-lg" />
+              ))}
+            </div>
+          ) : displayJobs.length === 0 ? (
+            <div className="flex items-center justify-center py-4 text-center">
+              <p className="text-xs text-slate-400">אין עבודות פעילות</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {displayJobs.map((job: any) => (
+                <div 
+                  key={job.id}
+                  className="p-2 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer"
+                  onClick={() => setShowAllJobs(true)}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Package className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+                      <span className="text-xs font-medium text-slate-700 truncate">{job.productName}</span>
+                    </div>
+                    <span className="text-[10px] text-slate-500 shrink-0">{job.supplierName}</span>
+                  </div>
+                  <JobProgressBar status={job.status} compact />
+                </div>
+              ))}
+              {activeJobs.length > 5 && (
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  className="w-full text-xs text-slate-500 h-7 mt-1"
+                  onClick={() => setShowAllJobs(true)}
+                >
+                  הצג הכל ({activeJobs.length})
+                </Button>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* All Jobs Modal */}
+      <Dialog open={showAllJobs} onOpenChange={setShowAllJobs}>
+        <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-hidden" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+              <Factory className="h-5 w-5 text-blue-600" />
+              כל העבודות הפעילות
+            </DialogTitle>
+            <DialogDescription className="text-slate-500">
+              {activeJobs.length} עבודות בתהליך
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="overflow-y-auto max-h-[60vh] space-y-3 pr-1">
+            {activeJobs.map((job: any) => (
+              <div 
+                key={job.id}
+                className="p-4 rounded-lg border border-slate-200 bg-white hover:border-slate-300 transition-colors"
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <p className="text-sm font-medium text-slate-800">{job.productName}</p>
+                    <p className="text-xs text-slate-500">ספק: {job.supplierName}</p>
+                    {job.customerName && (
+                      <p className="text-xs text-slate-500">לקוח: {job.customerName}</p>
+                    )}
+                  </div>
+                  <div className="text-left">
+                    <p className="text-xs text-slate-500">כמות: {formatNumber(job.quantity)}</p>
+                    <p className="text-xs text-slate-400">עבודה #{job.id}</p>
+                  </div>
+                </div>
+                <JobProgressBar status={job.status} />
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
