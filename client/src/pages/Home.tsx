@@ -1,5 +1,4 @@
 import React from "react";
-import { ActivityFeedCompact } from "@/components/ActivityFeed";
 import { trpc } from "@/lib/trpc";
 import { 
   FileText, 
@@ -13,6 +12,7 @@ import { KPICard } from "@/components/dashboard/KPICard";
 import { UnifiedPipelineCard } from "@/components/dashboard/UnifiedPipelineCard";
 import { DeliveryCalendarCard } from "@/components/dashboard/DeliveryCalendarCard";
 import { PendingSignupsCard } from "@/components/dashboard/PendingSignupsCard";
+import { ActivityLogCard } from "@/components/dashboard/ActivityLogCard";
 
 // Import utility functions
 import { formatCurrency, formatNumber } from "@/utils/dashboardHelpers";
@@ -89,18 +89,18 @@ export default function Home() {
       {/* Delivery Calendar - Full Width */}
       <DeliveryCalendarCard isLoading={kpisLoading} />
 
-      {/* Secondary Content Grid - 2 columns */}
-      <div className="grid gap-3 md:grid-cols-2">
-        <PendingSignupsCard 
-          signups={signups || []} 
-          isLoading={signupsLoading} 
-          onRefresh={handleSignupsRefresh} 
-        />
-        <ActivityFeedCompact 
-          activities={activities || []} 
-          isLoading={activitiesLoading} 
-        />
-      </div>
+      {/* Pending Signups - Full Width */}
+      <PendingSignupsCard 
+        signups={signups || []} 
+        isLoading={signupsLoading} 
+        onRefresh={handleSignupsRefresh} 
+      />
+
+      {/* Activity Log - Full Width at Bottom */}
+      <ActivityLogCard 
+        activities={activities || []} 
+        isLoading={activitiesLoading} 
+      />
     </div>
   );
 }
