@@ -14,6 +14,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { 
   FileText, 
   Users, 
@@ -546,22 +552,67 @@ function getStageIndex(status: string): number {
   return statusMap[status] ?? 0;
 }
 
-function JobProgressBar({ status, compact = false }: { status: string; compact?: boolean }) {
+interface JobProgressBarProps {
+  status: string;
+  compact?: boolean;
+  isOverdue?: boolean;
+  currentStatusLabel?: string;
+  issue?: string;
+}
+
+function JobProgressBar({ status, compact = false, isOverdue = false, currentStatusLabel, issue }: JobProgressBarProps) {
   const currentStage = getStageIndex(status);
+  
+  const renderDot = (index: number, stage: typeof JOB_STAGES[0]) => {
+    const isCurrentStage = index === currentStage;
+    const isCompleted = index < currentStage;
+    const isPending = index > currentStage;
+    
+    // Determine dot color
+    let dotColor = 'bg-slate-200';
+    if (isCompleted) {
+      dotColor = 'bg-emerald-500';
+    } else if (isCurrentStage) {
+      dotColor = isOverdue ? 'bg-red-500' : 'bg-blue-600';
+    }
+    
+    const dot = (
+      <div className={`h-2.5 w-2.5 rounded-full transition-colors ${dotColor} ${isOverdue && isCurrentStage ? 'ring-2 ring-red-200' : ''}`} />
+    );
+    
+    // If overdue and current stage, wrap with tooltip
+    if (isOverdue && isCurrentStage) {
+      return (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="cursor-pointer">
+                {dot}
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="bg-slate-900 text-white text-xs p-2 max-w-[200px]">
+              <div className="space-y-1">
+                <p className="font-medium text-blue-300">שלב אחרון: {currentStatusLabel || stage.label}</p>
+                <p className="text-red-300">בעיה: {issue || 'עדיין לא נמסר'}</p>
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    }
+    
+    return dot;
+  };
   
   return (
     <div className="w-full">
       <div className="flex items-center justify-between mb-1">
         {JOB_STAGES.map((stage, index) => (
           <div key={stage.key} className="flex flex-col items-center flex-1">
-            <div className={`h-2 w-2 rounded-full transition-colors ${
-              index <= currentStage 
-                ? index === currentStage ? 'bg-blue-600' : 'bg-emerald-500'
-                : 'bg-slate-200'
-            }`} />
+            {renderDot(index, stage)}
             {!compact && (
               <span className={`text-[9px] mt-1 ${
-                index <= currentStage ? 'text-slate-600' : 'text-slate-400'
+                index <= currentStage ? (isOverdue && index === currentStage ? 'text-red-600 font-medium' : 'text-slate-600') : 'text-slate-400'
               }`}>
                 {stage.shortLabel}
               </span>
@@ -582,6 +633,28 @@ function JobProgressBar({ status, compact = false }: { status: string; compact?:
 
 // ==================== JOBS IN PRODUCTION ====================
 
+// Helper to check if job is overdue
+function isJobOverdue(job: any): boolean {
+  if (!job.createdAt || !job.promisedDeliveryDays) return false;
+  const createdDate = new Date(job.createdAt);
+  const promisedDate = new Date(createdDate.getTime() + job.promisedDeliveryDays * 24 * 60 * 60 * 1000);
+  return new Date() > promisedDate;
+}
+
+// Helper to get status label in Hebrew
+function getStatusLabel(status: string): string {
+  const statusMap: Record<string, string> = {
+    'pending': 'ממתין לאישור ספק',
+    'in_progress': 'בייצור',
+    'in_production': 'בייצור',
+    'accepted': 'בייצור',
+    'ready': 'מוכן לאיסוף',
+    'picked_up': 'נאסף',
+    'delivered': 'נמסר',
+  };
+  return statusMap[status] || status;
+}
+
 function JobsInProductionCard({ isLoading: parentLoading }: { isLoading: boolean }) {
   const { data: jobs, isLoading } = trpc.jobs.list.useQuery();
   const [isExpanded, setIsExpanded] = React.useState(false);
@@ -591,6 +664,9 @@ function JobsInProductionCard({ isLoading: parentLoading }: { isLoading: boolean
   const activeJobs = jobs?.filter((job: any) => 
     !['delivered', 'cancelled'].includes(job.status)
   ) || [];
+  
+  // Count overdue jobs
+  const overdueCount = activeJobs.filter(isJobOverdue).length;
   
   // Jobs to show in card
   const displayJobs = isExpanded ? activeJobs : activeJobs.slice(0, 5);
@@ -606,6 +682,11 @@ function JobsInProductionCard({ isLoading: parentLoading }: { isLoading: boolean
             <CardTitle className="text-sm font-medium text-slate-900">עבודות פעילות</CardTitle>
           </div>
           <div className="flex items-center gap-2">
+            {overdueCount > 0 && (
+              <Badge className="text-[10px] px-2 py-0.5 h-5 bg-red-100 text-red-700 border-0">
+                {overdueCount} באיחור
+              </Badge>
+            )}
             {activeJobs.length > 0 && (
               <Badge className="text-[10px] px-2 py-0.5 h-5 bg-blue-100 text-blue-700 border-0">
                 {activeJobs.length}
@@ -653,7 +734,12 @@ function JobsInProductionCard({ isLoading: parentLoading }: { isLoading: boolean
                     <span className="text-[10px] text-slate-400">כמות: {formatNumber(job.quantity)}</span>
                   </div>
                 </div>
-                <JobProgressBar status={job.status} />
+                <JobProgressBar 
+                  status={job.status} 
+                  isOverdue={isJobOverdue(job)}
+                  currentStatusLabel={getStatusLabel(job.status)}
+                  issue="עדיין לא נמסר"
+                />
               </div>
             ))}
           </div>
@@ -669,6 +755,204 @@ function JobsInProductionCard({ isLoading: parentLoading }: { isLoading: boolean
           </Button>
         )}
       </CardContent>
+    </Card>
+  );
+}
+
+// ==================== UNIFIED PIPELINE CARD ====================
+
+function UnifiedPipelineCard({ isLoading: parentLoading }: { isLoading: boolean }) {
+  const { data: quotes, isLoading: quotesLoading } = trpc.quotes.list.useQuery();
+  const { data: jobs, isLoading: jobsLoading } = trpc.jobs.list.useQuery();
+  const [salesExpanded, setSalesExpanded] = React.useState(false);
+  const [jobsExpanded, setJobsExpanded] = React.useState(false);
+  const loading = parentLoading || quotesLoading || jobsLoading;
+  
+  // Active quotes (not approved/rejected/superseded)
+  const activeQuotes = quotes?.filter((quote: any) => 
+    ['draft', 'sent'].includes(quote.status)
+  ) || [];
+  
+  // All active jobs (not delivered or cancelled)
+  const activeJobs = jobs?.filter((job: any) => 
+    !['delivered', 'cancelled'].includes(job.status)
+  ) || [];
+  
+  // Count overdue jobs
+  const overdueCount = activeJobs.filter(isJobOverdue).length;
+  
+  // Display items
+  const displayQuotes = salesExpanded ? activeQuotes : activeQuotes.slice(0, 3);
+  const displayJobs = jobsExpanded ? activeJobs : activeJobs.slice(0, 3);
+
+  return (
+    <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 bg-white">
+      {/* Sales Pipeline Section */}
+      <div className="border-b border-slate-100">
+        <div className="px-4 pt-3 pb-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="h-7 w-7 rounded-lg bg-amber-50 flex items-center justify-center">
+                <FileText className="h-4 w-4 text-amber-600" />
+              </div>
+              <span className="text-sm font-medium text-slate-900">מכירות בתהליך</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {activeQuotes.length > 0 && (
+                <Badge className="text-[10px] px-2 py-0.5 h-5 bg-amber-100 text-amber-700 border-0">
+                  {activeQuotes.length}
+                </Badge>
+              )}
+              {activeQuotes.length > 3 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0"
+                  onClick={() => setSalesExpanded(!salesExpanded)}
+                >
+                  <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${salesExpanded ? 'rotate-180' : ''}`} />
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="px-4 pb-3">
+          {loading ? (
+            <div className="space-y-2 animate-pulse">
+              {[...Array(2)].map((_, i) => (
+                <Skeleton key={i} className="h-12 w-full rounded-lg" />
+              ))}
+            </div>
+          ) : displayQuotes.length === 0 ? (
+            <div className="flex items-center justify-center py-3 text-center">
+              <p className="text-xs text-slate-400">אין הצעות ממתינות</p>
+            </div>
+          ) : (
+            <div className={`space-y-2 transition-all duration-300 ${salesExpanded ? 'max-h-[400px]' : 'max-h-[200px]'} overflow-y-auto`}>
+              {displayQuotes.map((quote: any) => (
+                <div 
+                  key={quote.id}
+                  className="p-2.5 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors"
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-xs font-medium text-slate-700 truncate">
+                        {quote.customerName || 'לקוח לא מזוהה'}
+                      </span>
+                      <span className="text-[10px] text-slate-400">#{quote.id}</span>
+                    </div>
+                    <span className="text-xs text-amber-600 font-medium shrink-0">
+                      {formatCurrency(quote.totalPrice || 0)}
+                    </span>
+                  </div>
+                  <SalesProgressBar status={quote.status} compact />
+                </div>
+              ))}
+            </div>
+          )}
+          {activeQuotes.length > 3 && (
+            <Button 
+              variant="ghost" 
+              size="sm"
+              className="w-full text-xs text-slate-500 h-6 mt-1"
+              onClick={() => setSalesExpanded(!salesExpanded)}
+            >
+              {salesExpanded ? 'הצג פחות' : `הצג הכל (${activeQuotes.length})`}
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Jobs Pipeline Section */}
+      <div>
+        <div className="px-4 pt-3 pb-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="h-7 w-7 rounded-lg bg-blue-50 flex items-center justify-center">
+                <Factory className="h-4 w-4 text-blue-600" />
+              </div>
+              <span className="text-sm font-medium text-slate-900">עבודות פעילות</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {overdueCount > 0 && (
+                <Badge className="text-[10px] px-2 py-0.5 h-5 bg-red-100 text-red-700 border-0">
+                  {overdueCount} באיחור
+                </Badge>
+              )}
+              {activeJobs.length > 0 && (
+                <Badge className="text-[10px] px-2 py-0.5 h-5 bg-blue-100 text-blue-700 border-0">
+                  {activeJobs.length}
+                </Badge>
+              )}
+              {activeJobs.length > 3 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0"
+                  onClick={() => setJobsExpanded(!jobsExpanded)}
+                >
+                  <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${jobsExpanded ? 'rotate-180' : ''}`} />
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="px-4 pb-3">
+          {loading ? (
+            <div className="space-y-2 animate-pulse">
+              {[...Array(2)].map((_, i) => (
+                <Skeleton key={i} className="h-12 w-full rounded-lg" />
+              ))}
+            </div>
+          ) : displayJobs.length === 0 ? (
+            <div className="flex items-center justify-center py-3 text-center">
+              <p className="text-xs text-slate-400">אין עבודות פעילות</p>
+            </div>
+          ) : (
+            <div className={`space-y-2 transition-all duration-300 ${jobsExpanded ? 'max-h-[400px]' : 'max-h-[200px]'} overflow-y-auto`}>
+              {displayJobs.map((job: any) => {
+                const overdue = isJobOverdue(job);
+                return (
+                  <div 
+                    key={job.id}
+                    className={`p-2.5 rounded-lg transition-colors ${
+                      overdue ? 'bg-red-50 hover:bg-red-100' : 'bg-slate-50 hover:bg-slate-100'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Package className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+                        <span className="text-xs font-medium text-slate-700 truncate">{job.productName}</span>
+                        <span className="text-[10px] text-slate-400">#{job.id}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-slate-500 shrink-0">{job.supplierName}</span>
+                      </div>
+                    </div>
+                    <JobProgressBar 
+                      status={job.status} 
+                      compact
+                      isOverdue={overdue}
+                      currentStatusLabel={getStatusLabel(job.status)}
+                      issue="עדיין לא נמסר"
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {activeJobs.length > 3 && (
+            <Button 
+              variant="ghost" 
+              size="sm"
+              className="w-full text-xs text-slate-500 h-6 mt-1"
+              onClick={() => setJobsExpanded(!jobsExpanded)}
+            >
+              {jobsExpanded ? 'הצג פחות' : `הצג הכל (${activeJobs.length})`}
+            </Button>
+          )}
+        </div>
+      </div>
     </Card>
   );
 }
@@ -1342,8 +1626,7 @@ export default function Home() {
         </p>
       </div>
 
-      {/* Urgent Alerts Bar - Only shows when there are alerts */}
-      <UrgentAlertsBar />
+
 
       {/* KPIs Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -1389,11 +1672,8 @@ export default function Home() {
         />
       </div>
 
-      {/* Sales Pipeline - Full Width */}
-      <SalesPipelineCard isLoading={kpisLoading} />
-
-      {/* Jobs Pipeline - Full Width */}
-      <JobsInProductionCard isLoading={kpisLoading} />
+      {/* Unified Pipeline - Full Width */}
+      <UnifiedPipelineCard isLoading={kpisLoading} />
 
       {/* Secondary Content Grid - 3 columns */}
       <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
