@@ -668,7 +668,7 @@ export async function getRevenueReport(startDate?: Date, endDate?: Date) {
     .innerJoin(quotes, eq(quoteItems.quoteId, quotes.id))
     .where(and(
       sql`${quotes.createdAt} BETWEEN ${start} AND ${end}`,
-      inArray(quotes.status, ['approved', 'in_production', 'ready'])
+      inArray(quotes.status, ['approved', 'in_production', 'ready', 'delivered'])
     ));
 
   const totalRevenue = Number(summary[0]?.totalRevenue || 0);
@@ -685,7 +685,7 @@ export async function getRevenueReport(startDate?: Date, endDate?: Date) {
     FROM quote_items qi
     INNER JOIN quotes q ON qi."quoteId" = q.id
     WHERE q."createdAt" BETWEEN ${start} AND ${end}
-    AND q.status IN ('approved', 'in_production', 'ready')
+    AND q.status IN ('approved', 'in_production', 'ready', 'delivered')
     GROUP BY TO_CHAR(q."createdAt", 'YYYY-MM')
     ORDER BY month
   `);
