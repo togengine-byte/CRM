@@ -56,7 +56,8 @@ import {
   ChevronUp,
   Volume2,
   Send,
-  ExternalLink
+  ExternalLink,
+  MessageCircle
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -785,6 +786,39 @@ function getStatusLabel(status: string): string {
   return getCurrentStageLabel(status);
 }
 
+// Helper to generate WhatsApp message based on job status
+function getWhatsAppMessage(jobId: number, productName: string, status: string): string {
+  const baseMsg = `עבודה מספר ${jobId}`;
+  
+  switch (status) {
+    case 'pending':
+      return `${baseMsg} - ${productName}\nהעבודה עדיין לא אושרה על ידכם.\nאנא אשרו קבלת העבודה.`;
+    case 'in_progress':
+    case 'in_production':
+    case 'accepted':
+      return `${baseMsg} - ${productName}\nהעבודה עדיין לא בוצעה.\nהיה אמור כבר להיאסף.\nמה המצב?`;
+    case 'ready':
+      return `${baseMsg} - ${productName}\nהעבודה מוכנה לאיסוף.\nהשליח שלנו בדרך לאסוף.`;
+    case 'picked_up':
+      return `${baseMsg} - ${productName}\nהעבודה נאספה אך עדיין לא נמסרה ללקוח.`;
+    default:
+      return `${baseMsg} - ${productName}\nאנא עדכנו לגבי מצב העבודה.`;
+  }
+}
+
+// Helper to create WhatsApp URL
+function createWhatsAppUrl(phone: string | undefined, message: string): string {
+  if (!phone) return '';
+  // ניקוי מספר טלפון - הסרת מקפים ותווים מיותרים
+  const cleanPhone = phone.replace(/[^0-9]/g, '');
+  // אם מתחיל ב-0, מחליף ל-972
+  const formattedPhone = cleanPhone.startsWith('0') 
+    ? '972' + cleanPhone.substring(1) 
+    : cleanPhone;
+  const encodedMessage = encodeURIComponent(message);
+  return `https://wa.me/${formattedPhone}?text=${encodedMessage}`;
+}
+
 function JobsInProductionCard({ isLoading: parentLoading }: { isLoading: boolean }) {
   const { data: jobs, isLoading } = trpc.jobs.list.useQuery();
   const [isExpanded, setIsExpanded] = React.useState(false);
@@ -919,6 +953,7 @@ interface PipelineItem {
   customerName: string;
   productName?: string;
   supplierName?: string;
+  supplierPhone?: string;
   quoteStatus: string | null;
   jobStatus: string | null;
   totalPrice?: number;
@@ -969,6 +1004,7 @@ function UnifiedPipelineCard({ isLoading: parentLoading }: { isLoading: boolean 
             customerName: job.customerName || 'לקוח לא מזוהה',
             productName: job.productName,
             supplierName: job.supplierName,
+            supplierPhone: job.supplierPhone,
             quoteStatus: 'approved', // עבודה = הצעה אושרה
             jobStatus: job.status,
             isOverdue: overdue,
@@ -1052,6 +1088,30 @@ function UnifiedPipelineCard({ isLoading: parentLoading }: { isLoading: boolean 
                     <span className="text-[10px] text-slate-400">#{item.id}</span>
                   </div>
                   <div className="flex items-center gap-2">
+                    {/* כפתור WhatsApp לעבודות באיחור */}
+                    {item.type === 'job' && item.supplierPhone && (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <a
+                              href={createWhatsAppUrl(
+                                item.supplierPhone,
+                                getWhatsAppMessage(item.id, item.productName || '', item.jobStatus || '')
+                              )}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1 rounded hover:bg-green-100 transition-colors"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <MessageCircle className="h-4 w-4 text-green-600" />
+                            </a>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="text-xs">
+                            שלח הודעה לספק
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
                     {item.type === 'job' && item.supplierName && (
                       <span className="text-[10px] text-slate-500 shrink-0">{item.supplierName}</span>
                     )}
