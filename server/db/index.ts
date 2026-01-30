@@ -144,7 +144,6 @@ export {
 export {
   getSupplierJobs,
   getSupplierJobById,
-  createSupplierJob,
   updateSupplierJobStatus,
   markSupplierJobReady,
   confirmSupplierJobReady,

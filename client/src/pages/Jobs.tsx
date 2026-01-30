@@ -197,8 +197,12 @@ export default function Jobs() {
 
   // Filter jobs
   const filteredJobs = jobs?.filter((job: Job) => {
-    // Status filter
-    if (statusFilter !== "all" && job.status !== statusFilter) return false;
+    // Status filter - "in_progress" includes both pending and in_progress
+    if (statusFilter === "in_progress") {
+      if (job.status !== "pending" && job.status !== "in_progress") return false;
+    } else if (statusFilter !== "all" && job.status !== statusFilter) {
+      return false;
+    }
     
     // Search filter
     if (searchQuery) {

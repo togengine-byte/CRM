@@ -105,38 +105,6 @@ export async function getSupplierJobById(jobId: number) {
   };
 }
 
-/**
- * Create supplier job
- */
-export async function createSupplierJob(input: {
-  quoteId: number;
-  supplierId: number;
-  sizeQuantityId: number;
-  quantity: number;
-  pricePerUnit: number;
-  promisedDeliveryDays?: number;
-}) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  const result = await db.insert(supplierJobs).values({
-    quoteId: input.quoteId,
-    supplierId: input.supplierId,
-    sizeQuantityId: input.sizeQuantityId,
-    quantity: input.quantity,
-    pricePerUnit: input.pricePerUnit.toString(),
-    promisedDeliveryDays: input.promisedDeliveryDays || 3,
-    status: 'pending',
-  }).returning();
-
-  await logActivity(null, "supplier_job_created", { 
-    jobId: result[0].id, 
-    quoteId: input.quoteId,
-    supplierId: input.supplierId 
-  });
-
-  return result[0];
-}
 
 /**
  * Update supplier job status
