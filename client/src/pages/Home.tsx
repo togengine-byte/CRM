@@ -12,7 +12,6 @@ import {
 import { KPICard } from "@/components/dashboard/KPICard";
 import { UnifiedPipelineCard } from "@/components/dashboard/UnifiedPipelineCard";
 import { DeliveryCalendarCard } from "@/components/dashboard/DeliveryCalendarCard";
-import { ReadyForPickupCard } from "@/components/dashboard/ReadyForPickupCard";
 import { PendingSignupsCard } from "@/components/dashboard/PendingSignupsCard";
 
 // Import utility functions
@@ -90,9 +89,8 @@ export default function Home() {
       {/* Delivery Calendar - Full Width */}
       <DeliveryCalendarCard isLoading={kpisLoading} />
 
-      {/* Secondary Content Grid - 3 columns */}
-      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-        <ReadyForPickupCard isLoading={kpisLoading} />
+      {/* Secondary Content Grid - 2 columns */}
+      <div className="grid gap-3 md:grid-cols-2">
         <PendingSignupsCard 
           signups={signups || []} 
           isLoading={signupsLoading} 
