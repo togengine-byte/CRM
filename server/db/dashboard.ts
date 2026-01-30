@@ -441,7 +441,8 @@ export async function getActiveJobs() {
     LEFT JOIN size_quantities sq ON sj."sizeQuantityId" = sq.id
     LEFT JOIN product_sizes ps ON sq.size_id = ps.id
     LEFT JOIN base_products bp ON ps.product_id = bp.id
-    WHERE sj.status IN ('pending', 'in_progress', 'ready', 'picked_up', 'delivered')
+    WHERE sj.status IN ('pending', 'in_progress', 'ready', 'picked_up')
+    AND sj."isCancelled" IS NOT TRUE
     ORDER BY sj."createdAt" DESC
   `);
 
