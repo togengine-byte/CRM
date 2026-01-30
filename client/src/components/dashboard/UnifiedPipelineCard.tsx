@@ -129,7 +129,7 @@ interface PipelineItem {
   customerName: string;
   productName?: string;
   supplierName?: string;
-  supplierPhone?: string;
+  supplierId?: number;
   quoteStatus: string | null;
   jobStatus: string | null;
   totalPrice?: number;
@@ -189,7 +189,7 @@ export function UnifiedPipelineCard({ isLoading: parentLoading }: { isLoading: b
             customerName: job.customerName || 'לקוח לא מזוהה',
             productName: job.productName,
             supplierName: job.supplierName,
-            supplierPhone: job.supplierPhone,
+            supplierId: job.supplierId,
             quoteStatus: 'approved', // עבודה = הצעה אושרה
             jobStatus: job.status,
             isOverdue: overdue,
@@ -201,7 +201,7 @@ export function UnifiedPipelineCard({ isLoading: parentLoading }: { isLoading: b
     
     // מיון לפי תאריך יצירה (חדש קודם)
     return items.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-  }, [quotes, jobs]);
+  }, [quotes, jobs, suppliersMap]);
   
   const overdueCount = pipelineItems.filter(item => item.isOverdue).length;
   const displayItems = isExpanded ? pipelineItems : pipelineItems.slice(0, 5);
@@ -279,29 +279,39 @@ export function UnifiedPipelineCard({ isLoading: parentLoading }: { isLoading: b
                   </div>
                   <div className="flex items-center gap-2">
                     {/* כפתור WhatsApp לספק - רק בשורות אדומות (באיחור) ולא בשלב נאסף */}
-                    {item.type === 'job' && item.supplierPhone && item.isOverdue && item.jobStatus !== 'picked_up' && (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <a
-                              href={createWhatsAppUrl(
-                                item.supplierPhone,
-                                getWhatsAppMessage(item.id, item.productName || '', item.jobStatus || '')
-                              )}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="p-1 rounded hover:bg-green-100 transition-colors"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <MessageCircle className="h-4 w-4 text-green-600" />
-                            </a>
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="text-xs">
-                            שלח הודעה לספק
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    )}
+                    {(() => {
+                      // לקחת טלפון עדכני מטבלת הספקים (לא מהעבודה)
+                      const supplier = item.supplierId ? suppliersMap.get(item.supplierId) : null;
+                      const currentPhone = supplier?.phone;
+                      
+                      if (item.type !== 'job' || !currentPhone || !item.isOverdue || item.jobStatus === 'picked_up') {
+                        return null;
+                      }
+                      
+                      return (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <a
+                                href={createWhatsAppUrl(
+                                  currentPhone,
+                                  getWhatsAppMessage(item.id, item.productName || '', item.jobStatus || '')
+                                )}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-1 rounded hover:bg-green-100 transition-colors"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <MessageCircle className="h-4 w-4 text-green-600" />
+                              </a>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="text-xs">
+                              שלח הודעה לספק
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      );
+                    })()}
                     {item.type === 'job' && item.supplierName && (
                       <span className="text-[10px] text-slate-500 shrink-0">{item.supplierName}</span>
                     )}

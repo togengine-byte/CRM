@@ -2,42 +2,108 @@ import React from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Phone } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 
+interface CalendarItem {
+  id: number;
+  type: 'job' | 'quote';
+  name: string;
+  customerName?: string;
+  status: string;
+  action: string;
+  isOverdue: boolean;
+  date: Date;
+}
+
 export function DeliveryCalendarCard({ isLoading: parentLoading }: { isLoading: boolean }) {
-  const { data: jobs, isLoading } = trpc.jobs.list.useQuery();
-  const loading = parentLoading || isLoading;
+  const { data: jobs, isLoading: jobsLoading } = trpc.jobs.list.useQuery();
+  const { data: quotes, isLoading: quotesLoading } = trpc.quotes.list.useQuery();
+  const loading = parentLoading || jobsLoading || quotesLoading;
   const [currentMonth, setCurrentMonth] = React.useState(new Date());
   const [selectedDate, setSelectedDate] = React.useState<Date | null>(null);
 
-  // חישוב תאריכי אספקה לכל עבודה
-  const deliveryDates = React.useMemo(() => {
-    if (!jobs) return new Map<string, any[]>();
+  // חישוב תאריכים לכל פריט (עבודות + הצעות באיחור)
+  const calendarItems = React.useMemo(() => {
+    const dateMap = new Map<string, CalendarItem[]>();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     
-    const dateMap = new Map<string, any[]>();
-    
-    jobs
-      .filter((j: any) => !['delivered', 'cancelled'].includes(j.status))
-      .forEach((job: any) => {
-        if (job.createdAt && job.promisedDeliveryDays) {
-          const createdDate = new Date(job.createdAt);
-          const deliveryDate = new Date(createdDate.getTime() + job.promisedDeliveryDays * 24 * 60 * 60 * 1000);
-          const dateKey = deliveryDate.toISOString().split('T')[0];
-          
-          if (!dateMap.has(dateKey)) {
-            dateMap.set(dateKey, []);
+    // עבודות פעילות
+    if (jobs) {
+      jobs
+        .filter((j: any) => !['delivered', 'cancelled'].includes(j.status))
+        .forEach((job: any) => {
+          if (job.createdAt && job.promisedDeliveryDays) {
+            const createdDate = new Date(job.createdAt);
+            const deliveryDate = new Date(createdDate.getTime() + job.promisedDeliveryDays * 24 * 60 * 60 * 1000);
+            const dateKey = deliveryDate.toISOString().split('T')[0];
+            const isOverdue = today > deliveryDate;
+            
+            // קביעת הפעולה הנדרשת לפי סטטוס
+            let action = '';
+            if (job.status === 'ready') {
+              action = 'לאסוף מהספק';
+            } else if (job.status === 'picked_up') {
+              action = 'למסור ללקוח';
+            } else if (job.status === 'in_progress') {
+              action = 'בייצור אצל הספק';
+            } else if (job.status === 'pending') {
+              action = 'ממתין לספק';
+            } else {
+              action = 'לאסוף ולמסור';
+            }
+            
+            if (!dateMap.has(dateKey)) {
+              dateMap.set(dateKey, []);
+            }
+            dateMap.get(dateKey)!.push({
+              id: job.id,
+              type: 'job',
+              name: job.productName || 'ללא שם',
+              customerName: job.customerName,
+              status: job.status,
+              action,
+              isOverdue,
+              date: deliveryDate
+            });
           }
-          dateMap.get(dateKey)!.push({
-            ...job,
-            expectedDelivery: deliveryDate,
-            isOverdue: new Date() > deliveryDate
-          });
-        }
-      });
+        });
+    }
+    
+    // הצעות מחיר שנשלחו ולא אושרו תוך 24 שעות
+    if (quotes) {
+      quotes
+        .filter((q: any) => q.status === 'sent')
+        .forEach((quote: any) => {
+          if (quote.sentAt) {
+            const sentDate = new Date(quote.sentAt);
+            const deadlineDate = new Date(sentDate.getTime() + 24 * 60 * 60 * 1000);
+            
+            if (today > deadlineDate) {
+              // הצעה באיחור - מציג אותה בתאריך של היום
+              const dateKey = today.toISOString().split('T')[0];
+              
+              if (!dateMap.has(dateKey)) {
+                dateMap.set(dateKey, []);
+              }
+              dateMap.get(dateKey)!.push({
+                id: quote.id,
+                type: 'quote',
+                name: quote.customerName || 'לקוח לא מזוהה',
+                customerName: quote.customerName,
+                status: 'sent',
+                action: 'לעקוב אחרי לקוח',
+                isOverdue: true,
+                date: today
+              });
+            }
+          }
+        });
+    }
     
     return dateMap;
-  }, [jobs]);
+  }, [jobs, quotes]);
 
   // ימי החודש
   const getDaysInMonth = (date: Date) => {
@@ -68,9 +134,9 @@ export function DeliveryCalendarCard({ isLoading: parentLoading }: { isLoading: 
 
   const getDateStatus = (date: Date) => {
     const dateKey = date.toISOString().split('T')[0];
-    const jobsOnDate = deliveryDates.get(dateKey) || [];
-    const count = jobsOnDate.length;
-    const hasOverdue = jobsOnDate.some(j => j.isOverdue);
+    const itemsOnDate = calendarItems.get(dateKey) || [];
+    const count = itemsOnDate.length;
+    const hasOverdue = itemsOnDate.some(j => j.isOverdue);
     
     if (count === 0) return { count: 0, color: '', hasOverdue: false };
     if (hasOverdue) return { count, color: 'bg-red-500', hasOverdue: true };
@@ -88,27 +154,27 @@ export function DeliveryCalendarCard({ isLoading: parentLoading }: { isLoading: 
     setSelectedDate(null);
   };
 
-  const selectedDateJobs = selectedDate 
-    ? deliveryDates.get(selectedDate.toISOString().split('T')[0]) || []
+  const selectedDateItems = selectedDate 
+    ? calendarItems.get(selectedDate.toISOString().split('T')[0]) || []
     : [];
 
   const weekDays = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'];
 
   return (
-    <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-200 bg-white">
+    <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-200 bg-white col-span-full">
       <CardHeader className="pb-2 pt-3 px-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="h-7 w-7 rounded-lg bg-indigo-50 flex items-center justify-center">
               <CalendarDays className="h-4 w-4 text-indigo-600" />
             </div>
-            <CardTitle className="text-sm font-medium text-slate-900">לוח אספקות</CardTitle>
+            <CardTitle className="text-sm font-medium text-slate-900">לוח משימות ואספקות</CardTitle>
           </div>
           <div className="flex items-center gap-1">
             <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={prevMonth}>
               <ChevronRight className="h-4 w-4" />
             </Button>
-            <span className="text-xs font-medium text-slate-600 min-w-[80px] text-center">
+            <span className="text-xs font-medium text-slate-600 min-w-[100px] text-center">
               {currentMonth.toLocaleDateString('he-IL', { month: 'long', year: 'numeric' })}
             </span>
             <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={nextMonth}>
@@ -117,111 +183,144 @@ export function DeliveryCalendarCard({ isLoading: parentLoading }: { isLoading: 
           </div>
         </div>
       </CardHeader>
-      <CardContent className="px-4 pb-3">
+      <CardContent className="px-4 pb-4">
         {loading ? (
-          <Skeleton className="h-[180px] w-full rounded-lg" />
+          <Skeleton className="h-[280px] w-full rounded-lg" />
         ) : (
-          <div className="space-y-2">
-            {/* כותרות ימים */}
-            <div className="grid grid-cols-7 gap-1">
-              {weekDays.map((day) => (
-                <div key={day} className="text-center text-[10px] font-medium text-slate-400 py-1">
-                  {day}
+          <div className="flex gap-6">
+            {/* לוח שנה - צד ימין */}
+            <div className="flex-1 min-w-[300px]">
+              {/* כותרות ימים */}
+              <div className="grid grid-cols-7 gap-1 mb-2">
+                {weekDays.map((day) => (
+                  <div key={day} className="text-center text-xs font-medium text-slate-500 py-2">
+                    {day}
+                  </div>
+                ))}
+              </div>
+              
+              {/* ימי החודש */}
+              <div className="grid grid-cols-7 gap-1">
+                {days.map((date, index) => {
+                  if (!date) {
+                    return <div key={`empty-${index}`} className="h-10" />;
+                  }
+                  
+                  const status = getDateStatus(date);
+                  const isToday = date.getTime() === today.getTime();
+                  const isSelected = selectedDate && date.getTime() === selectedDate.getTime();
+                  
+                  return (
+                    <button
+                      key={date.toISOString()}
+                      onClick={() => setSelectedDate(status.count > 0 ? date : null)}
+                      className={`h-10 rounded-lg text-sm relative transition-all ${
+                        isSelected 
+                          ? 'bg-indigo-600 text-white shadow-md' 
+                          : isToday 
+                            ? 'bg-indigo-100 text-indigo-700 font-bold' 
+                            : 'hover:bg-slate-100 text-slate-600'
+                      } ${status.count > 0 ? 'cursor-pointer' : 'cursor-default'}`}
+                    >
+                      {date.getDate()}
+                      {status.count > 0 && (
+                        <span className={`absolute bottom-1 left-1/2 -translate-x-1/2 h-2 w-2 rounded-full ${status.color}`} />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* מקרא */}
+              <div className="flex items-center justify-center gap-4 pt-3 mt-3 border-t border-slate-100">
+                <div className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                  <span className="text-xs text-slate-500">1-2 משימות</span>
                 </div>
-              ))}
-            </div>
-            
-            {/* ימי החודש */}
-            <div className="grid grid-cols-7 gap-1">
-              {days.map((date, index) => {
-                if (!date) {
-                  return <div key={`empty-${index}`} className="h-7" />;
-                }
-                
-                const status = getDateStatus(date);
-                const isToday = date.getTime() === today.getTime();
-                const isSelected = selectedDate && date.getTime() === selectedDate.getTime();
-                
-                return (
-                  <button
-                    key={date.toISOString()}
-                    onClick={() => setSelectedDate(status.count > 0 ? date : null)}
-                    className={`h-7 rounded text-[10px] relative transition-all ${
-                      isSelected 
-                        ? 'bg-indigo-600 text-white' 
-                        : isToday 
-                          ? 'bg-indigo-100 text-indigo-700 font-bold' 
-                          : 'hover:bg-slate-100 text-slate-600'
-                    } ${status.count > 0 ? 'cursor-pointer' : 'cursor-default'}`}
-                  >
-                    {date.getDate()}
-                    {status.count > 0 && (
-                      <span className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 h-1.5 w-1.5 rounded-full ${status.color}`} />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* מקרא */}
-            <div className="flex items-center justify-center gap-3 pt-1 border-t border-slate-100">
-              <div className="flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                <span className="text-[9px] text-slate-500">1-2</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-amber-500" />
-                <span className="text-[9px] text-slate-500">3+</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-red-500" />
-                <span className="text-[9px] text-slate-500">באיחור</span>
-              </div>
-            </div>
-
-            {/* רשימת עבודות ליום נבחר */}
-            {selectedDate && selectedDateJobs.length > 0 && (
-              <div className="pt-2 border-t border-slate-100 space-y-1">
-                <p className="text-[10px] font-medium text-slate-500">
-                  {selectedDate.toLocaleDateString('he-IL', { weekday: 'long', day: 'numeric', month: 'short' })}
-                </p>
-                <div className="max-h-[80px] overflow-y-auto space-y-1">
-                  {selectedDateJobs.map((job: any) => {
-                    // קביעת הפעולה הנדרשת לפי סטטוס
-                    let action = '';
-                    if (job.status === 'ready') {
-                      action = 'לאסוף מהספק';
-                    } else if (job.status === 'picked_up') {
-                      action = 'למסור ללקוח';
-                    } else if (job.status === 'in_progress') {
-                      action = 'בייצור אצל הספק';
-                    } else if (job.status === 'pending') {
-                      action = 'ממתין לספק';
-                    } else {
-                      action = 'לאסוף ולמסור';
-                    }
-                    
-                    return (
-                      <div 
-                        key={job.id}
-                        className={`p-1.5 rounded text-[10px] ${
-                          job.isOverdue ? 'bg-red-50 text-red-700' : 'bg-slate-50 text-slate-600'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span>
-                            <span className="font-medium">עבודה {job.id}</span> - {job.productName || 'ללא שם'}
-                          </span>
-                        </div>
-                        <div className={`font-bold mt-0.5 ${job.isOverdue ? 'text-red-600' : 'text-indigo-600'}`}>
-                          ▶ {action}
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
+                  <span className="text-xs text-slate-500">3+ משימות</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
+                  <span className="text-xs text-slate-500">באיחור</span>
                 </div>
               </div>
-            )}
+            </div>
+
+            {/* רשימת משימות ליום נבחר - צד שמאל */}
+            <div className="flex-1 min-w-[350px] border-r border-slate-200 pr-6">
+              {selectedDate ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-slate-700">
+                      {selectedDate.toLocaleDateString('he-IL', { weekday: 'long', day: 'numeric', month: 'long' })}
+                    </h3>
+                    <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full">
+                      {selectedDateItems.length} משימות
+                    </span>
+                  </div>
+                  
+                  {selectedDateItems.length > 0 ? (
+                    <div className="max-h-[220px] overflow-y-auto space-y-2 pr-2">
+                      {selectedDateItems.map((item) => (
+                        <div 
+                          key={`${item.type}-${item.id}`}
+                          className={`p-3 rounded-lg border ${
+                            item.isOverdue 
+                              ? 'bg-red-50 border-red-200' 
+                              : 'bg-slate-50 border-slate-200'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                  item.type === 'job' 
+                                    ? 'bg-blue-100 text-blue-700' 
+                                    : 'bg-amber-100 text-amber-700'
+                                }`}>
+                                  {item.type === 'job' ? 'עבודה' : 'הצעה'}
+                                </span>
+                                <span className="text-xs text-slate-500">#{item.id}</span>
+                              </div>
+                              <p className="text-sm font-medium text-slate-800 mt-1">
+                                {item.name}
+                              </p>
+                              {item.customerName && item.type === 'job' && (
+                                <p className="text-xs text-slate-500 mt-0.5">
+                                  לקוח: {item.customerName}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <div className={`mt-2 pt-2 border-t ${
+                            item.isOverdue ? 'border-red-200' : 'border-slate-200'
+                          }`}>
+                            <span className={`text-sm font-bold ${
+                              item.isOverdue ? 'text-red-600' : 'text-indigo-600'
+                            }`}>
+                              ▶ {item.action}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-slate-400">
+                      <CalendarDays className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">אין משימות ליום זה</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-slate-400 py-8">
+                  <CalendarDays className="h-12 w-12 mb-3 opacity-30" />
+                  <p className="text-sm font-medium">בחר יום מהלוח</p>
+                  <p className="text-xs mt-1">לצפייה במשימות ואספקות</p>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </CardContent>

@@ -87,9 +87,11 @@ export default function Home() {
       {/* Unified Pipeline - Full Width */}
       <UnifiedPipelineCard isLoading={kpisLoading} />
 
-      {/* Secondary Content Grid - 4 columns */}
-      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-        <DeliveryCalendarCard isLoading={kpisLoading} />
+      {/* Delivery Calendar - Full Width */}
+      <DeliveryCalendarCard isLoading={kpisLoading} />
+
+      {/* Secondary Content Grid - 3 columns */}
+      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
         <ReadyForPickupCard isLoading={kpisLoading} />
         <PendingSignupsCard 
           signups={signups || []} 
