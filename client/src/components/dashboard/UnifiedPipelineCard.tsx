@@ -130,7 +130,6 @@ interface PipelineItem {
   customerName: string;
   customerPhone?: string;
   productName?: string;
-  quantity?: number;
   supplierName?: string;
   supplierId?: number;
   quoteStatus: string | null;
@@ -167,16 +166,17 @@ export function UnifiedPipelineCard({ isLoading: parentLoading }: { isLoading: b
         .filter((q: any) => ['draft', 'sent'].includes(q.status))
         .forEach((quote: any) => {
           const { overdue, issue } = isQuoteOverdue(quote);
-          // לקחת פרטי מוצר מהפריט הראשון
-          const firstItem = quote.items?.[0];
-          const totalQuantity = quote.items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) || 0;
+          // בניית רשימת מוצרים: "250 כרטיסי ביקור" או "250 כרטיסי ביקור ו5 רולאפים"
+          const productsList = quote.items?.map((item: any) => 
+            `${item.quantity || 1} ${item.productName || 'מוצר'}`
+          ).join(' ו') || 'מוצר';
+          
           items.push({
             id: quote.id,
             type: 'quote',
             customerName: quote.customerName || 'לקוח לא מזוהה',
             customerPhone: quote.customerPhone,
-            productName: firstItem?.productName || 'מוצר',
-            quantity: totalQuantity,
+            productName: productsList,
             quoteStatus: quote.status,
             jobStatus: null,
             totalPrice: quote.finalValue ? parseFloat(quote.finalValue) : undefined,
@@ -299,7 +299,6 @@ export function UnifiedPipelineCard({ isLoading: parentLoading }: { isLoading: b
                                 getQuoteWhatsAppMessage(
                                   item.id,
                                   item.productName || 'מוצר',
-                                  item.quantity || 1,
                                   item.totalPrice || 0,
                                   currentUser?.name || 'צוות IDI'
                                 )

@@ -104,10 +104,10 @@ export function isQuoteOverdue(quote: any): { overdue: boolean; issue: string } 
 }
 
 // Helper to generate WhatsApp message for overdue quotes
+// productsList format: "250 כרטיסי ביקור" or "250 כרטיסי ביקור ו-5 רולאפים"
 export function getQuoteWhatsAppMessage(
   quoteId: number, 
-  productName: string, 
-  quantity: number, 
+  productsList: string, 
   price: number,
   senderName: string
 ): string {
@@ -117,7 +117,7 @@ export function getQuoteWhatsAppMessage(
     minimumFractionDigits: 0,
   }).format(price);
   
-  return `שלום, יש לכם אצלנו הצעת מחיר מספר ${quoteId} של ${quantity} ${productName} במחיר של ${formattedPrice}. איך אפשר לקדם אותה?\n${senderName}`;
+  return `שלום, יש לכם אצלנו הצעת מחיר מספר ${quoteId} של ${productsList} במחיר של ${formattedPrice}. איך אפשר לקדם אותה?\n${senderName}`;
 }
 
 // Helper to generate WhatsApp message based on job status
