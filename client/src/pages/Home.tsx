@@ -479,10 +479,10 @@ function UnifiedProgressBar({
                 {dot}
               </div>
             </TooltipTrigger>
-            <TooltipContent side="top" className="bg-slate-900 text-white text-xs p-2 max-w-[200px]">
+            <TooltipContent side="top" className="bg-slate-900 text-white text-xs p-2 max-w-[250px]">
               <div className="space-y-1">
-                <p className="font-medium text-blue-300">שלב אחרון: {currentStatusLabel || stage.label}</p>
-                <p className="text-red-300">בעיה: {issue || 'עדיין לא נמסר'}</p>
+                <p className="font-medium text-blue-300">{currentStatusLabel || stage.label}</p>
+                <p className="text-red-300">{issue || 'עדיין לא נמסר'}</p>
               </div>
             </TooltipContent>
           </Tooltip>
@@ -694,10 +694,10 @@ function JobProgressBar({ status, compact = false, isOverdue = false, currentSta
                 {dot}
               </div>
             </TooltipTrigger>
-            <TooltipContent side="top" className="bg-slate-900 text-white text-xs p-2 max-w-[200px]">
+            <TooltipContent side="top" className="bg-slate-900 text-white text-xs p-2 max-w-[250px]">
               <div className="space-y-1">
-                <p className="font-medium text-blue-300">שלב אחרון: {currentStatusLabel || stage.label}</p>
-                <p className="text-red-300">בעיה: {issue || 'עדיין לא נמסר'}</p>
+                <p className="font-medium text-blue-300">{currentStatusLabel || stage.label}</p>
+                <p className="text-red-300">{issue || 'עדיין לא נמסר'}</p>
               </div>
             </TooltipContent>
           </Tooltip>
@@ -745,18 +745,44 @@ function isJobOverdue(job: any): boolean {
   return new Date() > promisedDate;
 }
 
-// Helper to get status label in Hebrew
-function getStatusLabel(status: string): string {
+// Helper to get detailed issue description based on job status
+function getJobIssueDescription(job: any): string {
+  const status = job.status;
+  
+  // לפי השלב הנוכחי, מסביר מה הבעיה
+  switch (status) {
+    case 'pending':
+      return 'אושר על ידי הלקוח אך הספק עדיין לא אישר קבלת העבודה - היה צריך כבר למסור ללקוח';
+    case 'in_progress':
+    case 'in_production':
+    case 'accepted':
+      return 'הספק לא אישר סיום עבודה - היה צריך כבר למסור ללקוח';
+    case 'ready':
+      return 'מוכן לאיסוף אך עדיין לא נאסף - היה צריך כבר למסור ללקוח';
+    case 'picked_up':
+      return 'נאסף אך עדיין לא נמסר ללקוח';
+    default:
+      return 'עבר את מועד האספקה';
+  }
+}
+
+// Helper to get current stage label in Hebrew (for tooltip)
+function getCurrentStageLabel(status: string): string {
   const statusMap: Record<string, string> = {
-    'pending': 'ממתין לאישור ספק',
-    'in_progress': 'בייצור',
-    'in_production': 'בייצור',
-    'accepted': 'בייצור',
-    'ready': 'מוכן לאיסוף',
+    'pending': 'אושר על ידי הלקוח',
+    'in_progress': 'עבודות בביצוע',
+    'in_production': 'עבודות בביצוע',
+    'accepted': 'עבודות בביצוע',
+    'ready': 'ממתין לאיסוף',
     'picked_up': 'נאסף',
     'delivered': 'נמסר',
   };
   return statusMap[status] || status;
+}
+
+// Helper to get status label in Hebrew (legacy)
+function getStatusLabel(status: string): string {
+  return getCurrentStageLabel(status);
 }
 
 function JobsInProductionCard({ isLoading: parentLoading }: { isLoading: boolean }) {
@@ -946,7 +972,7 @@ function UnifiedPipelineCard({ isLoading: parentLoading }: { isLoading: boolean 
             quoteStatus: 'approved', // עבודה = הצעה אושרה
             jobStatus: job.status,
             isOverdue: overdue,
-            issue: overdue ? 'עבר את מועד האספקה' : undefined,
+            issue: overdue ? getJobIssueDescription(job) : undefined,
             createdAt: new Date(job.createdAt),
           });
         });
