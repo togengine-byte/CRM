@@ -499,15 +499,14 @@ function UnifiedProgressBar({
         {UNIFIED_STAGES.map((stage, index) => (
           <div key={stage.key} className="flex flex-col items-center flex-1">
             {renderDot(index, stage)}
-            {!compact && (
-              <span className={`text-[8px] mt-1 text-center leading-tight ${
-                index <= currentStage 
-                  ? (isOverdue && index === currentStage ? 'text-red-600 font-medium' : 'text-slate-600') 
-                  : 'text-slate-400'
-              }`}>
-                {stage.shortLabel}
-              </span>
-            )}
+            {/* תמיד מציג את שם השלב מתחת לנקודה */}
+            <span className={`text-[7px] mt-0.5 text-center leading-tight ${
+              index <= currentStage 
+                ? (isOverdue && index === currentStage ? 'text-red-600 font-medium' : 'text-slate-600') 
+                : 'text-slate-400'
+            }`}>
+              {stage.shortLabel}
+            </span>
           </div>
         ))}
       </div>
@@ -867,6 +866,26 @@ function JobsInProductionCard({ isLoading: parentLoading }: { isLoading: boolean
 // ==================== UNIFIED PIPELINE CARD ====================
 // כרטיס אחד עם פס התקדמות מלא לכל פריט
 
+// בדיקת איחור להצעות מחיר
+function isQuoteOverdue(quote: any): { overdue: boolean; issue: string } {
+  if (!quote.createdAt) return { overdue: false, issue: '' };
+  
+  const createdDate = new Date(quote.createdAt);
+  const now = new Date();
+  const hoursSinceCreation = Math.floor((now.getTime() - createdDate.getTime()) / (1000 * 60 * 60));
+  const daysSinceCreation = Math.floor(hoursSinceCreation / 24);
+  
+  // נשלחה יותר מ-24 שעות - ממתינה לאישור
+  if (quote.status === 'sent' && hoursSinceCreation > 24) {
+    const timeText = daysSinceCreation > 0 
+      ? `${daysSinceCreation} ימים` 
+      : `${hoursSinceCreation} שעות`;
+    return { overdue: true, issue: `ממתינה לאישור לקוח כבר ${timeText}` };
+  }
+  
+  return { overdue: false, issue: '' };
+}
+
 // מיזוג הצעות ועבודות לרשימה אחת
 interface PipelineItem {
   id: number;
@@ -878,6 +897,7 @@ interface PipelineItem {
   jobStatus: string | null;
   totalPrice?: number;
   isOverdue: boolean;
+  issue?: string;
   createdAt: Date;
 }
 
@@ -896,6 +916,7 @@ function UnifiedPipelineCard({ isLoading: parentLoading }: { isLoading: boolean 
       quotes
         .filter((q: any) => ['draft', 'sent'].includes(q.status))
         .forEach((quote: any) => {
+          const { overdue, issue } = isQuoteOverdue(quote);
           items.push({
             id: quote.id,
             type: 'quote',
@@ -903,7 +924,8 @@ function UnifiedPipelineCard({ isLoading: parentLoading }: { isLoading: boolean 
             quoteStatus: quote.status,
             jobStatus: null,
             totalPrice: quote.totalPrice,
-            isOverdue: false,
+            isOverdue: overdue,
+            issue: issue,
             createdAt: new Date(quote.createdAt),
           });
         });
@@ -914,6 +936,7 @@ function UnifiedPipelineCard({ isLoading: parentLoading }: { isLoading: boolean 
       jobs
         .filter((j: any) => !['delivered', 'cancelled'].includes(j.status))
         .forEach((job: any) => {
+          const overdue = isJobOverdue(job);
           items.push({
             id: job.id,
             type: 'job',
@@ -922,7 +945,8 @@ function UnifiedPipelineCard({ isLoading: parentLoading }: { isLoading: boolean 
             supplierName: job.supplierName,
             quoteStatus: 'approved', // עבודה = הצעה אושרה
             jobStatus: job.status,
-            isOverdue: isJobOverdue(job),
+            isOverdue: overdue,
+            issue: overdue ? 'עבר את מועד האספקה' : undefined,
             createdAt: new Date(job.createdAt),
           });
         });
@@ -1016,8 +1040,8 @@ function UnifiedPipelineCard({ isLoading: parentLoading }: { isLoading: boolean 
                   quoteStatus={item.quoteStatus}
                   jobStatus={item.jobStatus}
                   isOverdue={item.isOverdue}
-                  currentStatusLabel={item.jobStatus ? getStatusLabel(item.jobStatus) : undefined}
-                  issue={item.isOverdue ? 'עדיין לא נמסר' : undefined}
+                  currentStatusLabel={item.jobStatus ? getStatusLabel(item.jobStatus) : (item.quoteStatus === 'sent' ? 'ממתין לאישור לקוח' : 'הצעת מחיר')}
+                  issue={item.issue}
                 />
               </div>
             ))}
