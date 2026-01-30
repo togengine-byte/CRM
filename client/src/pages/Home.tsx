@@ -388,10 +388,10 @@ function KPICard({
 // פס התקדמות אחד רציף לכל התהליך - מטיוטה עד נמסר
 
 const UNIFIED_STAGES = [
-  { key: 'draft', label: 'הצעת מחיר', shortLabel: 'הצעה', phase: 'sales' },
-  { key: 'sent', label: 'ממתין לאישור לקוח', shortLabel: 'ממתין ללקוח', phase: 'sales' },
-  { key: 'approved', label: 'אושר על ידי הלקוח', shortLabel: 'אושר', phase: 'sales' },
-  { key: 'in_production', label: 'עבודות בביצוע', shortLabel: 'בביצוע', phase: 'production' },
+  { key: 'draft', label: 'הצעות מחיר', shortLabel: 'הצעות מחיר', phase: 'sales' },
+  { key: 'sent', label: 'ממתין לאישור לקוח', shortLabel: 'ממתין לאישור לקוח', phase: 'sales' },
+  { key: 'approved', label: 'אושר על ידי הלקוח', shortLabel: 'אושר על ידי הלקוח', phase: 'sales' },
+  { key: 'in_production', label: 'עבודות בביצוע', shortLabel: 'עבודות בביצוע', phase: 'production' },
   { key: 'ready', label: 'ממתין לאיסוף', shortLabel: 'ממתין לאיסוף', phase: 'production' },
   { key: 'picked_up', label: 'נאסף', shortLabel: 'נאסף', phase: 'delivery' },
   { key: 'delivered', label: 'נמסר', shortLabel: 'נמסר', phase: 'delivery' },
