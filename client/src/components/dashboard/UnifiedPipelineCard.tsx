@@ -143,8 +143,15 @@ interface PipelineItem {
 export function UnifiedPipelineCard({ isLoading: parentLoading }: { isLoading: boolean }) {
   const { data: quotes, isLoading: quotesLoading } = trpc.quotes.list.useQuery();
   const { data: jobs, isLoading: jobsLoading } = trpc.jobs.list.useQuery();
+  const { data: suppliers, isLoading: suppliersLoading } = trpc.suppliers.list.useQuery();
   const [isExpanded, setIsExpanded] = React.useState(false);
-  const loading = parentLoading || quotesLoading || jobsLoading;
+  const loading = parentLoading || quotesLoading || jobsLoading || suppliersLoading;
+  
+  // מיפוי ספקים לפי ID לגישה מהירה לטלפון עדכני
+  const suppliersMap = React.useMemo(() => {
+    if (!suppliers) return new Map<number, any>();
+    return new Map(suppliers.map((s: any) => [s.id, s]));
+  }, [suppliers]);
   
   // מיזוג כל הפריטים לרשימה אחת
   const pipelineItems: PipelineItem[] = React.useMemo(() => {

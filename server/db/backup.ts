@@ -9,10 +9,11 @@
 
 import { getDb } from './connection';
 import { 
-  users, customers, suppliers, products, quotes, quoteItems, 
-  jobs, notes, activity, systemSettings, couriers, courierDeliveries,
-  supplierPrices, sizeQuantities, productCategories
-} from '@shared/schema';
+  users, categories, baseProducts, quotes, quoteItems, 
+  supplierJobs, internalNotes, activityLog, systemSettings,
+  supplierPrices, sizeQuantities, pricelists, customerPricelists,
+  customerSignupRequests
+} from '../../drizzle/schema';
 import { sendEmail } from './email';
 import { getSystemSetting, setSystemSetting } from './settings';
 import * as fs from 'fs';
@@ -44,20 +45,19 @@ async function getAllData() {
       version: '1.0',
       tables: {
         users: await db.select().from(users),
-        customers: await db.select().from(customers),
-        suppliers: await db.select().from(suppliers),
-        products: await db.select().from(products),
-        productCategories: await db.select().from(productCategories),
+        categories: await db.select().from(categories),
+        baseProducts: await db.select().from(baseProducts),
         quotes: await db.select().from(quotes),
         quoteItems: await db.select().from(quoteItems),
         sizeQuantities: await db.select().from(sizeQuantities),
-        jobs: await db.select().from(jobs),
-        notes: await db.select().from(notes),
-        activity: await db.select().from(activity),
+        supplierJobs: await db.select().from(supplierJobs),
+        internalNotes: await db.select().from(internalNotes),
+        activityLog: await db.select().from(activityLog),
         systemSettings: await db.select().from(systemSettings),
-        couriers: await db.select().from(couriers),
-        courierDeliveries: await db.select().from(courierDeliveries),
         supplierPrices: await db.select().from(supplierPrices),
+        pricelists: await db.select().from(pricelists),
+        customerPricelists: await db.select().from(customerPricelists),
+        customerSignupRequests: await db.select().from(customerSignupRequests),
       }
     };
     return data;
