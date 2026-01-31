@@ -5,7 +5,7 @@
 
 import { z } from "zod";
 import { protectedProcedure, adminProcedure, publicProcedure, router } from "../_core/trpc";
-import { createCustomerWithQuote } from "../createCustomerWithQuote";
+import { createCustomerWithQuote, createCustomerWithFilesOnly } from "../createCustomerWithQuote";
 import {
   getCustomers,
   getCustomerById,
@@ -18,6 +18,15 @@ import {
   setCustomerDefaultPricelist,
   getCustomerStats,
 } from "../db";
+
+// Schema for file attachments
+const attachmentSchema = z.object({
+  fileName: z.string(),
+  fileUrl: z.string(),
+  s3Key: z.string(),
+  fileSize: z.number().optional(),
+  mimeType: z.string().optional(),
+});
 
 export const customersRouter = router({
   list: protectedProcedure
@@ -147,6 +156,7 @@ export const customersRouter = router({
       return await createCustomer(input);
     }),
 
+  // Create customer with quote (with products)
   createWithQuote: publicProcedure
     .input(z.object({
       customerInfo: z.object({
@@ -161,8 +171,26 @@ export const customersRouter = router({
         quantity: z.number().int().positive(),
       })).min(1),
       notes: z.string().optional(),
+      attachments: z.array(attachmentSchema).optional(),
     }))
     .mutation(async ({ input }) => {
       return await createCustomerWithQuote(input);
+    }),
+
+  // Create quote with files only (no products selected)
+  createQuoteWithFilesOnly: publicProcedure
+    .input(z.object({
+      customerInfo: z.object({
+        name: z.string().min(1),
+        email: z.string().email(),
+        phone: z.string().min(1),
+        companyName: z.string().optional(),
+        address: z.string().optional(),
+      }),
+      description: z.string().min(1, "נדרש תיאור הפרויקט"),
+      attachments: z.array(attachmentSchema).min(1, "נדרש להעלות לפחות קובץ אחד"),
+    }))
+    .mutation(async ({ input }) => {
+      return await createCustomerWithFilesOnly(input);
     }),
 });
