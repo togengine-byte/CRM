@@ -114,13 +114,14 @@ export async function approveCustomer(customerId: number, approvedBy: number) {
 
     if (quoteItemsData.length > 0 || attachmentsData.length > 0) {
       // Calculate total price from size_quantities
+      // Note: price in size_quantities already includes the quantity (e.g., 500 cards = 220 NIS)
       let totalPrice = 0;
       for (const item of quoteItemsData) {
         const priceResult = await db.execute(sql`
           SELECT price FROM size_quantities WHERE id = ${item.sizeQuantityId}
         `);
         const price = priceResult.rows[0]?.price || 0;
-        totalPrice += Number(price) * (item.quantity || 1);
+        totalPrice += Number(price); // Don't multiply by quantity - price already includes it
       }
 
       // Create the quote
@@ -144,7 +145,7 @@ export async function approveCustomer(customerId: number, approvedBy: number) {
           quoteId: newQuote.id,
           sizeQuantityId: item.sizeQuantityId,
           quantity: item.quantity || 1,
-          priceAtTimeOfQuote: String(Number(price) * (item.quantity || 1)),
+          priceAtTimeOfQuote: String(price), // Price already includes quantity
           addonIds: item.addonIds || [],
         });
       }
