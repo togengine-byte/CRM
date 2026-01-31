@@ -71,9 +71,27 @@ export interface Quantity {
   price: string;
 }
 
+export interface Addon {
+  id: number;
+  name: string;
+  description?: string | null;
+  priceType: string; // 'fixed' or 'percentage'
+  price: string;
+  categoryId?: number | null;
+  productId?: number | null;
+  isActive?: boolean;
+}
+
 // ============================================================================
 // Selected Product Types
 // ============================================================================
+
+export interface SelectedAddon {
+  id: number;
+  name: string;
+  priceType: string;
+  price: number; // parsed price
+}
 
 export interface SelectedProduct {
   id: string; // unique id for this selection
@@ -90,6 +108,7 @@ export interface SelectedProduct {
   graphicDesignPrice: number;
   file?: ProductFile;
   needsGraphicDesign?: boolean;
+  addons?: SelectedAddon[]; // selected addons for this product
 }
 
 // ============================================================================

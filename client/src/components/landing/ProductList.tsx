@@ -119,10 +119,10 @@ export function ProductList({
                         <button
                           type="button"
                           onClick={() => onToggleGraphicDesign(product.id)}
-                          className="flex items-center gap-1 mt-2 px-3 py-1.5 bg-purple-100 text-purple-700 rounded text-[11px] hover:bg-purple-200"
+                          className="flex items-center gap-1 mt-2 px-3 py-1.5 text-purple-700 rounded text-[11px] hover:bg-purple-50 border border-purple-200"
                         >
                           <Palette className="h-3.5 w-3.5" />
-                          אנחנו נעשה לך גרפיקה
+                          לחץ כאן לביצוע גרפיקה על ידינו
                         </button>
                       </div>
                     )}
