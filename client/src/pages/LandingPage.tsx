@@ -56,6 +56,16 @@ interface ProductFile {
 interface Category {
   id: number;
   name: string;
+  // Validation settings
+  validationEnabled?: boolean;
+  minDpi?: number;
+  maxDpi?: number | null;
+  allowedColorspaces?: string[];
+  requiredBleedMm?: string;
+  requireBleed?: boolean;
+  maxFileSizeMb?: number;
+  allowedFormats?: string[];
+  aspectRatioTolerance?: string;
 }
 
 interface Product {
@@ -83,6 +93,7 @@ interface SelectedProduct {
   productId: number;
   productName: string;
   categoryId: number;
+  categoryValidation?: Category; // הגדרות וולידציה מהקטגוריה
   sizeId: number;
   sizeName: string;
   sizeDimensions?: string;
@@ -207,44 +218,74 @@ export default function LandingPage() {
     });
   };
 
-  // Parse dimensions string (e.g., "80x200" -> { width: 80, height: 200 })
+  // Parse dimensions string - supports both cm (e.g., "80x200") and mm (e.g., "800x2000")
+  // If both numbers are > 500, assume mm; otherwise assume cm
   const parseDimensions = (dimensions?: string): { widthMm: number; heightMm: number } | null => {
     if (!dimensions) return null;
     const match = dimensions.match(/(\d+(?:\.\d+)?)\s*[xX×]\s*(\d+(?:\.\d+)?)/);
     if (!match) return null;
+    
+    let width = parseFloat(match[1]);
+    let height = parseFloat(match[2]);
+    
+    // Auto-detect: if both values are large (>500), assume already in mm
+    // Otherwise assume cm and convert to mm
+    const isAlreadyMm = width > 500 || height > 500;
+    
     return {
-      widthMm: parseFloat(match[1]) * 10, // cm to mm
-      heightMm: parseFloat(match[2]) * 10,
+      widthMm: isAlreadyMm ? width : width * 10,
+      heightMm: isAlreadyMm ? height : height * 10,
     };
   };
 
-  // Validate file against product requirements
+  // Validate file against product requirements using category settings
   const validateFileForProduct = async (
     file: File, 
     imageDimensions: { width: number; height: number } | null,
-    sizeDimensions?: string
+    sizeDimensions?: string,
+    categoryValidation?: Category
   ): Promise<{ errors: ValidationIssue[]; warnings: ValidationIssue[] }> => {
     const errors: ValidationIssue[] = [];
     const warnings: ValidationIssue[] = [];
 
-    // Basic validation
-    const extension = '.' + file.name.split('.').pop()?.toLowerCase();
-    if (!ALLOWED_EXTENSIONS.includes(extension)) {
+    // Get validation settings from category or use defaults
+    const minDpi = categoryValidation?.minDpi ?? 150;
+    const maxFileSizeMb = categoryValidation?.maxFileSizeMb ?? 100;
+    const allowedFormats = categoryValidation?.allowedFormats ?? ['pdf', 'ai', 'eps', 'tiff', 'jpg', 'png'];
+    const aspectRatioTolerance = parseFloat(categoryValidation?.aspectRatioTolerance ?? '10');
+    const validationEnabled = categoryValidation?.validationEnabled !== false;
+
+    // If validation is disabled for this category, skip all checks
+    if (!validationEnabled) {
+      return { errors, warnings };
+    }
+
+    // Check file format
+    const extension = file.name.split('.').pop()?.toLowerCase() || '';
+    const formatAllowed = allowedFormats.some(fmt => 
+      extension === fmt.toLowerCase() || 
+      (fmt === 'jpg' && extension === 'jpeg') ||
+      (fmt === 'tiff' && extension === 'tif')
+    );
+    
+    if (!formatAllowed) {
       errors.push({
         type: 'format',
         severity: 'error',
         message: 'פורמט קובץ לא נתמך',
-        details: `הפורמט ${extension.toUpperCase()} אינו מותר`,
+        details: `הפורמט ${extension.toUpperCase()} אינו מותר. פורמטים מותרים: ${allowedFormats.join(', ').toUpperCase()}`,
       });
       return { errors, warnings };
     }
 
-    if (file.size > MAX_FILE_SIZE) {
+    // Check file size
+    const fileSizeMb = file.size / 1024 / 1024;
+    if (fileSizeMb > maxFileSizeMb) {
       errors.push({
         type: 'filesize',
         severity: 'error',
         message: 'קובץ גדול מדי',
-        details: `גודל הקובץ ${(file.size / 1024 / 1024).toFixed(1)}MB חורג מהמקסימום`,
+        details: `גודל הקובץ ${fileSizeMb.toFixed(1)}MB חורג מהמקסימום (${maxFileSizeMb}MB)`,
       });
       return { errors, warnings };
     }
@@ -258,20 +299,22 @@ export default function LandingPage() {
         const dpiHeight = (imageDimensions.height / targetDims.heightMm) * 25.4;
         const avgDpi = Math.round((dpiWidth + dpiHeight) / 2);
 
-        // Check DPI (minimum 150 for acceptable, 300 for optimal)
-        if (avgDpi < 100) {
+        // Check DPI against category settings
+        const criticalMinDpi = Math.floor(minDpi * 0.5); // 50% of minDpi is critical error
+        
+        if (avgDpi < criticalMinDpi) {
           errors.push({
             type: 'dpi',
             severity: 'error',
             message: 'רזולוציה נמוכה מדי',
-            details: `הרזולוציה ${avgDpi} DPI נמוכה מדי להדפסה איכותית (מינימום 150 DPI)`,
+            details: `הרזולוציה ${avgDpi} DPI נמוכה מדי להדפסה איכותית (מינימום נדרש ${minDpi} DPI)`,
           });
-        } else if (avgDpi < 150) {
+        } else if (avgDpi < minDpi) {
           warnings.push({
             type: 'dpi',
             severity: 'warning',
             message: 'רזולוציה נמוכה',
-            details: `הרזולוציה ${avgDpi} DPI עשויה לגרום לתוצאה לא אופטימלית (מומלץ 300 DPI)`,
+            details: `הרזולוציה ${avgDpi} DPI נמוכה מהמומלץ (${minDpi} DPI) - עלול להשפיע על האיכות`,
           });
         }
 
@@ -280,7 +323,7 @@ export default function LandingPage() {
         const targetRatio = targetDims.widthMm / targetDims.heightMm;
         const ratioDiff = Math.abs(fileRatio - targetRatio) / targetRatio * 100;
 
-        if (ratioDiff > 10) {
+        if (ratioDiff > aspectRatioTolerance) {
           warnings.push({
             type: 'aspectratio',
             severity: 'warning',
@@ -360,11 +403,12 @@ export default function LandingPage() {
     const s3Result = await uploadFileToS3(file);
     
     if (s3Result) {
-      // Validate file against product size
+      // Validate file against product size using category settings
       const { errors, warnings } = await validateFileForProduct(
         file,
         imageDimensions,
-        product.sizeDimensions
+        product.sizeDimensions,
+        product.categoryValidation
       );
 
       // Update product with uploaded file and validation results
@@ -475,11 +519,15 @@ export default function LandingPage() {
       return;
     }
 
+    // Get category validation settings
+    const categoryData = categories?.find(c => c.id === selectedCategoryId);
+
     const newProduct: SelectedProduct = {
       id: Math.random().toString(36).substr(2, 9),
       productId: selectedProductId,
       productName: selectedProduct?.name || "",
       categoryId: selectedCategoryId,
+      categoryValidation: categoryData, // הגדרות וולידציה מהקטגוריה
       sizeId: selectedSizeId,
       sizeName: selectedSize?.name || "",
       sizeDimensions: selectedSize?.dimensions,
