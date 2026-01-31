@@ -668,66 +668,36 @@ export interface NewQuoteRequest {
 }
 
 /**
- * Get new quote requests (quotes with status 'draft' or 'pending')
- * These are requests from the landing page waiting for review
+ * Get new quote requests from NEW CUSTOMERS (pending_approval status)
+ * These are requests from the landing page waiting for customer approval
  */
 export async function getNewQuoteRequests(limit: number = 10): Promise<NewQuoteRequest[]> {
   const db = await getDb();
   if (!db) return [];
 
   try {
-    // Get quotes with customer info
-    const quotesResult = await db.execute(sql`
+    // Get new customers with pending_approval status and their request data from activity_log
+    const customersResult = await db.execute(sql`
       SELECT 
-        q.id,
-        q."customerId",
-        q.status,
-        q."createdAt",
+        u.id,
         u.name as "customerName",
         u.email as "customerEmail",
         u.phone as "customerPhone",
-        u."companyName" as "customerCompany"
-      FROM quotes q
-      LEFT JOIN users u ON q."customerId" = u.id
-      WHERE q.status IN ('draft', 'pending')
-      ORDER BY q."createdAt" DESC
+        u."companyName" as "customerCompany",
+        u.status,
+        u."createdAt",
+        al.details as "requestDetails"
+      FROM users u
+      LEFT JOIN activity_log al ON al."userId" = u.id 
+        AND al."actionType" = 'pending_quote_request_data'
+      WHERE u.status = 'pending_approval'
+        AND u.role = 'customer'
+      ORDER BY u."createdAt" DESC
       LIMIT ${limit}
     `);
 
-    const quotesList = quotesResult.rows as any[];
-    if (quotesList.length === 0) return [];
-
-    // Get items for all quotes
-    const quoteIds = quotesList.map(q => q.id);
-    const itemsResult = await db.execute(sql`
-      SELECT 
-        qi.id,
-        qi."quoteId",
-        qi.quantity,
-        qi."addonIds",
-        bp.name as "productName",
-        ps.name as "sizeName",
-        ps.dimensions
-      FROM quote_items qi
-      LEFT JOIN size_quantities sq ON qi."sizeQuantityId" = sq.id
-      LEFT JOIN product_sizes ps ON sq."sizeId" = ps.id
-      LEFT JOIN base_products bp ON ps."productId" = bp.id
-      WHERE qi."quoteId" = ANY(${quoteIds}::int[])
-    `);
-
-    // Get attachments for all quotes
-    const attachmentsResult = await db.execute(sql`
-      SELECT 
-        id,
-        "quoteId",
-        "quoteItemId",
-        "fileName",
-        "fileUrl",
-        "fileSize",
-        "mimeType"
-      FROM quote_attachments
-      WHERE "quoteId" = ANY(${quoteIds}::int[])
-    `);
+    const customersList = customersResult.rows as any[];
+    if (customersList.length === 0) return [];
 
     // Get all addon names for addon IDs
     const addonsResult = await db.execute(sql`
@@ -735,53 +705,78 @@ export async function getNewQuoteRequests(limit: number = 10): Promise<NewQuoteR
     `);
     const addonsMap = new Map((addonsResult.rows as any[]).map(a => [a.id, a.name]));
 
-    // Build the response
-    const result: NewQuoteRequest[] = quotesList.map(quote => {
-      const items = (itemsResult.rows as any[])
-        .filter(item => item.quoteId === quote.id)
-        .map(item => {
-          let addonIds: number[] = [];
-          try {
-            if (item.addonIds) {
-              addonIds = JSON.parse(item.addonIds);
-            }
-          } catch (e) {}
+    // Get product info for sizeQuantityIds
+    const getProductInfo = async (sizeQuantityId: number) => {
+      const result = await db.execute(sql`
+        SELECT 
+          sq.id,
+          sq.quantity,
+          ps.name as "sizeName",
+          ps.dimensions,
+          bp.name as "productName"
+        FROM size_quantities sq
+        LEFT JOIN product_sizes ps ON sq."sizeId" = ps.id
+        LEFT JOIN base_products bp ON ps."productId" = bp.id
+        WHERE sq.id = ${sizeQuantityId}
+      `);
+      return result.rows[0] as any;
+    };
+
+    // Build the response from activity log data
+    const result: NewQuoteRequest[] = [];
+    
+    for (const customer of customersList) {
+      const requestDetails = customer.requestDetails as any;
+      
+      // Parse items from request details
+      const items: NewQuoteRequest['items'] = [];
+      if (requestDetails?.quoteItems) {
+        for (let i = 0; i < requestDetails.quoteItems.length; i++) {
+          const item = requestDetails.quoteItems[i];
+          const productInfo = await getProductInfo(item.sizeQuantityId);
+          const addonIds = item.addonIds || [];
           
-          return {
-            id: item.id,
-            productName: item.productName || 'מוצר לא ידוע',
-            sizeName: item.sizeName || 'גודל לא ידוע',
-            dimensions: item.dimensions,
+          items.push({
+            id: i + 1,
+            productName: productInfo?.productName || 'מוצר לא ידוע',
+            sizeName: productInfo?.sizeName || 'גודל לא ידוע',
+            dimensions: productInfo?.dimensions,
             quantity: item.quantity,
             addonIds,
-            addonNames: addonIds.map(id => addonsMap.get(id) || `תוספת ${id}`),
-          };
+            addonNames: addonIds.map((id: number) => addonsMap.get(id) || `תוספת ${id}`),
+          });
+        }
+      }
+
+      // Parse attachments from request details
+      const attachments: NewQuoteRequest['attachments'] = [];
+      if (requestDetails?.attachments) {
+        requestDetails.attachments.forEach((att: any, i: number) => {
+          attachments.push({
+            id: i + 1,
+            fileName: att.fileName || 'קובץ',
+            fileUrl: att.fileUrl || '',
+            fileSize: att.fileSize,
+            mimeType: att.mimeType,
+            quoteItemId: null,
+          });
         });
+      }
 
-      const attachments = (attachmentsResult.rows as any[])
-        .filter(att => att.quoteId === quote.id)
-        .map(att => ({
-          id: att.id,
-          fileName: att.fileName,
-          fileUrl: att.fileUrl,
-          fileSize: att.fileSize,
-          mimeType: att.mimeType,
-          quoteItemId: att.quoteItemId,
-        }));
-
-      return {
-        id: quote.id,
-        customerId: quote.customerId,
-        customerName: quote.customerName || 'לקוח חדש',
-        customerEmail: quote.customerEmail || '',
-        customerPhone: quote.customerPhone || '',
-        customerCompany: quote.customerCompany,
-        status: quote.status,
-        createdAt: quote.createdAt,
+      result.push({
+        id: customer.id,
+        customerId: customer.id,
+        customerName: customer.customerName || 'לקוח חדש',
+        customerEmail: customer.customerEmail || '',
+        customerPhone: customer.customerPhone || '',
+        customerCompany: customer.customerCompany,
+        status: customer.status,
+        createdAt: customer.createdAt,
         items,
         attachments,
-      };
-    });
+        notes: requestDetails?.notes || null,
+      });
+    }
 
     return result;
   } catch (error) {
