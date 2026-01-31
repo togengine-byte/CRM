@@ -682,83 +682,108 @@ export default function Suppliers() {
                                   </div>
                                 </div>
                               ) : (
-                                <>
-                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                    <div className="flex items-center gap-2">
-                                      <Mail className="h-4 w-4 text-muted-foreground" />
-                                      <span dir="ltr">{supplierDetails.email || "-"}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <Phone className="h-4 w-4 text-muted-foreground" />
-                                      <span dir="ltr">{supplierDetails.phone || "-"}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                                      <span>{supplierDetails.address || "-"}</span>
-                                    </div>
-                                    {supplierDetails.whatsapp && (
-                                      <div className="flex items-center gap-2">
-                                        <MessageCircle className="h-4 w-4 text-green-600" />
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                  <div className="space-y-1">
+                                    <Label className="text-xs">שם</Label>
+                                    <Input
+                                      value={supplierDetails.name || ""}
+                                      disabled
+                                      className="bg-muted/50"
+                                    />
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-xs">אימייל</Label>
+                                    <Input
+                                      value={supplierDetails.email || ""}
+                                      disabled
+                                      dir="ltr"
+                                      className="bg-muted/50"
+                                    />
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-xs">טלפון</Label>
+                                    <Input
+                                      value={supplierDetails.phone || ""}
+                                      disabled
+                                      dir="ltr"
+                                      className="bg-muted/50"
+                                    />
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-xs">שם חברה</Label>
+                                    <Input
+                                      value={supplierDetails.companyName || ""}
+                                      disabled
+                                      className="bg-muted/50"
+                                    />
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-xs">כתובת</Label>
+                                    <Input
+                                      value={supplierDetails.address || ""}
+                                      disabled
+                                      className="bg-muted/50"
+                                    />
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-xs">וואטסאפ</Label>
+                                    <div className="flex gap-2">
+                                      <Input
+                                        value={supplierDetails.whatsapp || ""}
+                                        disabled
+                                        dir="ltr"
+                                        className="bg-muted/50 flex-1"
+                                      />
+                                      {supplierDetails.whatsapp && (
                                         <a 
                                           href={`https://wa.me/${supplierDetails.whatsapp.replace(/[^0-9]/g, '')}`}
                                           target="_blank"
                                           rel="noopener noreferrer"
-                                          className="text-green-600 hover:underline"
-                                          dir="ltr"
+                                          className="flex items-center justify-center w-10 h-10 bg-green-500 hover:bg-green-600 rounded-md text-white"
                                         >
-                                          {supplierDetails.whatsapp}
+                                          <MessageCircle className="h-4 w-4" />
                                         </a>
-                                      </div>
-                                    )}
-                                  </div>
-                                  {(supplierDetails.contactPerson || supplierDetails.contactPhone) && (
-                                    <div className="flex flex-wrap gap-6 text-sm mt-2 pt-2 border-t border-dashed">
-                                      {supplierDetails.contactPerson && (
-                                        <div className="flex items-center gap-2">
-                                          <User className="h-4 w-4 text-muted-foreground" />
-                                          <span className="text-muted-foreground">איש קשר נוסף:</span>
-                                          <span>{supplierDetails.contactPerson}</span>
-                                        </div>
-                                      )}
-                                      {supplierDetails.contactPhone && (
-                                        <div className="flex items-center gap-2">
-                                          <Phone className="h-4 w-4 text-muted-foreground" />
-                                          <span className="text-muted-foreground">טלפון נוסף:</span>
-                                          <span dir="ltr">{supplierDetails.contactPhone}</span>
-                                        </div>
                                       )}
                                     </div>
-                                  )}
-                                </>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-xs">איש קשר נוסף</Label>
+                                    <Input
+                                      value={supplierDetails.contactPerson || ""}
+                                      disabled
+                                      className="bg-muted/50"
+                                    />
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-xs">טלפון נוסף</Label>
+                                    <Input
+                                      value={supplierDetails.contactPhone || ""}
+                                      disabled
+                                      dir="ltr"
+                                      className="bg-muted/50"
+                                    />
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-xs">ח.פ / עוסק מורשה</Label>
+                                    <Input
+                                      value={supplierDetails.taxId || ""}
+                                      disabled
+                                      dir="ltr"
+                                      className="bg-muted/50"
+                                    />
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-xs">תנאי תשלום</Label>
+                                    <Input
+                                      value={supplierDetails.paymentTerms || ""}
+                                      disabled
+                                      className="bg-muted/50"
+                                    />
+                                  </div>
+                                </div>
                               )}
                             </div>
 
-                            {/* פרטים עסקיים */}
-                            {!isEditingSupplier && (
-                              <div className="space-y-3 border-t pt-4">
-                                <h4 className="font-semibold text-sm flex items-center gap-2">
-                                  <Building2 className="h-4 w-4" />
-                                  פרטים עסקיים
-                                </h4>
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                                  <div className="flex items-center gap-2">
-                                    <CreditCard className="h-4 w-4 text-muted-foreground" />
-                                    <span className="text-muted-foreground">ח.פ / ע.מ:</span>
-                                    <span dir="ltr">{supplierDetails.taxId || "-"}</span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <Banknote className="h-4 w-4 text-muted-foreground" />
-                                    <span className="text-muted-foreground">תנאי תשלום:</span>
-                                    <span>{supplierDetails.paymentTerms || "-"}</span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <Clock className="h-4 w-4 text-muted-foreground" />
-                                    <span className="text-muted-foreground">ימי אספקה ממוצעים:</span>
-                                    <span>{supplierDetails.ratings?.speed?.avgDeliveryDays || "-"} ימים</span>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
 
                             {/* סטטיסטיקות */}
                             <div className="space-y-3 border-t pt-4">
