@@ -13,6 +13,7 @@ interface CalendarItem {
   status: string;
   action: string;
   isOverdue: boolean;
+  daysOverdue: number;
   date: Date;
 }
 
@@ -38,6 +39,11 @@ export function DeliveryCalendarCard({ isLoading: parentLoading }: { isLoading: 
             const createdDate = new Date(job.createdAt);
             const originalDeliveryDate = new Date(createdDate.getTime() + job.promisedDeliveryDays * 24 * 60 * 60 * 1000);
             const isOverdue = today > originalDeliveryDate;
+            
+            // חישוב ימי איחור
+            const daysOverdue = isOverdue 
+              ? Math.floor((today.getTime() - originalDeliveryDate.getTime()) / (24 * 60 * 60 * 1000))
+              : 0;
             
             // אם המשימה באיחור - מציג אותה ביום הנוכחי (לא נאבד משימות)
             const displayDate = isOverdue ? today : originalDeliveryDate;
@@ -68,6 +74,7 @@ export function DeliveryCalendarCard({ isLoading: parentLoading }: { isLoading: 
               status: job.status,
               action,
               isOverdue,
+              daysOverdue,
               date: displayDate
             });
           }
@@ -87,6 +94,9 @@ export function DeliveryCalendarCard({ isLoading: parentLoading }: { isLoading: 
               // הצעה באיחור - מציג אותה בתאריך של היום
               const dateKey = today.toISOString().split('T')[0];
               
+              // חישוב ימי איחור (מה-deadline)
+              const daysOverdue = Math.floor((today.getTime() - deadlineDate.getTime()) / (24 * 60 * 60 * 1000));
+              
               if (!dateMap.has(dateKey)) {
                 dateMap.set(dateKey, []);
               }
@@ -98,6 +108,7 @@ export function DeliveryCalendarCard({ isLoading: parentLoading }: { isLoading: 
                 status: 'sent',
                 action: 'לעקוב אחרי לקוח',
                 isOverdue: true,
+                daysOverdue,
                 date: today
               });
             }
@@ -292,6 +303,11 @@ export function DeliveryCalendarCard({ isLoading: parentLoading }: { isLoading: 
                           }`}>
                             {item.action}
                           </span>
+                          {item.isOverdue && item.daysOverdue > 0 && (
+                            <span className="px-1.5 py-0.5 rounded bg-red-100 text-red-700 text-[10px] font-bold whitespace-nowrap">
+                              {item.daysOverdue} {item.daysOverdue === 1 ? 'יום' : 'ימים'} איחור
+                            </span>
+                          )}
                         </div>
                       ))}
                     </div>
