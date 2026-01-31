@@ -17,6 +17,9 @@ interface CreateCustomerWithQuoteInput {
     phone: string;
     companyName?: string;
     address?: string;
+    billingEmail?: string;
+    taxId?: string;
+    contactPerson?: string;
   };
   quoteItems: Array<{
     sizeQuantityId: number;
@@ -34,6 +37,9 @@ interface CreateCustomerWithFilesOnlyInput {
     phone: string;
     companyName?: string;
     address?: string;
+    billingEmail?: string;
+    taxId?: string;
+    contactPerson?: string;
   };
   description: string;
   attachments: Attachment[];
@@ -114,6 +120,9 @@ async function getOrCreateCustomer(db: any, customerInfo: CreateCustomerWithQuot
       phone: customerInfo.phone,
       companyName: customerInfo.companyName || null,
       address: customerInfo.address || null,
+      billingEmail: customerInfo.billingEmail || null,
+      taxId: customerInfo.taxId || null,
+      contactPerson: customerInfo.contactPerson || null,
       role: "customer",
       status: "pending_approval",
       customerNumber: customerNumber,

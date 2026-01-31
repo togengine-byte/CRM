@@ -413,6 +413,10 @@ export default function LandingPage() {
             email: customerData.email,
             phone: customerData.phone,
             companyName: customerData.company || undefined,
+            address: customerData.address || undefined,
+            billingEmail: customerData.billingEmail || undefined,
+            taxId: customerData.taxId || undefined,
+            contactPerson: customerData.contactPerson || undefined,
           },
           quoteItems: selectedProducts.map((p) => ({
             sizeQuantityId: p.quantityId,
@@ -435,6 +439,10 @@ export default function LandingPage() {
             email: customerData.email,
             phone: customerData.phone,
             companyName: customerData.company || undefined,
+            address: customerData.address || undefined,
+            billingEmail: customerData.billingEmail || undefined,
+            taxId: customerData.taxId || undefined,
+            contactPerson: customerData.contactPerson || undefined,
           },
           description: description,
           attachments: generalFiles
