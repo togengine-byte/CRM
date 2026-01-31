@@ -9,6 +9,7 @@ export { CustomerForm } from "./CustomerForm";
 export { ProductSelector } from "./ProductSelector";
 export { ProductList } from "./ProductList";
 export { GeneralFileUploader } from "./GeneralFileUploader";
+export { ProductSelectionRow } from "./ProductSelectionRow";
 
 // Types
 export * from "./types";

@@ -2,6 +2,7 @@
  * Landing Page
  * Main page for customer quote requests
  * Compact Split Screen Design with Colors
+ * New flow: Select product -> Upload file -> Animate to summary
  */
 
 import { useState, useMemo, useCallback } from "react";
@@ -12,12 +13,13 @@ import {
   Send, Loader2, LogIn, Package, Upload, X, Check, 
   Trash2, AlertCircle, AlertTriangle, Palette, FileText,
   Image, File, Plus, Tag, ShoppingCart, User, Phone, Mail, Building,
-  ChevronDown, ChevronUp, MapPin, Receipt, Hash, UserPlus
+  ChevronDown, ChevronUp, MapPin, Receipt, Hash, UserPlus, Video, FileQuestion
 } from "lucide-react";
 
 // Landing page components & utils
 import {
   LoginModal,
+  ProductSelectionRow,
   type CustomerFormData,
   type SelectedProduct,
   type ProductFile,
@@ -29,6 +31,13 @@ import {
   validateFileBasic,
   ALLOWED_EXTENSIONS,
 } from "@/components/landing";
+
+// Success sound for animations
+const playSuccessSound = () => {
+  const audio = new Audio('/success-sound.mp3');
+  audio.volume = 0.5;
+  audio.play().catch(() => {});
+};
 
 export default function LandingPage() {
   // ============================================================================
@@ -63,6 +72,11 @@ export default function LandingPage() {
   const [description, setDescription] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [showExpandedDetails, setShowExpandedDetails] = useState(false);
+
+  // ============================================================================
+  // Animation State
+  // ============================================================================
+  const [animatingProductId, setAnimatingProductId] = useState<string | null>(null);
 
   // ============================================================================
   // Submission State
@@ -116,6 +130,13 @@ export default function LandingPage() {
   }, [customerData, selectedProducts, generalFiles, description, hasUnresolvedErrors]);
 
   // ============================================================================
+  // Helper Functions
+  // ============================================================================
+  const getCategoryValidation = useCallback((categoryId: number): Category | undefined => {
+    return categories?.find((c) => c.id === categoryId) as Category | undefined;
+  }, [categories]);
+
+  // ============================================================================
   // Addon Management
   // ============================================================================
   const handleAddonToggle = (addonId: number) => {
@@ -135,51 +156,18 @@ export default function LandingPage() {
   };
 
   // ============================================================================
-  // Product Management
+  // Product Management (New Flow)
   // ============================================================================
-  const handleAddProduct = () => {
-    if (!selectedQuantityId || !selectedSizeId || !selectedProductId || !selectedCategoryId) return;
-
-    const product = products?.find((p) => p.id === selectedProductId);
-    const size = sizes?.find((s) => s.id === selectedSizeId);
-    const quantity = quantities?.find((q) => q.id === selectedQuantityId);
-    const category = categories?.find((c) => c.id === selectedCategoryId);
-
-    if (!product || !size || !quantity) return;
-
-    const productAddons: SelectedAddon[] = selectedAddonIds
-      .map((addonId) => {
-        const addon = addons?.find((a) => a.id === addonId);
-        if (!addon) return null;
-        return {
-          id: addon.id,
-          name: addon.name,
-          priceType: addon.priceType,
-          price: parseFloat(addon.price),
-        };
-      })
-      .filter((a): a is SelectedAddon => a !== null);
-
-    const newProduct: SelectedProduct = {
-      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      productId: product.id,
-      productName: product.name,
-      categoryId: selectedCategoryId,
-      categoryValidation: category as Category,
-      sizeId: size.id,
-      sizeName: size.name,
-      sizeDimensions: size.dimensions,
-      quantityId: quantity.id,
-      quantity: quantity.quantity,
-      price: parseFloat(quantity.price),
-      graphicDesignPrice: parseFloat(size.graphicDesignPrice || "0"),
-      addons: productAddons.length > 0 ? productAddons : undefined,
-    };
-
-    setSelectedProducts((prev) => [...prev, newProduct]);
+  const handleProductAdded = (product: SelectedProduct) => {
+    setAnimatingProductId(product.id);
+    setSelectedProducts((prev) => [...prev, product]);
     setSelectedQuantityId(null);
     setSelectedAddonIds([]);
-    toast.success(`${product.name} נוסף לרשימה`);
+    
+    // Clear animation after delay
+    setTimeout(() => {
+      setAnimatingProductId(null);
+    }, 600);
   };
 
   const removeProduct = (productId: string) => {
@@ -187,7 +175,7 @@ export default function LandingPage() {
   };
 
   // ============================================================================
-  // Product File Upload
+  // Product File Management (for products in summary)
   // ============================================================================
   const handleProductFileUpload = async (productId: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -252,6 +240,7 @@ export default function LandingPage() {
     );
 
     if (uploadResult) {
+      playSuccessSound();
       if (errors.length > 0) {
         toast.warning("הקובץ הועלה אך יש בעיות שדורשות טיפול");
       } else if (warnings.length > 0) {
@@ -356,124 +345,87 @@ export default function LandingPage() {
   };
 
   // ============================================================================
+  // File Icon Helper
+  // ============================================================================
+  const getFileIcon = (file: File) => {
+    if (file.type.startsWith("image/")) return <Image className="h-4 w-4 text-blue-500" />;
+    if (file.type === "application/pdf") return <FileText className="h-4 w-4 text-red-500" />;
+    if (file.type.startsWith("video/")) return <Video className="h-4 w-4 text-purple-500" />;
+    return <File className="h-4 w-4 text-slate-400" />;
+  };
+
+  // ============================================================================
   // Form Submission
   // ============================================================================
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canSubmit) return;
+
+    setSubmitLoading(true);
     setSubmitError(null);
     setSubmitErrorDetails([]);
 
-    const errors: string[] = [];
-    if (!customerData.name) errors.push("שם מלא חסר");
-    if (!customerData.email) errors.push("אימייל חסר");
-    if (!customerData.phone) errors.push("טלפון חסר");
-
-    if (selectedProducts.length === 0 && generalFiles.length === 0) {
-      errors.push("יש לבחור מוצר או להעלות קבצים");
-    }
-
-    if (selectedProducts.length === 0 && generalFiles.length > 0 && !description.trim()) {
-      errors.push("יש להוסיף תיאור כשמעלים קבצים ללא מוצרים");
-    }
-
-    if (hasUnresolvedErrors) {
-      errors.push("יש לתקן שגיאות בקבצים או לבחור עיצוב גרפי");
-    }
-
-    if (errors.length > 0) {
-      setSubmitError("שגיאה בשליחת הבקשה");
-      setSubmitErrorDetails(errors);
-      return;
-    }
-
-    setSubmitLoading(true);
-
     try {
-      const notes: string[] = [];
-      selectedProducts.forEach((p) => {
-        if (p.needsGraphicDesign) {
-          notes.push(`${p.productName}: נדרש עיצוב גרפי (₪${p.graphicDesignPrice})`);
-        }
-        if (p.addons && p.addons.length > 0) {
-          const addonNames = p.addons.map((a) => a.name).join(", ");
-          notes.push(`${p.productName} - תוספות: ${addonNames}`);
-        }
-        p.file?.validationWarnings?.forEach((w) => {
-          notes.push(`${p.productName}: ${w.message} - ${w.details || ""}`);
-        });
-      });
-      if (description.trim()) {
-        notes.push(`תיאור: ${description}`);
-      }
-
       if (selectedProducts.length > 0) {
+        const items = selectedProducts.map((p) => ({
+          productId: p.productId,
+          sizeId: p.sizeId,
+          quantityId: p.quantityId,
+          notes: p.needsGraphicDesign
+            ? "נדרש עיצוב גרפי"
+            : p.file?.validationWarnings?.map((w) => w.message).join(", ") || "",
+          fileKey: p.file?.s3Key,
+          fileUrl: p.file?.s3Url,
+          needsGraphicDesign: p.needsGraphicDesign || false,
+          addonIds: p.addons?.map(a => a.id) || [],
+        }));
+
+        const generalFileUrls = generalFiles
+          .filter((f) => f.s3Url)
+          .map((f) => f.s3Url!);
+
         await createWithQuoteMutation.mutateAsync({
           customerInfo: {
             name: customerData.name,
             email: customerData.email,
             phone: customerData.phone,
-            companyName: customerData.company || undefined,
+            company: customerData.company || undefined,
             address: customerData.address || undefined,
             billingEmail: customerData.billingEmail || undefined,
             taxId: customerData.taxId || undefined,
             contactPerson: customerData.contactPerson || undefined,
           },
-          quoteItems: selectedProducts.map((p) => ({
-            sizeQuantityId: p.quantityId,
-            quantity: p.quantity,
-            addonIds: p.addons?.map((a) => a.id),
-          })),
-          notes: notes.join("\n"),
-          attachments: generalFiles
-            .filter((f) => f.s3Key)
-            .map((f) => ({
-              fileName: f.file.name,
-              fileUrl: f.s3Url!,
-              s3Key: f.s3Key!,
-            })),
+          items,
+          generalFileUrls,
+          notes: description || undefined,
         });
       } else {
+        const fileUrls = generalFiles.filter((f) => f.s3Url).map((f) => f.s3Url!);
         await createQuoteFilesOnlyMutation.mutateAsync({
           customerInfo: {
             name: customerData.name,
             email: customerData.email,
             phone: customerData.phone,
-            companyName: customerData.company || undefined,
+            company: customerData.company || undefined,
             address: customerData.address || undefined,
             billingEmail: customerData.billingEmail || undefined,
             taxId: customerData.taxId || undefined,
             contactPerson: customerData.contactPerson || undefined,
           },
-          description: description,
-          attachments: generalFiles
-            .filter((f) => f.s3Key)
-            .map((f) => ({
-              fileName: f.file.name,
-              fileUrl: f.s3Url!,
-              s3Key: f.s3Key!,
-            })),
+          fileUrls,
+          description,
         });
       }
 
       setSubmitted(true);
       toast.success("הבקשה נשלחה בהצלחה!");
     } catch (error: any) {
-      console.error("Submit error:", error);
       setSubmitError("שגיאה בשליחת הבקשה");
-      setSubmitErrorDetails([error.message || "אנא נסה שוב מאוחר יותר"]);
+      setSubmitErrorDetails([error.message || "נסה שוב מאוחר יותר"]);
       toast.error("שגיאה בשליחת הבקשה");
-    } finally {
-      setSubmitLoading(false);
     }
-  };
 
-  // ============================================================================
-  // Helper: Get file icon
-  // ============================================================================
-  const getFileIcon = (file: File) => {
-    if (file.type.startsWith('image/')) return <Image className="h-4 w-4" />;
-    if (file.type === 'application/pdf') return <FileText className="h-4 w-4" />;
-    return <File className="h-4 w-4" />;
+    setSubmitLoading(false);
   };
 
   // ============================================================================
@@ -481,16 +433,22 @@ export default function LandingPage() {
   // ============================================================================
   if (submitted) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4" dir="rtl">
-        <div className="bg-white rounded-2xl p-12 shadow-lg border border-blue-100 max-w-md text-center">
-          <div className="w-20 h-20 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
-            <Check className="h-10 w-10 text-white" />
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center p-4" dir="rtl">
+        <div className="bg-white rounded-2xl p-8 shadow-xl text-center max-w-md">
+          <div className="w-16 h-16 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Check className="h-8 w-8 text-white" />
           </div>
-          <h2 className="text-2xl font-bold text-slate-900 mb-3">הבקשה נשלחה בהצלחה!</h2>
-          <p className="text-slate-500 mb-8">נחזור אליך בהקדם עם הצעת מחיר מותאמת</p>
-          <Button 
-            onClick={() => window.location.reload()} 
-            className="px-8 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+          <h1 className="text-2xl font-bold text-slate-900 mb-2">הבקשה נשלחה בהצלחה!</h1>
+          <p className="text-slate-500 mb-6">נחזור אליך בהקדם עם הצעת מחיר</p>
+          <Button
+            onClick={() => {
+              setSubmitted(false);
+              setSelectedProducts([]);
+              setGeneralFiles([]);
+              setDescription("");
+              setCustomerData({ name: "", email: "", phone: "", company: "" });
+            }}
+            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
           >
             שלח בקשה נוספת
           </Button>
@@ -500,32 +458,34 @@ export default function LandingPage() {
   }
 
   // ============================================================================
-  // Main Render - Compact Split Screen Layout
+  // Main Render
   // ============================================================================
   return (
-    <div className="h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 overflow-hidden" dir="rtl">
-      {/* Compact Header */}
-      <header className="bg-white/80 backdrop-blur-sm border-b border-slate-200/50 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center shadow-md">
-              <span className="text-white font-bold text-sm">QF</span>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50" dir="rtl">
+      {/* Header */}
+      <header className="bg-white/80 backdrop-blur-sm border-b border-slate-200/50 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center">
+              <Package className="h-5 w-5 text-white" />
             </div>
-            <span className="font-bold text-slate-800">QuoteFlow</span>
+            <span className="font-bold text-slate-900">QuoteFlow</span>
           </div>
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => setShowLoginModal(true)}
-            className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-blue-600 transition-colors"
+            className="text-slate-600 hover:text-slate-900"
           >
-            <LogIn className="h-4 w-4" />
-            התחברות
-          </button>
+            <LogIn className="h-4 w-4 ml-1" />
+            כניסה
+          </Button>
         </div>
       </header>
 
-      {/* Main Content - Split Screen (No Scroll) */}
-      <main className="h-[calc(100vh-56px)] max-w-7xl mx-auto flex">
-        <form onSubmit={handleSubmit} className="flex flex-col lg:flex-row w-full">
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto">
+        <form onSubmit={handleSubmit} className="flex flex-col lg:flex-row min-h-[calc(100vh-60px)]">
           
           {/* Right Side - Form */}
           <div className="flex-1 p-4 lg:p-6 lg:border-l border-slate-200/50 overflow-y-auto">
@@ -534,130 +494,36 @@ export default function LandingPage() {
               {/* Title - Compact */}
               <div className="text-center lg:text-right">
                 <h1 className="text-2xl font-bold text-slate-900">בקשת הצעת מחיר</h1>
-                <p className="text-slate-500 text-sm">בחרו מוצר ונחזור אליכם עם הצעה</p>
+                <p className="text-slate-500 text-sm">בחרו מוצר, העלו קובץ ונחזור אליכם עם הצעה</p>
               </div>
 
-              {/* Product Selection - All in One Row */}
+              {/* Product Selection Row - New Component */}
+              <ProductSelectionRow
+                categories={categories}
+                products={products}
+                sizes={sizes}
+                quantities={quantities}
+                addons={addons}
+                selectedCategoryId={selectedCategoryId}
+                selectedProductId={selectedProductId}
+                selectedSizeId={selectedSizeId}
+                selectedQuantityId={selectedQuantityId}
+                selectedAddonIds={selectedAddonIds}
+                onCategoryChange={handleCategoryChange}
+                onProductChange={setSelectedProductId}
+                onSizeChange={setSelectedSizeId}
+                onQuantityChange={setSelectedQuantityId}
+                onAddonToggle={handleAddonToggle}
+                onProductAdded={handleProductAdded}
+                getCategoryValidation={getCategoryValidation}
+              />
+
+              {/* General File Upload - Video/Reference Files */}
               <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-200/50">
                 <h2 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                  <Package className="h-4 w-4 text-blue-600" />
-                  בחירת מוצר
-                </h2>
-                
-                {/* 4 Selects in One Row */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-3">
-                  <div className="relative">
-                    <select
-                      value={selectedCategoryId || ""}
-                      onChange={(e) => handleCategoryChange(e.target.value ? parseInt(e.target.value) : null)}
-                      className="w-full h-10 px-3 pr-8 rounded-lg border border-slate-200 bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none cursor-pointer hover:border-blue-300 transition-colors"
-                    >
-                      <option value="">קטגוריה</option>
-                      {categories?.map((cat) => (
-                        <option key={cat.id} value={cat.id}>{cat.name}</option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
-                  </div>
-                  
-                  <div className="relative">
-                    <select
-                      value={selectedProductId || ""}
-                      onChange={(e) => {
-                        setSelectedProductId(e.target.value ? parseInt(e.target.value) : null);
-                        setSelectedSizeId(null);
-                        setSelectedQuantityId(null);
-                      }}
-                      disabled={!selectedCategoryId}
-                      className="w-full h-10 px-3 pr-8 rounded-lg border border-slate-200 bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none cursor-pointer hover:border-blue-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-slate-200"
-                    >
-                      <option value="">מוצר</option>
-                      {products?.map((prod) => (
-                        <option key={prod.id} value={prod.id}>{prod.name}</option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
-                  </div>
-                  
-                  <div className="relative">
-                    <select
-                      value={selectedSizeId || ""}
-                      onChange={(e) => {
-                        setSelectedSizeId(e.target.value ? parseInt(e.target.value) : null);
-                        setSelectedQuantityId(null);
-                      }}
-                      disabled={!selectedProductId}
-                      className="w-full h-10 px-3 pr-8 rounded-lg border border-slate-200 bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none cursor-pointer hover:border-blue-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-slate-200"
-                    >
-                      <option value="">גודל</option>
-                      {sizes?.map((size) => (
-                        <option key={size.id} value={size.id}>
-                          {size.name} {size.dimensions && `(${size.dimensions})`}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
-                  </div>
-                  
-                  <div className="relative">
-                    <select
-                      value={selectedQuantityId || ""}
-                      onChange={(e) => setSelectedQuantityId(e.target.value ? parseInt(e.target.value) : null)}
-                      disabled={!selectedSizeId}
-                      className="w-full h-10 px-3 pr-8 rounded-lg border border-slate-200 bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none cursor-pointer hover:border-blue-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-slate-200"
-                    >
-                      <option value="">כמות</option>
-                      {quantities?.map((qty) => (
-                        <option key={qty.id} value={qty.id}>{qty.quantity} יח'</option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
-                  </div>
-                </div>
-
-                {/* Addons - Inline */}
-                {selectedProductId && addons && addons.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-2 mb-3">
-                    <span className="text-xs text-slate-500">תוספות:</span>
-                    {addons.map((addon) => (
-                      <label
-                        key={addon.id}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium cursor-pointer transition-all ${
-                          selectedAddonIds.includes(addon.id)
-                            ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md"
-                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedAddonIds.includes(addon.id)}
-                          onChange={() => handleAddonToggle(addon.id)}
-                          className="sr-only"
-                        />
-                        {addon.name}
-                      </label>
-                    ))}
-                  </div>
-                )}
-
-                {/* Add Button */}
-                <Button
-                  type="button"
-                  onClick={handleAddProduct}
-                  disabled={!selectedQuantityId}
-                  size="sm"
-                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-slate-300 disabled:to-slate-400"
-                >
-                  <Plus className="h-4 w-4 ml-1" />
-                  הוסף לרשימה
-                </Button>
-              </div>
-
-              {/* File Upload - Drag & Drop */}
-              <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-200/50">
-                <h2 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                  <Upload className="h-4 w-4 text-indigo-600" />
-                  העלאת קבצים
+                  <Video className="h-4 w-4 text-purple-600" />
+                  וידאו או קבצים להבנת ההצעה
+                  <span className="text-xs font-normal text-slate-400">(אופציונלי)</span>
                 </h2>
                 
                 <div
@@ -666,21 +532,22 @@ export default function LandingPage() {
                   onDrop={handleDrop}
                   className={`relative border-2 border-dashed rounded-xl p-4 text-center transition-all ${
                     isDragging
-                      ? "border-blue-500 bg-blue-50"
-                      : "border-slate-200 hover:border-blue-300 hover:bg-slate-50"
+                      ? "border-purple-500 bg-purple-50"
+                      : "border-slate-200 hover:border-purple-300 hover:bg-slate-50"
                   }`}
                 >
                   <input
                     type="file"
-                    accept={ALLOWED_EXTENSIONS.join(',')}
+                    accept={[...ALLOWED_EXTENSIONS, '.mp4', '.mov', '.avi', '.webm'].join(',')}
                     onChange={handleGeneralFileUpload}
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                     multiple
                   />
-                  <Upload className={`h-8 w-8 mx-auto mb-2 ${isDragging ? "text-blue-500" : "text-slate-300"}`} />
+                  <FileQuestion className={`h-8 w-8 mx-auto mb-2 ${isDragging ? "text-purple-500" : "text-slate-300"}`} />
                   <p className="text-sm text-slate-500">
-                    {isDragging ? "שחרר כאן" : "גרור קבצים או לחץ לבחירה"}
+                    {isDragging ? "שחרר כאן" : "גרור וידאו, לוגו או קבצי עזר"}
                   </p>
+                  <p className="text-xs text-slate-400 mt-1">קבצים אלו יעזרו לנו להבין את הבקשה</p>
                 </div>
 
                 {/* Uploaded Files */}
@@ -696,7 +563,7 @@ export default function LandingPage() {
                           </div>
                         )}
                         <span className="flex-1 text-xs text-slate-700 truncate">{f.file.name}</span>
-                        {f.uploading && <Loader2 className="h-4 w-4 animate-spin text-blue-500" />}
+                        {f.uploading && <Loader2 className="h-4 w-4 animate-spin text-purple-500" />}
                         {f.uploaded && <Check className="h-4 w-4 text-emerald-500" />}
                         <button type="button" onClick={() => removeGeneralFile(f.id)} className="p-1 hover:bg-slate-200 rounded">
                           <X className="h-3 w-3 text-slate-400" />
@@ -712,7 +579,7 @@ export default function LandingPage() {
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     rows={2}
-                    className="w-full mt-3 px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-900 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                    className="w-full mt-3 px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-900 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
                     placeholder="תאר את הפרויקט שלך..."
                   />
                 )}
@@ -752,8 +619,9 @@ export default function LandingPage() {
                       type="text"
                       value={customerData.name}
                       onChange={(e) => setCustomerData({ ...customerData, name: e.target.value })}
-                      className="w-full h-10 pr-9 pl-3 rounded-lg border border-slate-200 bg-white text-slate-900 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full h-10 pr-9 pl-3 rounded-lg border border-slate-200 bg-white text-slate-900 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                       placeholder="שם מלא *"
+                      required
                     />
                   </div>
                   <div className="relative">
@@ -762,8 +630,9 @@ export default function LandingPage() {
                       type="tel"
                       value={customerData.phone}
                       onChange={(e) => setCustomerData({ ...customerData, phone: e.target.value })}
-                      className="w-full h-10 pr-9 pl-3 rounded-lg border border-slate-200 bg-white text-slate-900 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full h-10 pr-9 pl-3 rounded-lg border border-slate-200 bg-white text-slate-900 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                       placeholder="טלפון *"
+                      required
                       dir="ltr"
                     />
                   </div>
@@ -773,8 +642,9 @@ export default function LandingPage() {
                       type="email"
                       value={customerData.email}
                       onChange={(e) => setCustomerData({ ...customerData, email: e.target.value })}
-                      className="w-full h-10 pr-9 pl-3 rounded-lg border border-slate-200 bg-white text-slate-900 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full h-10 pr-9 pl-3 rounded-lg border border-slate-200 bg-white text-slate-900 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                       placeholder="אימייל *"
+                      required
                       dir="ltr"
                     />
                   </div>
@@ -782,13 +652,13 @@ export default function LandingPage() {
 
                 {/* Expanded Optional Fields */}
                 {showExpandedDetails && (
-                  <div className="mt-3 pt-3 border-t border-slate-100 space-y-3">
+                  <div className="mt-3 space-y-3 pt-3 border-t border-slate-100">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                       <div className="relative">
                         <Building className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                         <input
                           type="text"
-                          value={customerData.company}
+                          value={customerData.company || ""}
                           onChange={(e) => setCustomerData({ ...customerData, company: e.target.value })}
                           className="w-full h-10 pr-9 pl-3 rounded-lg border border-slate-200 bg-white text-slate-900 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           placeholder="שם חברה"
@@ -857,7 +727,14 @@ export default function LandingPage() {
               {selectedProducts.length > 0 ? (
                 <div className="space-y-3 mb-4 max-h-[calc(100vh-350px)] overflow-y-auto">
                   {selectedProducts.map((product) => (
-                    <div key={product.id} className="p-3 bg-gradient-to-br from-slate-50 to-blue-50 rounded-xl border border-slate-100">
+                    <div 
+                      key={product.id} 
+                      className={`p-3 bg-gradient-to-br from-slate-50 to-blue-50 rounded-xl border border-slate-100 transition-all duration-500 ${
+                        animatingProductId === product.id 
+                          ? "animate-pulse ring-2 ring-blue-400 ring-offset-2" 
+                          : ""
+                      }`}
+                    >
                       <div className="flex items-start justify-between mb-2">
                         <div>
                           <h3 className="font-semibold text-slate-900 text-sm">{product.productName}</h3>
@@ -880,19 +757,8 @@ export default function LandingPage() {
                         </div>
                       )}
 
-                      {/* File Upload for Product */}
-                      {!product.file ? (
-                        <label className="flex items-center gap-2 p-2 border border-dashed border-slate-300 rounded-lg cursor-pointer hover:border-blue-400 hover:bg-white transition-all text-xs">
-                          <input
-                            type="file"
-                            accept={ALLOWED_EXTENSIONS.join(',')}
-                            onChange={(e) => handleProductFileUpload(product.id, e)}
-                            className="hidden"
-                          />
-                          <Upload className="h-3.5 w-3.5 text-slate-400" />
-                          <span className="text-slate-500">העלה קובץ</span>
-                        </label>
-                      ) : (
+                      {/* File Status */}
+                      {product.file ? (
                         <div className="space-y-1.5">
                           <div className="flex items-center gap-2 p-2 bg-white rounded-lg border border-slate-200">
                             {product.file.preview ? (
@@ -944,20 +810,28 @@ export default function LandingPage() {
                               ))}
                             </div>
                           )}
-
-                          {/* Graphic Design Selected */}
-                          {product.needsGraphicDesign && (
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="text-purple-600 flex items-center gap-1 font-medium">
-                                <Palette className="h-3 w-3" />
-                                נבחר עיצוב גרפי
-                              </span>
-                              <button type="button" onClick={() => toggleProductGraphicDesign(product.id)} className="text-slate-400 hover:text-red-500">
-                                ביטול
-                              </button>
-                            </div>
-                          )}
                         </div>
+                      ) : product.needsGraphicDesign ? (
+                        <div className="flex items-center justify-between text-xs p-2 bg-purple-50 rounded-lg">
+                          <span className="text-purple-600 flex items-center gap-1 font-medium">
+                            <Palette className="h-3 w-3" />
+                            נדרש עיצוב גרפי
+                          </span>
+                          <button type="button" onClick={() => toggleProductGraphicDesign(product.id)} className="text-slate-400 hover:text-red-500">
+                            ביטול
+                          </button>
+                        </div>
+                      ) : (
+                        <label className="flex items-center gap-2 p-2 border border-dashed border-slate-300 rounded-lg cursor-pointer hover:border-blue-400 hover:bg-white transition-all text-xs">
+                          <input
+                            type="file"
+                            accept={ALLOWED_EXTENSIONS.join(',')}
+                            onChange={(e) => handleProductFileUpload(product.id, e)}
+                            className="hidden"
+                          />
+                          <Upload className="h-3.5 w-3.5 text-slate-400" />
+                          <span className="text-slate-500">העלה קובץ</span>
+                        </label>
                       )}
                     </div>
                   ))}
@@ -965,14 +839,15 @@ export default function LandingPage() {
               ) : (
                 <div className="text-center py-8 text-slate-400">
                   <Package className="h-10 w-10 mx-auto mb-2 opacity-40" />
-                  <p className="text-sm">לא נבחרו מוצרים</p>
+                  <p className="text-sm">בחר מוצר והעלה קובץ</p>
+                  <p className="text-xs mt-1">המוצרים יופיעו כאן</p>
                 </div>
               )}
 
               {/* General Files Count */}
               {generalFiles.length > 0 && (
-                <div className="mb-4 py-2 px-3 bg-indigo-50 rounded-lg">
-                  <p className="text-sm text-indigo-700 font-medium">📎 {generalFiles.length} קבצים מצורפים</p>
+                <div className="mb-4 py-2 px-3 bg-purple-50 rounded-lg">
+                  <p className="text-sm text-purple-700 font-medium">📎 {generalFiles.length} קבצי עזר מצורפים</p>
                 </div>
               )}
 
@@ -1012,7 +887,7 @@ export default function LandingPage() {
                 {hasUnresolvedErrors
                   ? "יש לתקן שגיאות בקבצים"
                   : !canSubmit
-                  ? "מלא את כל השדות הנדרשים"
+                  ? "בחר מוצר והעלה קובץ או מלא פרטים"
                   : "✓ הבקשה מוכנה לשליחה"}
               </p>
             </div>
