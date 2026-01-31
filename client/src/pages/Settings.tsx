@@ -26,6 +26,7 @@ import {
   PortalsSettings,
   GmailSettings,
   BackupSettings,
+  CategoryValidationSettings,
 } from "@/components/settings";
 
 export default function Settings() {
@@ -103,6 +104,7 @@ export default function Settings() {
 
         {/* Validation Tab */}
         <TabsContent value="validation" className="space-y-6">
+          <CategoryValidationSettings />
           <ValidationProfilesSettings />
         </TabsContent>
 

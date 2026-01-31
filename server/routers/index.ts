@@ -28,6 +28,8 @@ import { pricelistsRouter } from "./pricelists.router";
 import { quotePricingRouter } from "./quotePricing.router";
 import { adminRouter } from "./admin.router";
 import { backupRouter } from "./backup.router";
+import { categoriesRouter } from "./categories.router";
+import { fileValidationRouter } from "./fileValidation.router";
 
 /**
  * Main application router
@@ -61,6 +63,8 @@ export const appRouter = router({
   pricelists: pricelistsRouter,
   quotePricing: quotePricingRouter,
   backup: backupRouter,
+  categories: categoriesRouter,
+  fileValidation: fileValidationRouter,
 });
 
 export type AppRouter = typeof appRouter;

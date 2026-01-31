@@ -44,6 +44,21 @@ export const categories = pgTable("categories", {
   icon: varchar("icon", { length: 50 }),
   displayOrder: integer("displayOrder").default(0),
   isActive: boolean("isActive").default(true),
+  // File Validation Settings (inherited by products)
+  validationEnabled: boolean("validationEnabled").default(true),
+  minDpi: integer("minDpi").default(300),
+  maxDpi: integer("maxDpi"),
+  allowedColorspaces: jsonb("allowedColorspaces").default('["CMYK"]'),
+  requiredBleedMm: decimal("requiredBleedMm", { precision: 5, scale: 2 }).default("3"),
+  requireBleed: boolean("requireBleed").default(true),
+  requireCropMarks: boolean("requireCropMarks").default(false),
+  requireRegistrationMarks: boolean("requireRegistrationMarks").default(false),
+  requireColorBars: boolean("requireColorBars").default(false),
+  requireEmbeddedFonts: boolean("requireEmbeddedFonts").default(true),
+  allowOutlinedFonts: boolean("allowOutlinedFonts").default(true),
+  maxFileSizeMb: integer("maxFileSizeMb").default(100),
+  allowedFormats: jsonb("allowedFormats").default('["pdf", "ai", "eps", "tiff", "jpg", "png"]'),
+  aspectRatioTolerance: decimal("aspectRatioTolerance", { precision: 5, scale: 2 }).default("5"), // % tolerance
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
@@ -59,6 +74,21 @@ export const baseProducts = pgTable("base_products", {
   imageUrl: text("image_url"),
   allowCustomQuantity: boolean("allow_custom_quantity").default(true),
   isActive: boolean("isActive").default(true),
+  // File Validation Settings (override category settings, null = inherit from category)
+  validationOverride: boolean("validationOverride").default(false), // true = use product settings, false = inherit from category
+  minDpi: integer("minDpi"),
+  maxDpi: integer("maxDpi"),
+  allowedColorspaces: jsonb("allowedColorspaces"),
+  requiredBleedMm: decimal("requiredBleedMm", { precision: 5, scale: 2 }),
+  requireBleed: boolean("requireBleed"),
+  requireCropMarks: boolean("requireCropMarks"),
+  requireRegistrationMarks: boolean("requireRegistrationMarks"),
+  requireColorBars: boolean("requireColorBars"),
+  requireEmbeddedFonts: boolean("requireEmbeddedFonts"),
+  allowOutlinedFonts: boolean("allowOutlinedFonts"),
+  maxFileSizeMb: integer("maxFileSizeMb"),
+  allowedFormats: jsonb("allowedFormats"),
+  aspectRatioTolerance: decimal("aspectRatioTolerance", { precision: 5, scale: 2 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
