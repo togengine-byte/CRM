@@ -88,8 +88,8 @@ export default function LandingPage() {
     { enabled: !!selectedSizeId }
   );
   const { data: addons } = trpc.products.getAddons.useQuery(
-    { categoryId: selectedCategoryId! },
-    { enabled: !!selectedCategoryId }
+    { productId: selectedProductId! },
+    { enabled: !!selectedProductId }
   );
 
   // ============================================================================
@@ -607,7 +607,7 @@ export default function LandingPage() {
                 </div>
 
                 {/* Addons - Inline */}
-                {selectedCategoryId && addons && addons.length > 0 && (
+                {selectedProductId && addons && addons.length > 0 && (
                   <div className="flex flex-wrap items-center gap-2 mb-3">
                     <span className="text-xs text-slate-500">תוספות:</span>
                     {addons.map((addon) => (
