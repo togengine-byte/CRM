@@ -103,6 +103,7 @@ export interface SelectedProduct {
   sizeName: string;
   sizeDimensions?: string;
   quantityId: number;
+  sizeQuantityId: number; // The actual ID to send to API
   quantity: number;
   price: number;
   graphicDesignPrice: number;

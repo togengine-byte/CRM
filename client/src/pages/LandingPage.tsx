@@ -367,52 +367,91 @@ export default function LandingPage() {
 
     try {
       if (selectedProducts.length > 0) {
-        const items = selectedProducts.map((p) => ({
-          productId: p.productId,
-          sizeId: p.sizeId,
-          quantityId: p.quantityId,
-          notes: p.needsGraphicDesign
-            ? "נדרש עיצוב גרפי"
-            : p.file?.validationWarnings?.map((w) => w.message).join(", ") || "",
-          fileKey: p.file?.s3Key,
-          fileUrl: p.file?.s3Url,
-          needsGraphicDesign: p.needsGraphicDesign || false,
+        // Build quoteItems in the format the API expects
+        const quoteItems = selectedProducts.map((p) => ({
+          sizeQuantityId: p.sizeQuantityId || p.quantityId, // Use sizeQuantityId or fallback to quantityId
+          quantity: p.quantity,
           addonIds: p.addons?.map(a => a.id) || [],
         }));
 
-        const generalFileUrls = generalFiles
-          .filter((f) => f.s3Url)
-          .map((f) => f.s3Url!);
+        // Build attachments array
+        const attachments = selectedProducts
+          .filter((p) => p.file?.s3Key && p.file?.s3Url)
+          .map((p) => ({
+            fileName: p.file!.file.name,
+            fileUrl: p.file!.s3Url!,
+            s3Key: p.file!.s3Key!,
+            fileSize: p.file!.file.size,
+            mimeType: p.file!.file.type,
+          }));
+
+        // Add general files to attachments
+        generalFiles
+          .filter((f) => f.s3Url && f.s3Key)
+          .forEach((f) => {
+            attachments.push({
+              fileName: f.file.name,
+              fileUrl: f.s3Url!,
+              s3Key: f.s3Key!,
+              fileSize: f.file.size,
+              mimeType: f.file.type,
+            });
+          });
+
+        // Build notes from validation warnings and graphic design needs
+        const notesArray = selectedProducts
+          .map((p) => {
+            if (p.needsGraphicDesign) return `${p.productName}: נדרש עיצוב גרפי`;
+            if (p.file?.validationWarnings?.length) {
+              return `${p.productName}: ${p.file.validationWarnings.map((w) => w.message).join(", ")}`;
+            }
+            return null;
+          })
+          .filter(Boolean);
+        
+        const allNotes = description 
+          ? [description, ...notesArray].join("\n")
+          : notesArray.join("\n");
 
         await createWithQuoteMutation.mutateAsync({
           customerInfo: {
             name: customerData.name,
             email: customerData.email,
             phone: customerData.phone,
-            company: customerData.company || undefined,
+            companyName: customerData.company || undefined,
             address: customerData.address || undefined,
             billingEmail: customerData.billingEmail || undefined,
             taxId: customerData.taxId || undefined,
             contactPerson: customerData.contactPerson || undefined,
           },
-          items,
-          generalFileUrls,
-          notes: description || undefined,
+          quoteItems,
+          attachments: attachments.length > 0 ? attachments : undefined,
+          notes: allNotes || undefined,
         });
       } else {
-        const fileUrls = generalFiles.filter((f) => f.s3Url).map((f) => f.s3Url!);
+        // Build attachments for files-only submission
+        const attachments = generalFiles
+          .filter((f) => f.s3Url && f.s3Key)
+          .map((f) => ({
+            fileName: f.file.name,
+            fileUrl: f.s3Url!,
+            s3Key: f.s3Key!,
+            fileSize: f.file.size,
+            mimeType: f.file.type,
+          }));
+
         await createQuoteFilesOnlyMutation.mutateAsync({
           customerInfo: {
             name: customerData.name,
             email: customerData.email,
             phone: customerData.phone,
-            company: customerData.company || undefined,
+            companyName: customerData.company || undefined,
             address: customerData.address || undefined,
             billingEmail: customerData.billingEmail || undefined,
             taxId: customerData.taxId || undefined,
             contactPerson: customerData.contactPerson || undefined,
           },
-          fileUrls,
+          attachments,
           description,
         });
       }

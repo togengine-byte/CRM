@@ -60,6 +60,7 @@ interface PendingProduct {
   sizeName: string;
   sizeDimensions?: string | null;
   quantityId: number;
+  sizeQuantityId: number;
   quantity: number;
   price: number;
   graphicDesignPrice: number;
@@ -128,6 +129,7 @@ export function ProductSelectionRow({
       sizeName: size.name,
       sizeDimensions: size.dimensions,
       quantityId: quantity.id,
+      sizeQuantityId: quantity.id, // This is the ID to send to API
       quantity: quantity.quantity,
       price: parseFloat(quantity.price),
       graphicDesignPrice: parseFloat(size.graphicDesignPrice || "0"),
