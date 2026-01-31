@@ -21,6 +21,90 @@ import {
 } from "../db";
 
 export const quotesRouter = router({
+  // Create new quote with full details (for admin/employee)
+  create: protectedProcedure
+    .input(z.object({
+      customerId: z.number(),
+      items: z.array(z.object({
+        sizeQuantityId: z.number(),
+        quantity: z.number(),
+        priceAtTimeOfQuote: z.number(),
+        addonIds: z.array(z.number()).optional(),
+        attachment: z.object({
+          fileName: z.string(),
+          fileUrl: z.string(),
+          fileSize: z.number().optional(),
+          mimeType: z.string().optional(),
+        }).optional(),
+      })),
+      notes: z.string().optional(),
+      status: z.enum(['draft', 'approved']).default('draft'),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (!ctx.user) throw new Error("Not authenticated");
+      if (ctx.user.role !== 'admin' && ctx.user.role !== 'employee') {
+        throw new Error("Only admin/employee can create quotes");
+      }
+      
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+      
+      // Calculate total value
+      const totalValue = input.items.reduce((sum, item) => sum + item.priceAtTimeOfQuote, 0);
+      
+      // Get next quote number
+      const maxQuoteResult = await db.execute(sql`
+        SELECT COALESCE(MAX("quoteNumber"), 0) + 1 as next_num FROM quotes
+      `);
+      const quoteNumber = (maxQuoteResult.rows[0] as any)?.next_num || 1;
+      
+      // Create quote
+      const quoteResult = await db.execute(sql`
+        INSERT INTO quotes ("customerId", "employeeId", status, "quoteNumber", "finalValue", "createdAt", "updatedAt")
+        VALUES (${input.customerId}, ${ctx.user.id}, ${input.status}, ${quoteNumber}, ${totalValue}, NOW(), NOW())
+        RETURNING id
+      `);
+      
+      const quoteId = (quoteResult.rows[0] as any).id;
+      
+      // Create quote items and attachments
+      for (const item of input.items) {
+        // Create quote item
+        const addonIdsJson = item.addonIds ? JSON.stringify(item.addonIds) : null;
+        const itemResult = await db.execute(sql`
+          INSERT INTO quote_items ("quoteId", "sizeQuantityId", quantity, "priceAtTimeOfQuote", "addonIds", "createdAt")
+          VALUES (${quoteId}, ${item.sizeQuantityId}, ${item.quantity}, ${item.priceAtTimeOfQuote}, ${addonIdsJson}, NOW())
+          RETURNING id
+        `);
+        
+        const quoteItemId = (itemResult.rows[0] as any).id;
+        
+        // Create attachment if exists
+        if (item.attachment) {
+          await db.execute(sql`
+            INSERT INTO quote_attachments ("quoteId", "quoteItemId", "fileName", "fileUrl", "fileSize", "mimeType", "uploadedAt")
+            VALUES (${quoteId}, ${quoteItemId}, ${item.attachment.fileName}, ${item.attachment.fileUrl}, ${item.attachment.fileSize || null}, ${item.attachment.mimeType || null}, NOW())
+          `);
+        }
+      }
+      
+      // If status is approved, create supplier jobs
+      if (input.status === 'approved') {
+        // Update status to in_production
+        await db.execute(sql`
+          UPDATE quotes SET status = 'in_production', "updatedAt" = NOW() WHERE id = ${quoteId}
+        `);
+      }
+      
+      // Add activity log
+      await db.execute(sql`
+        INSERT INTO activity_log ("userId", "actionType", details, "createdAt")
+        VALUES (${ctx.user.id}, 'quote_created', ${JSON.stringify({ quoteId, customerId: input.customerId, status: input.status })}, NOW())
+      `);
+      
+      return { id: quoteId, quoteNumber };
+    }),
+
   list: protectedProcedure
     .input(z.object({
       status: z.string().optional(),
