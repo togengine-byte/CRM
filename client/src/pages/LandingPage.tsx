@@ -548,6 +548,7 @@ export default function LandingPage() {
                 selectedSizeId={selectedSizeId}
                 selectedQuantityId={selectedQuantityId}
                 selectedAddonIds={selectedAddonIds}
+                selectedProductsCount={selectedProducts.length}
                 onCategoryChange={handleCategoryChange}
                 onProductChange={setSelectedProductId}
                 onSizeChange={setSelectedSizeId}

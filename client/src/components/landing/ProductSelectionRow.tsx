@@ -40,6 +40,7 @@ interface ProductSelectionRowProps {
   selectedSizeId: number | null;
   selectedQuantityId: number | null;
   selectedAddonIds: number[];
+  selectedProductsCount: number; // Number of products already added
   onCategoryChange: (categoryId: number | null) => void;
   onProductChange: (productId: number | null) => void;
   onSizeChange: (sizeId: number | null) => void;
@@ -78,6 +79,7 @@ export function ProductSelectionRow({
   selectedSizeId,
   selectedQuantityId,
   selectedAddonIds,
+  selectedProductsCount,
   onCategoryChange,
   onProductChange,
   onSizeChange,
@@ -207,38 +209,10 @@ export function ProductSelectionRow({
 
       // Check if there are blocking errors
       if (errors.length > 0) {
-        // Show error but allow to choose graphic design
+        // Show error - file stays on the right side, doesn't move to summary
         setUploadError(`הקובץ לא עומד בדרישות: ${errors[0].message}`);
         setIsUploading(false);
-        
-        // Still create the product with the file and errors
-        const newProduct: SelectedProduct = {
-          ...pendingProduct,
-          file: {
-            file,
-            id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            preview,
-            uploading: false,
-            uploaded: true,
-            s3Key: uploadResult.key,
-            s3Url: uploadResult.url,
-            imageDimensions,
-            validationErrors: errors,
-            validationWarnings: warnings,
-          },
-        };
-
-        // Animate and add (with errors - user can fix later)
-        setIsAnimating(true);
-        playSuccessSound();
-        
-        setTimeout(() => {
-          onProductAdded(newProduct);
-          resetSelection();
-          setIsAnimating(false);
-          toast.warning("הקובץ הועלה אך יש בעיות שדורשות טיפול");
-        }, 500);
-        
+        toast.error("הקובץ לא עומד בדרישות - בחר קובץ אחר או לחץ 'אין לי גרפיקה'");
         e.target.value = "";
         return;
       }
@@ -284,9 +258,14 @@ export function ProductSelectionRow({
     e.target.value = "";
   };
 
-  // Reset selection after adding product
+  // Reset selection after adding product - reset ALL fields
   const resetSelection = () => {
+    onCategoryChange(null);
+    onProductChange(null);
+    onSizeChange(null);
     onQuantityChange(null);
+    // Clear all addon selections
+    selectedAddonIds.forEach(id => onAddonToggle(id));
     setPendingProduct(null);
     setUploadError(null);
   };
@@ -297,7 +276,7 @@ export function ProductSelectionRow({
     }`}>
       <h2 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
         <Package className="h-4 w-4 text-blue-600" />
-        בחירת מוצר
+        {selectedProductsCount > 0 ? "בחירת מוצר נוסף" : "בחירת מוצר"}
       </h2>
       
       {/* 4 Selects in One Row */}
