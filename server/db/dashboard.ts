@@ -352,13 +352,29 @@ export async function getPendingSignups(limit: number = 5) {
         }
       }
 
-      // Get attachments from requestDetails
-      const attachments = (requestDetails.attachments || []).map((att: any) => ({
+      // Get attachments from requestDetails (general attachments)
+      const generalAttachments = (requestDetails.attachments || []).map((att: any) => ({
         fileName: att.fileName || 'קובץ',
         fileUrl: att.fileUrl || '',
         mimeType: att.mimeType || '',
         fileSize: att.fileSize || 0,
       }));
+
+      // Get quote items with their attached files
+      const quoteItems = (requestDetails.quoteItems || []).map((item: any) => ({
+        sizeQuantityId: item.sizeQuantityId,
+        quantity: item.quantity,
+        addonIds: item.addonIds || [],
+        attachment: item.attachment ? {
+          fileName: item.attachment.fileName || 'קובץ',
+          fileUrl: item.attachment.fileUrl || '',
+          mimeType: item.attachment.mimeType || '',
+          fileSize: item.attachment.fileSize || 0,
+        } : null,
+      }));
+
+      // Total attachments = item attachments + general attachments
+      const totalAttachmentCount = quoteItems.filter((item: any) => item.attachment).length + generalAttachments.length;
 
       return {
         id: row.id,
@@ -369,9 +385,10 @@ export async function getPendingSignups(limit: number = 5) {
         customerNumber: row.customerNumber,
         createdAt: row.createdAt,
         notes: signupDetails.notes || requestDetails.notes || '',
-        itemCount: signupDetails.itemCount || (requestDetails.quoteItems?.length || 0),
-        attachmentCount: attachments.length,
-        attachments,
+        itemCount: signupDetails.itemCount || quoteItems.length,
+        attachmentCount: totalAttachmentCount,
+        attachments: generalAttachments,
+        quoteItems,
         activityLogId: row.activityLogId
       };
     });

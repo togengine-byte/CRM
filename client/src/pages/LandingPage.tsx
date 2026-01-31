@@ -367,11 +367,19 @@ export default function LandingPage() {
 
     try {
       if (selectedProducts.length > 0) {
-        // Build quoteItems in the format the API expects
+        // Build quoteItems in the format the API expects - now includes attachment per item
         const quoteItems = selectedProducts.map((p) => ({
           sizeQuantityId: p.sizeQuantityId || p.quantityId, // Use sizeQuantityId or fallback to quantityId
           quantity: p.quantity,
           addonIds: p.addons?.map(a => a.id) || [],
+          // Include file attachment for this specific product
+          attachment: p.file?.s3Key && p.file?.s3Url ? {
+            fileName: p.file.file.name,
+            fileUrl: p.file.s3Url,
+            s3Key: p.file.s3Key,
+            fileSize: p.file.file.size,
+            mimeType: p.file.file.type,
+          } : undefined,
         }));
 
         // Build attachments array

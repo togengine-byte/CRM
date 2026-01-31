@@ -173,6 +173,7 @@ export const customersRouter = router({
         sizeQuantityId: z.number(),
         quantity: z.number().int().positive(),
         addonIds: z.array(z.number()).optional(), // Selected addon IDs
+        attachment: attachmentSchema.optional(), // File attached to this specific product
       })).min(1),
       notes: z.string().optional(),
       attachments: z.array(attachmentSchema).optional(),

@@ -25,9 +25,10 @@ interface CreateCustomerWithQuoteInput {
     sizeQuantityId: number;
     quantity: number;
     addonIds?: number[]; // Selected addon IDs for this item
+    attachment?: Attachment; // File attached to this specific product
   }>;
   notes?: string;
-  attachments?: Attachment[];
+  attachments?: Attachment[]; // General attachments (not linked to specific products)
 }
 
 interface CreateCustomerWithFilesOnlyInput {

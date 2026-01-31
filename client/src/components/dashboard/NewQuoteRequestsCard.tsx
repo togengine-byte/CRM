@@ -22,7 +22,8 @@ import {
   File,
   X,
   Download,
-  ExternalLink
+  ExternalLink,
+  ChevronLeft
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -34,6 +35,13 @@ interface Attachment {
   fileUrl: string;
   mimeType: string;
   fileSize: number;
+}
+
+interface QuoteItem {
+  sizeQuantityId: number;
+  quantity: number;
+  addonIds: number[];
+  attachment: Attachment | null;
 }
 
 interface PendingSignup {
@@ -48,6 +56,7 @@ interface PendingSignup {
   itemCount: number;
   attachmentCount: number;
   attachments: Attachment[];
+  quoteItems?: QuoteItem[];
   activityLogId: number | null;
 }
 
@@ -55,10 +64,12 @@ interface PendingSignup {
 
 function FilePreviewModal({ 
   file, 
-  onClose 
+  onClose,
+  productName
 }: { 
   file: Attachment | null; 
   onClose: () => void;
+  productName?: string;
 }) {
   if (!file) return null;
 
@@ -69,17 +80,25 @@ function FilePreviewModal({
   const isPdf = file.mimeType === 'application/pdf' || 
     /\.pdf$/i.test(file.fileName);
 
+  // Format file size
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 B';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1024 / 1024).toFixed(2) + ' MB';
+  };
+
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
       onClick={onClose}
     >
       <div 
-        className="relative bg-white rounded-2xl shadow-2xl max-w-4xl max-h-[90vh] w-full mx-4 overflow-hidden"
+        className="relative bg-white rounded-2xl shadow-2xl max-w-5xl max-h-[95vh] w-full mx-4 overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-slate-50">
+        <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-blue-50">
           <div className="flex items-center gap-3">
             {isImage && <ImageIcon className="h-5 w-5 text-blue-600" />}
             {isVideo && <Video className="h-5 w-5 text-purple-600" />}
@@ -87,11 +106,15 @@ function FilePreviewModal({
             {!isImage && !isVideo && !isPdf && <File className="h-5 w-5 text-slate-600" />}
             <div>
               <p className="font-medium text-slate-900 truncate max-w-md">{file.fileName}</p>
-              {file.fileSize > 0 && (
-                <p className="text-xs text-slate-500">
-                  {(file.fileSize / 1024 / 1024).toFixed(2)} MB
-                </p>
-              )}
+              <div className="flex items-center gap-3 text-xs text-slate-500">
+                <span>{formatFileSize(file.fileSize)}</span>
+                {productName && (
+                  <>
+                    <span>•</span>
+                    <span className="text-blue-600">{productName}</span>
+                  </>
+                )}
+              </div>
             </div>
           </div>
           <button 
@@ -103,34 +126,47 @@ function FilePreviewModal({
         </div>
 
         {/* Content */}
-        <div className="p-4 max-h-[calc(90vh-140px)] overflow-auto">
+        <div className="p-4 max-h-[calc(95vh-140px)] overflow-auto bg-slate-100">
           {isImage && (
-            <div className="flex items-center justify-center bg-slate-100 rounded-xl p-4">
+            <div className="flex items-center justify-center">
               <img 
                 src={file.fileUrl} 
                 alt={file.fileName}
-                className="max-w-full max-h-[60vh] object-contain rounded-lg shadow-lg"
+                className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-xl"
               />
             </div>
           )}
           
           {isVideo && (
-            <div className="flex items-center justify-center bg-slate-900 rounded-xl p-4">
+            <div className="flex items-center justify-center bg-black rounded-xl">
               <video 
                 src={file.fileUrl}
                 controls
-                className="max-w-full max-h-[60vh] rounded-lg"
+                autoPlay
+                className="max-w-full max-h-[70vh] rounded-lg"
               />
             </div>
           )}
           
           {isPdf && (
-            <div className="bg-slate-100 rounded-xl p-4 h-[60vh]">
-              <iframe 
-                src={file.fileUrl}
-                className="w-full h-full rounded-lg border border-slate-200"
-                title={file.fileName}
-              />
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <FileText className="h-24 w-24 text-red-400 mb-4" />
+              <p className="text-lg font-medium text-slate-700 mb-2">{file.fileName}</p>
+              <p className="text-slate-500 mb-6">{formatFileSize(file.fileSize)}</p>
+              <div className="flex gap-3">
+                <a href={file.fileUrl} download={file.fileName}>
+                  <Button variant="outline" size="lg">
+                    <Download className="h-5 w-5 ml-2" />
+                    הורד קובץ
+                  </Button>
+                </a>
+                <a href={file.fileUrl} target="_blank" rel="noopener noreferrer">
+                  <Button size="lg" className="bg-red-600 hover:bg-red-700">
+                    <ExternalLink className="h-5 w-5 ml-2" />
+                    פתח PDF
+                  </Button>
+                </a>
+              </div>
             </div>
           )}
           
@@ -138,77 +174,130 @@ function FilePreviewModal({
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <File className="h-20 w-20 text-slate-300 mb-4" />
               <p className="text-slate-500 mb-4">לא ניתן להציג תצוגה מקדימה לקובץ זה</p>
+              <a href={file.fileUrl} download={file.fileName}>
+                <Button>
+                  <Download className="h-4 w-4 ml-2" />
+                  הורד קובץ
+                </Button>
+              </a>
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-3 p-4 border-t border-slate-200 bg-slate-50">
-          <Button variant="outline" onClick={onClose}>
-            סגור
-          </Button>
-          <a href={file.fileUrl} download={file.fileName}>
-            <Button variant="outline" className="border-slate-300">
-              <Download className="h-4 w-4 ml-2" />
-              הורד
+        <div className="flex justify-between items-center p-4 border-t border-slate-200 bg-slate-50">
+          <div className="text-sm text-slate-500">
+            {isImage && "תמונה"}
+            {isVideo && "וידאו"}
+            {isPdf && "מסמך PDF"}
+            {!isImage && !isVideo && !isPdf && "קובץ"}
+          </div>
+          <div className="flex gap-3">
+            <Button variant="outline" onClick={onClose}>
+              סגור
             </Button>
-          </a>
-          <a href={file.fileUrl} target="_blank" rel="noopener noreferrer">
-            <Button className="bg-blue-600 hover:bg-blue-700">
-              <ExternalLink className="h-4 w-4 ml-2" />
-              פתח בחלון חדש
-            </Button>
-          </a>
+            {!isPdf && (
+              <>
+                <a href={file.fileUrl} download={file.fileName}>
+                  <Button variant="outline" className="border-slate-300">
+                    <Download className="h-4 w-4 ml-2" />
+                    הורד
+                  </Button>
+                </a>
+                <a href={file.fileUrl} target="_blank" rel="noopener noreferrer">
+                  <Button className="bg-blue-600 hover:bg-blue-700">
+                    <ExternalLink className="h-4 w-4 ml-2" />
+                    פתח בחלון חדש
+                  </Button>
+                </a>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-// ==================== FILE THUMBNAIL ====================
+// ==================== PRODUCT ROW WITH FILE ====================
 
-function FileThumbnail({ 
-  file, 
-  onClick 
+function ProductRow({ 
+  item, 
+  index,
+  onFileClick 
 }: { 
-  file: Attachment; 
-  onClick: () => void;
+  item: QuoteItem;
+  index: number;
+  onFileClick: (file: Attachment, productName: string) => void;
 }) {
-  const isImage = file.mimeType?.startsWith('image/') || 
-    /\.(jpg|jpeg|png|gif|webp|tiff|tif)$/i.test(file.fileName);
-  const isVideo = file.mimeType?.startsWith('video/') || 
-    /\.(mp4|mov|avi|webm)$/i.test(file.fileName);
-  const isPdf = file.mimeType === 'application/pdf' || 
-    /\.pdf$/i.test(file.fileName);
+  // Fetch product details
+  const { data: sizeQuantity } = trpc.products.getSizeQuantityById.useQuery(
+    { id: item.sizeQuantityId },
+    { enabled: !!item.sizeQuantityId }
+  );
+
+  const productName = sizeQuantity?.productName || `מוצר ${index + 1}`;
+  const sizeName = sizeQuantity?.sizeName || '';
+  const quantityLabel = sizeQuantity?.quantityLabel || `${item.quantity} יח'`;
+
+  const isImage = item.attachment?.mimeType?.startsWith('image/') || 
+    /\.(jpg|jpeg|png|gif|webp|tiff|tif)$/i.test(item.attachment?.fileName || '');
 
   return (
-    <div 
-      onClick={onClick}
-      className="relative w-20 h-20 rounded-lg border border-slate-200 overflow-hidden cursor-pointer hover:border-blue-400 hover:shadow-md transition-all group"
-    >
-      {isImage ? (
-        <img 
-          src={file.fileUrl} 
-          alt={file.fileName}
-          className="w-full h-full object-cover"
-        />
+    <div className="flex items-center gap-3 p-3 bg-white rounded-lg border border-slate-200 hover:border-blue-300 transition-colors">
+      {/* Product Info */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <Package className="h-4 w-4 text-blue-500 shrink-0" />
+          <span className="font-medium text-slate-900 truncate">{productName}</span>
+        </div>
+        <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
+          {sizeName && <span>{sizeName}</span>}
+          <span>•</span>
+          <span>{quantityLabel}</span>
+          {item.addonIds && item.addonIds.length > 0 && (
+            <>
+              <span>•</span>
+              <span className="text-purple-600">{item.addonIds.length} תוספות</span>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* File Thumbnail */}
+      {item.attachment ? (
+        <div 
+          onClick={() => onFileClick(item.attachment!, productName)}
+          className="relative w-16 h-16 rounded-lg border-2 border-slate-200 overflow-hidden cursor-pointer hover:border-blue-400 hover:shadow-md transition-all group shrink-0"
+        >
+          {isImage ? (
+            <img 
+              src={item.attachment.fileUrl} 
+              alt={item.attachment.fileName}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-slate-50">
+              {item.attachment.mimeType === 'application/pdf' || /\.pdf$/i.test(item.attachment.fileName) ? (
+                <FileText className="h-8 w-8 text-red-500" />
+              ) : item.attachment.mimeType?.startsWith('video/') ? (
+                <Video className="h-8 w-8 text-purple-500" />
+              ) : (
+                <File className="h-8 w-8 text-slate-400" />
+              )}
+            </div>
+          )}
+          
+          {/* Hover overlay */}
+          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+            <ExternalLink className="h-5 w-5 text-white" />
+          </div>
+        </div>
       ) : (
-        <div className="w-full h-full flex flex-col items-center justify-center bg-slate-50">
-          {isVideo && <Video className="h-8 w-8 text-purple-500" />}
-          {isPdf && <FileText className="h-8 w-8 text-red-500" />}
-          {!isVideo && !isPdf && <File className="h-8 w-8 text-slate-400" />}
+        <div className="w-16 h-16 rounded-lg border-2 border-dashed border-slate-200 flex items-center justify-center bg-slate-50 shrink-0">
+          <span className="text-[10px] text-slate-400 text-center">אין קובץ</span>
         </div>
       )}
-      
-      {/* Hover overlay */}
-      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-        <ExternalLink className="h-5 w-5 text-white" />
-      </div>
-      
-      {/* File name tooltip */}
-      <div className="absolute bottom-0 left-0 right-0 bg-black/70 px-1 py-0.5">
-        <p className="text-[9px] text-white truncate text-center">{file.fileName}</p>
-      </div>
     </div>
   );
 }
@@ -229,6 +318,7 @@ function RequestDetails({
   isRejecting: boolean;
 }) {
   const [selectedFile, setSelectedFile] = useState<Attachment | null>(null);
+  const [selectedProductName, setSelectedProductName] = useState<string>('');
 
   const formatDate = (date: Date) => {
     return new Date(date).toLocaleDateString('he-IL', {
@@ -238,6 +328,11 @@ function RequestDetails({
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+
+  const handleFileClick = (file: Attachment, productName: string) => {
+    setSelectedFile(file);
+    setSelectedProductName(productName);
   };
 
   return (
@@ -298,36 +393,70 @@ function RequestDetails({
         </div>
       )}
 
-      {/* Attachments Preview */}
-      {request.attachments && request.attachments.length > 0 && (
+      {/* Products with Files */}
+      {request.quoteItems && request.quoteItems.length > 0 && (
         <div className="p-3 bg-white rounded-lg border border-slate-100 shadow-sm">
           <div className="flex items-center gap-2 mb-3">
-            <ImageIcon className="h-4 w-4 text-blue-500" />
-            <p className="text-sm font-medium text-slate-700">קבצים מצורפים ({request.attachments.length})</p>
+            <Package className="h-4 w-4 text-blue-500" />
+            <p className="text-sm font-medium text-slate-700">מוצרים וקבצים ({request.quoteItems.length})</p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {request.attachments.map((file, index) => (
-              <FileThumbnail 
+          <div className="space-y-2">
+            {request.quoteItems.map((item, index) => (
+              <ProductRow 
                 key={index} 
-                file={file} 
-                onClick={() => setSelectedFile(file)}
+                item={item} 
+                index={index}
+                onFileClick={handleFileClick}
               />
             ))}
           </div>
         </div>
       )}
 
-      {/* Summary */}
-      <div className="flex items-center gap-4 p-3 bg-white rounded-lg border border-slate-100 shadow-sm">
-        <div className="flex items-center gap-2">
-          <Package className="h-4 w-4 text-blue-500" />
-          <span className="text-sm text-slate-600">{request.itemCount} מוצרים</span>
+      {/* General Attachments (not linked to products) */}
+      {request.attachments && request.attachments.length > 0 && (
+        <div className="p-3 bg-white rounded-lg border border-slate-100 shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <ImageIcon className="h-4 w-4 text-amber-500" />
+            <p className="text-sm font-medium text-slate-700">קבצים כלליים ({request.attachments.length})</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {request.attachments.map((file, index) => {
+              const isImage = file.mimeType?.startsWith('image/') || 
+                /\.(jpg|jpeg|png|gif|webp|tiff|tif)$/i.test(file.fileName);
+              
+              return (
+                <div 
+                  key={index}
+                  onClick={() => handleFileClick(file, 'קובץ כללי')}
+                  className="relative w-16 h-16 rounded-lg border-2 border-slate-200 overflow-hidden cursor-pointer hover:border-blue-400 hover:shadow-md transition-all group"
+                >
+                  {isImage ? (
+                    <img 
+                      src={file.fileUrl} 
+                      alt={file.fileName}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-slate-50">
+                      {file.mimeType === 'application/pdf' ? (
+                        <FileText className="h-6 w-6 text-red-500" />
+                      ) : file.mimeType?.startsWith('video/') ? (
+                        <Video className="h-6 w-6 text-purple-500" />
+                      ) : (
+                        <File className="h-6 w-6 text-slate-400" />
+                      )}
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <ExternalLink className="h-4 w-4 text-white" />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <FileText className="h-4 w-4 text-amber-500" />
-          <span className="text-sm text-slate-600">{request.attachmentCount} קבצים</span>
-        </div>
-      </div>
+      )}
 
       {/* Action Buttons */}
       <div className="flex justify-end gap-2 pt-2 border-t border-slate-200">
@@ -363,7 +492,8 @@ function RequestDetails({
       {/* File Preview Modal */}
       <FilePreviewModal 
         file={selectedFile} 
-        onClose={() => setSelectedFile(null)} 
+        onClose={() => setSelectedFile(null)}
+        productName={selectedProductName}
       />
     </div>
   );
@@ -425,95 +555,108 @@ export function NewQuoteRequestsCard() {
     }
   };
 
+  const toggleExpand = (id: number) => {
+    setExpandedId(expandedId === id ? null : id);
+  };
+
+  // Get initials for avatar
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase();
+  };
+
+  // Get avatar color based on name
+  const getAvatarColor = (name: string) => {
+    const colors = [
+      'bg-blue-500',
+      'bg-emerald-500',
+      'bg-purple-500',
+      'bg-amber-500',
+      'bg-rose-500',
+      'bg-cyan-500',
+    ];
+    const index = name.charCodeAt(0) % colors.length;
+    return colors[index];
+  };
+
   return (
-    <Card className="border border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-200 bg-white">
-      <CardHeader className="pb-2 pt-3 px-4">
+    <Card className="shadow-lg border-slate-200 overflow-hidden">
+      <CardHeader className="pb-3 bg-gradient-to-r from-slate-50 to-blue-50/50">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="h-7 w-7 rounded-lg bg-amber-50 flex items-center justify-center">
-              <Inbox className="h-4 w-4 text-amber-600" />
-            </div>
-            <CardTitle className="text-sm font-medium text-slate-900">בקשות חדשות</CardTitle>
-          </div>
+          <CardTitle className="text-base font-semibold text-slate-800 flex items-center gap-2">
+            <Inbox className="h-5 w-5 text-blue-600" />
+            בקשות חדשות
+          </CardTitle>
           {requests && requests.length > 0 && (
-            <Badge className="text-[10px] px-2 py-0.5 h-5 bg-amber-100 text-amber-700 border-0">
+            <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">
               {requests.length}
             </Badge>
           )}
         </div>
       </CardHeader>
-      <CardContent className="px-4 pb-3">
+      
+      <CardContent className="p-4">
         {isLoading ? (
-          <div className="space-y-2 animate-pulse">
-            {[...Array(3)].map((_, i) => (
-              <Skeleton key={i} className="h-12 w-full rounded-lg" />
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex items-center gap-3 p-3 border rounded-lg">
+                <Skeleton className="h-10 w-10 rounded-full" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-3 w-48" />
+                </div>
+              </div>
             ))}
           </div>
         ) : !requests || requests.length === 0 ? (
-          <div className="flex items-center justify-center py-6 text-center">
-            <div className="text-center">
-              <Inbox className="h-8 w-8 text-slate-300 mx-auto mb-2" />
-              <p className="text-xs text-slate-400">אין בקשות חדשות</p>
-            </div>
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <Inbox className="h-12 w-12 text-slate-300 mb-3" />
+            <p className="text-slate-500 text-sm">אין בקשות חדשות</p>
           </div>
         ) : (
           <div className="space-y-2">
             {requests.map((request) => (
-              <div key={request.id} className="rounded-lg border border-slate-100 overflow-hidden">
-                {/* Request Header - Always Visible */}
+              <div 
+                key={request.id}
+                className="border border-slate-200 rounded-xl overflow-hidden hover:border-blue-300 transition-colors"
+              >
+                {/* Collapsed Header */}
                 <div 
-                  className={`flex items-center justify-between py-3 px-3 cursor-pointer transition-colors ${
-                    expandedId === request.id 
-                      ? 'bg-blue-50 border-b border-blue-100' 
-                      : 'bg-white hover:bg-slate-50'
-                  }`}
-                  onClick={() => setExpandedId(expandedId === request.id ? null : request.id)}
+                  className="flex items-center gap-3 p-3 cursor-pointer hover:bg-slate-50 transition-colors"
+                  onClick={() => toggleExpand(request.id)}
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="h-8 w-8 rounded-full bg-gradient-to-br from-amber-100 to-amber-200 flex items-center justify-center shrink-0">
-                      <span className="text-xs font-semibold text-amber-700">
-                        {request.name?.charAt(0) || '?'}
+                  <button className="p-1 hover:bg-slate-100 rounded transition-colors">
+                    {expandedId === request.id ? (
+                      <ChevronDown className="h-4 w-4 text-slate-400" />
+                    ) : (
+                      <ChevronLeft className="h-4 w-4 text-slate-400" />
+                    )}
+                  </button>
+                  
+                  <span className="text-xs text-slate-400 font-mono">#{request.customerNumber || request.id}</span>
+                  
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-slate-900 truncate">{request.name}</span>
+                      <span className="text-xs text-slate-400 truncate hidden sm:inline">
+                        • {request.itemCount} מוצרים • {request.attachmentCount} קבצים • {request.email}
                       </span>
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-slate-900 truncate">
-                        {request.name || 'לקוח חדש'}
-                      </p>
-                      <div className="flex items-center gap-2 text-[10px] text-slate-500">
-                        <span>{request.companyName || request.email}</span>
-                        {request.itemCount > 0 && (
-                          <>
-                            <span>•</span>
-                            <span>{request.itemCount} מוצרים</span>
-                          </>
-                        )}
-                        {request.attachmentCount > 0 && (
-                          <>
-                            <span>•</span>
-                            <span>{request.attachmentCount} קבצים</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {request.customerNumber && (
-                      <Badge className="text-[10px] bg-slate-100 text-slate-600 border-0">
-                        #{request.customerNumber}
-                      </Badge>
-                    )}
-                    {expandedId === request.id ? (
-                      <ChevronDown className="h-4 w-4 text-blue-600" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4 text-slate-400" />
-                    )}
+                  
+                  <div className={`w-9 h-9 rounded-full ${getAvatarColor(request.name)} flex items-center justify-center text-white text-sm font-medium shrink-0`}>
+                    {getInitials(request.name)}
                   </div>
                 </div>
 
-                {/* Expanded Details - In Page */}
+                {/* Expanded Details */}
                 {expandedId === request.id && (
-                  <RequestDetails 
-                    request={request as PendingSignup}
+                  <RequestDetails
+                    request={request}
                     onApprove={() => handleApprove(request.id)}
                     onReject={() => handleReject(request.id)}
                     isApproving={approvingId === request.id}

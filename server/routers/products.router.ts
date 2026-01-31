@@ -396,4 +396,37 @@ export const productsRouter = router({
     .query(async ({ input }) => {
       return await getProductsWithDetails(input?.categoryId);
     }),
+
+  // ===== GET SIZE QUANTITY BY ID =====
+  getSizeQuantityById: publicProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return null;
+      const { sizeQuantities, productSizes, baseProducts } = await import('../../drizzle/schema');
+      const { eq } = await import('drizzle-orm');
+      
+      const result = await db.select({
+        id: sizeQuantities.id,
+        sizeId: sizeQuantities.sizeId,
+        quantity: sizeQuantities.quantity,
+        price: sizeQuantities.price,
+        sizeName: productSizes.name,
+        dimensions: productSizes.dimensions,
+        productId: productSizes.productId,
+        productName: baseProducts.name,
+      })
+        .from(sizeQuantities)
+        .innerJoin(productSizes, eq(sizeQuantities.sizeId, productSizes.id))
+        .innerJoin(baseProducts, eq(productSizes.productId, baseProducts.id))
+        .where(eq(sizeQuantities.id, input.id))
+        .limit(1);
+
+      if (!result[0]) return null;
+      
+      return {
+        ...result[0],
+        quantityLabel: `${result[0].quantity} יח'`,
+      };
+    }),
 });
