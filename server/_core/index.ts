@@ -9,6 +9,7 @@ import { appRouter } from "../routers/index";
 import { startBackupScheduler } from "../db/backup";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import s3Router from "../routers/s3.router";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -251,6 +252,9 @@ async function startServer() {
   // Our custom OAuth routes (login, logout, me, signup)
   // This replaces Clerk authentication with our own JWT-based system
   registerOAuthRoutes(app);
+  
+  // S3 file upload routes
+  app.use('/api/s3', s3Router);
   
   // tRPC API
   app.use(
