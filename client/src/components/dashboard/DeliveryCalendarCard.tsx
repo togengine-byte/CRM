@@ -201,9 +201,9 @@ export function DeliveryCalendarCard({ isLoading: parentLoading }: { isLoading: 
         {loading ? (
           <Skeleton className="h-[280px] w-full rounded-lg" />
         ) : (
-          <div className="flex gap-6">
+          <div className="flex flex-col lg:flex-row gap-6">
             {/* לוח שנה - צד ימין */}
-            <div className="flex-1 min-w-[300px]">
+            <div className="flex-1 lg:min-w-[300px]">
               {/* כותרות ימים */}
               <div className="grid grid-cols-7 gap-1 mb-2">
                 {weekDays.map((day) => (
@@ -263,7 +263,7 @@ export function DeliveryCalendarCard({ isLoading: parentLoading }: { isLoading: 
             </div>
 
             {/* רשימת משימות ליום נבחר - צד שמאל */}
-            <div className="flex-1 min-w-[350px] border-r border-slate-200 pr-6">
+            <div className="flex-1 lg:min-w-[350px] border-t lg:border-t-0 lg:border-r border-slate-200 pt-4 lg:pt-0 lg:pr-6">
               {selectedDate ? (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
