@@ -147,6 +147,12 @@ function FilePreviewModal({
           <Button variant="outline" onClick={onClose}>
             סגור
           </Button>
+          <a href={file.fileUrl} download={file.fileName}>
+            <Button variant="outline" className="border-slate-300">
+              <Download className="h-4 w-4 ml-2" />
+              הורד
+            </Button>
+          </a>
           <a href={file.fileUrl} target="_blank" rel="noopener noreferrer">
             <Button className="bg-blue-600 hover:bg-blue-700">
               <ExternalLink className="h-4 w-4 ml-2" />
