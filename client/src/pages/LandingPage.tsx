@@ -139,6 +139,31 @@ export default function LandingPage() {
   const selectedSize = sizes?.find((s: Size) => s.id === selectedSizeId);
   const selectedQuantity = quantities?.find((q: Quantity) => q.id === selectedQuantityId);
 
+  // Mutations for submitting quote requests
+  const createWithQuoteMutation = trpc.customers.createWithQuote.useMutation({
+    onSuccess: () => {
+      setSubmitted(true);
+      toast.success("הבקשה נשלחה בהצלחה!");
+    },
+    onError: (error) => {
+      console.error('Submit error:', error);
+      setSubmitError("שגיאה בשליחת הבקשה");
+      setSubmitErrorDetails(["אנא נסה שוב מאוחר יותר"]);
+    },
+  });
+
+  const createQuoteWithFilesOnlyMutation = trpc.customers.createQuoteWithFilesOnly.useMutation({
+    onSuccess: () => {
+      setSubmitted(true);
+      toast.success("הבקשה נשלחה בהצלחה!");
+    },
+    onError: (error) => {
+      console.error('Submit error:', error);
+      setSubmitError("שגיאה בשליחת הבקשה");
+      setSubmitErrorDetails(["אנא נסה שוב מאוחר יותר"]);
+    },
+  });
+
   // Redirect to dashboard if already authenticated
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
@@ -325,56 +350,37 @@ export default function LandingPage() {
 
       if (hasProducts) {
         // Submit with products via tRPC
-        const response = await fetch('/api/trpc/customers.createWithQuote', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            customerInfo: {
-              name: customerName.trim(),
-              email: customerEmail.trim(),
-              phone: customerPhone.trim(),
-              companyName: customerCompany.trim() || undefined,
-            },
-            quoteItems: selectedProducts.map(p => ({
-              sizeQuantityId: p.quantityId,
-              quantity: p.quantity,
-            })),
-            notes: description || undefined,
-            attachments: fileAttachments.length > 0 ? fileAttachments : undefined,
-          }),
+        await createWithQuoteMutation.mutateAsync({
+          customerInfo: {
+            name: customerName.trim(),
+            email: customerEmail.trim(),
+            phone: customerPhone.trim(),
+            companyName: customerCompany.trim() || undefined,
+          },
+          quoteItems: selectedProducts.map(p => ({
+            sizeQuantityId: p.quantityId,
+            quantity: p.quantity,
+          })),
+          notes: description || undefined,
+          attachments: fileAttachments.length > 0 ? fileAttachments : undefined,
         });
-
-        if (!response.ok) {
-          throw new Error('שגיאה בשליחת הבקשה');
-        }
       } else {
         // Submit with files only
-        const response = await fetch('/api/trpc/customers.createQuoteWithFilesOnly', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            customerInfo: {
-              name: customerName.trim(),
-              email: customerEmail.trim(),
-              phone: customerPhone.trim(),
-              companyName: customerCompany.trim() || undefined,
-            },
-            description: description,
-            attachments: fileAttachments,
-          }),
+        await createQuoteWithFilesOnlyMutation.mutateAsync({
+          customerInfo: {
+            name: customerName.trim(),
+            email: customerEmail.trim(),
+            phone: customerPhone.trim(),
+            companyName: customerCompany.trim() || undefined,
+          },
+          description: description,
+          attachments: fileAttachments,
         });
-
-        if (!response.ok) {
-          throw new Error('שגיאה בשליחת הבקשה');
-        }
       }
-
-      setSubmitted(true);
-      toast.success("הבקשה נשלחה בהצלחה!");
+      // Success handled by mutation onSuccess
     } catch (err) {
+      // Error handled by mutation onError
       console.error('Submit error:', err);
-      setSubmitError("שגיאה בשליחת הבקשה");
-      setSubmitErrorDetails(["אנא נסה שוב מאוחר יותר"]);
     } finally {
       setSubmitLoading(false);
     }
