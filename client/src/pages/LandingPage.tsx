@@ -22,6 +22,7 @@ import {
   type SelectedProduct,
   type ProductFile,
   type Category,
+  type SelectedAddon,
   // Utils
   getImageDimensions,
   validateFileForProduct,
@@ -52,6 +53,7 @@ export default function LandingPage() {
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
   const [selectedSizeId, setSelectedSizeId] = useState<number | null>(null);
   const [selectedQuantityId, setSelectedQuantityId] = useState<number | null>(null);
+  const [selectedAddonIds, setSelectedAddonIds] = useState<number[]>([]);
   const [selectedProducts, setSelectedProducts] = useState<SelectedProduct[]>([]);
 
   // ============================================================================
@@ -84,6 +86,10 @@ export default function LandingPage() {
     { sizeId: selectedSizeId! },
     { enabled: !!selectedSizeId }
   );
+  const { data: addons } = trpc.products.getAddons.useQuery(
+    { categoryId: selectedCategoryId! },
+    { enabled: !!selectedCategoryId }
+  );
 
   // ============================================================================
   // API Mutations
@@ -111,6 +117,23 @@ export default function LandingPage() {
   }, [selectedProducts]);
 
   // ============================================================================
+  // Addon Management
+  // ============================================================================
+  const handleAddonToggle = (addonId: number) => {
+    setSelectedAddonIds((prev) =>
+      prev.includes(addonId)
+        ? prev.filter((id) => id !== addonId)
+        : [...prev, addonId]
+    );
+  };
+
+  // Reset addons when category changes
+  const handleCategoryChange = (categoryId: number | null) => {
+    setSelectedCategoryId(categoryId);
+    setSelectedAddonIds([]); // Reset addons when category changes
+  };
+
+  // ============================================================================
   // Product Management
   // ============================================================================
   const handleAddProduct = () => {
@@ -122,6 +145,20 @@ export default function LandingPage() {
     const category = categories?.find((c) => c.id === selectedCategoryId);
 
     if (!product || !size || !quantity) return;
+
+    // Build selected addons array
+    const productAddons: SelectedAddon[] = selectedAddonIds
+      .map((addonId) => {
+        const addon = addons?.find((a) => a.id === addonId);
+        if (!addon) return null;
+        return {
+          id: addon.id,
+          name: addon.name,
+          priceType: addon.priceType,
+          price: parseFloat(addon.price),
+        };
+      })
+      .filter((a): a is SelectedAddon => a !== null);
 
     const newProduct: SelectedProduct = {
       id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -136,12 +173,14 @@ export default function LandingPage() {
       quantity: quantity.quantity,
       price: parseFloat(quantity.price),
       graphicDesignPrice: parseFloat(size.graphicDesignPrice || "0"),
+      addons: productAddons.length > 0 ? productAddons : undefined,
     };
 
     setSelectedProducts((prev) => [...prev, newProduct]);
     
-    // Reset selection
+    // Reset selection (keep category for convenience)
     setSelectedQuantityId(null);
+    setSelectedAddonIds([]); // Reset addons after adding product
     toast.success(`${product.name} נוסף לרשימה`);
   };
 
@@ -338,11 +377,16 @@ export default function LandingPage() {
     setSubmitLoading(true);
 
     try {
-      // Build notes from warnings
+      // Build notes from warnings and addons
       const notes: string[] = [];
       selectedProducts.forEach((p) => {
         if (p.needsGraphicDesign) {
           notes.push(`${p.productName}: נדרש עיצוב גרפי (₪${p.graphicDesignPrice})`);
+        }
+        // Add addons to notes
+        if (p.addons && p.addons.length > 0) {
+          const addonNames = p.addons.map((a) => a.name).join(", ");
+          notes.push(`${p.productName} - תוספות: ${addonNames}`);
         }
         p.file?.validationWarnings?.forEach((w) => {
           notes.push(`${p.productName}: ${w.message} - ${w.details || ""}`);
@@ -369,6 +413,8 @@ export default function LandingPage() {
             fileKey: p.file?.s3Key,
             fileUrl: p.file?.s3Url,
             fileName: p.file?.file.name,
+            // Include addon IDs for backend processing
+            addonIds: p.addons?.map((a) => a.id),
           })),
           notes: notes.join("\n"),
           attachments: generalFiles
@@ -470,14 +516,17 @@ export default function LandingPage() {
             products={products}
             sizes={sizes}
             quantities={quantities}
+            addons={addons}
             selectedCategoryId={selectedCategoryId}
             selectedProductId={selectedProductId}
             selectedSizeId={selectedSizeId}
             selectedQuantityId={selectedQuantityId}
-            onCategoryChange={setSelectedCategoryId}
+            selectedAddonIds={selectedAddonIds}
+            onCategoryChange={handleCategoryChange}
             onProductChange={setSelectedProductId}
             onSizeChange={setSelectedSizeId}
             onQuantityChange={setSelectedQuantityId}
+            onAddonToggle={handleAddonToggle}
             onAddProduct={handleAddProduct}
           />
 

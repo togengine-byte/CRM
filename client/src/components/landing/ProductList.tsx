@@ -1,11 +1,11 @@
 /**
  * Product List Component
- * Displays selected products with file upload and validation per product
+ * Displays selected products with file upload, validation, and addons per product
  */
 
 import { 
   Upload, X, Loader2, Check, Trash2, AlertCircle, AlertTriangle, 
-  Palette, File, FileText, Image, Package 
+  Palette, File, FileText, Image, Package, Tag 
 } from "lucide-react";
 import type { SelectedProduct, ProductFile } from "./types";
 import { ALLOWED_EXTENSIONS } from "./types";
@@ -55,6 +55,21 @@ export function ProductList({
                   <span className="text-xs text-slate-500">•</span>
                   <span className="text-xs text-slate-600">{product.quantity} יח'</span>
                 </div>
+
+                {/* Selected Addons Display */}
+                {product.addons && product.addons.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {product.addons.map((addon) => (
+                      <span
+                        key={addon.id}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs border border-blue-100"
+                      >
+                        <Tag className="h-3 w-3" />
+                        {addon.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
 
                 {/* File Upload for this Product */}
                 {!product.file ? (
