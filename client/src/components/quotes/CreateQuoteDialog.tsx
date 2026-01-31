@@ -1,10 +1,9 @@
 /**
  * CreateQuoteDialog - טופס יצירת הצעת מחיר חדשה
- * עיצוב מודרני כמו דף נחיתה
- * תמיכה בבחירת מוצרים, תוספות, והעלאת קבצים
+ * שדות בחירה אינטראקטיביים עם חיפוש
  */
 
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -19,9 +18,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { 
-  Plus, Search, X, FileUp, Package, ChevronDown, Check, 
-  Loader2, Image as ImageIcon, FileText, Video, File,
-  Trash2, Upload, Tag, Rocket, Send
+  Plus, Search, X, ChevronDown, Check, 
+  Loader2, FileText, Video, File,
+  Trash2, Upload, Tag, Rocket, Send, Package
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -54,7 +53,7 @@ interface ProductFile {
 }
 
 interface SelectedProduct {
-  id: string; // unique id for UI
+  id: string;
   productId: number;
   productName: string;
   sizeId: number;
@@ -72,6 +71,130 @@ interface CreateQuoteDialogProps {
   onClose: () => void;
   onSuccess: () => void;
   customers: Customer[];
+}
+
+// ==================== COMBOBOX COMPONENT ====================
+
+interface ComboboxOption {
+  id: number;
+  label: string;
+  sublabel?: string;
+  price?: string;
+}
+
+function Combobox({ 
+  options, 
+  value, 
+  onChange, 
+  placeholder,
+  disabled,
+  className
+}: { 
+  options: ComboboxOption[];
+  value: number | null;
+  onChange: (id: number | null) => void;
+  placeholder: string;
+  disabled?: boolean;
+  className?: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const selectedOption = options.find(o => o.id === value);
+  
+  const filteredOptions = useMemo(() => {
+    if (!search) return options;
+    const searchLower = search.toLowerCase();
+    return options.filter(o => 
+      o.label.toLowerCase().includes(searchLower) ||
+      o.sublabel?.toLowerCase().includes(searchLower)
+    );
+  }, [options, search]);
+
+  // Close on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+        setSearch("");
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSelect = (id: number) => {
+    onChange(id);
+    setIsOpen(false);
+    setSearch("");
+  };
+
+  const handleClear = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onChange(null);
+    setSearch("");
+  };
+
+  return (
+    <div ref={containerRef} className={`relative ${className}`}>
+      <div 
+        className={`flex items-center border rounded-lg bg-white cursor-pointer transition-all ${
+          isOpen ? 'border-blue-500 ring-2 ring-blue-100' : 'border-slate-200 hover:border-slate-300'
+        } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+        onClick={() => !disabled && setIsOpen(true)}
+      >
+        <input
+          ref={inputRef}
+          type="text"
+          className="flex-1 px-3 py-2 text-sm bg-transparent outline-none"
+          placeholder={selectedOption ? selectedOption.label : placeholder}
+          value={isOpen ? search : (selectedOption ? selectedOption.label : "")}
+          onChange={(e) => setSearch(e.target.value)}
+          onFocus={() => !disabled && setIsOpen(true)}
+          disabled={disabled}
+        />
+        {value && !isOpen && (
+          <button onClick={handleClear} className="p-1 mr-1 hover:bg-slate-100 rounded">
+            <X className="h-3 w-3 text-slate-400" />
+          </button>
+        )}
+        <ChevronDown className={`h-4 w-4 text-slate-400 ml-2 mr-2 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </div>
+      
+      {isOpen && !disabled && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+          {filteredOptions.length === 0 ? (
+            <div className="p-3 text-sm text-slate-500 text-center">לא נמצאו תוצאות</div>
+          ) : (
+            filteredOptions.map(option => (
+              <div
+                key={option.id}
+                className={`px-3 py-2 cursor-pointer hover:bg-blue-50 flex items-center justify-between ${
+                  option.id === value ? 'bg-blue-50' : ''
+                }`}
+                onClick={() => handleSelect(option.id)}
+              >
+                <div>
+                  <div className="text-sm font-medium text-slate-900">{option.label}</div>
+                  {option.sublabel && (
+                    <div className="text-xs text-slate-500">{option.sublabel}</div>
+                  )}
+                </div>
+                {option.price && (
+                  <span className="text-sm font-semibold text-emerald-600">₪{option.price}</span>
+                )}
+                {option.id === value && (
+                  <Check className="h-4 w-4 text-blue-600" />
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ==================== FILE UPLOAD HELPER ====================
@@ -100,40 +223,34 @@ function FileThumbnail({ file, onRemove }: { file: ProductFile; onRemove: () => 
   const isPdf = file.mimeType === 'application/pdf';
 
   return (
-    <div className="relative w-16 h-16 rounded-lg border-2 border-slate-200 overflow-hidden group">
+    <div className="relative w-12 h-12 rounded-lg border border-slate-200 overflow-hidden group">
       {file.uploading ? (
         <div className="w-full h-full flex items-center justify-center bg-slate-100">
-          <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
+          <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
         </div>
       ) : file.s3Url && isImage ? (
         <img src={file.s3Url} alt={file.fileName} className="w-full h-full object-cover" />
       ) : (
         <div className="w-full h-full flex items-center justify-center bg-slate-50">
-          {isPdf && <FileText className="h-6 w-6 text-red-500" />}
-          {isVideo && <Video className="h-6 w-6 text-purple-500" />}
-          {!isPdf && !isVideo && <File className="h-6 w-6 text-slate-400" />}
+          {isPdf && <FileText className="h-5 w-5 text-red-500" />}
+          {isVideo && <Video className="h-5 w-5 text-purple-500" />}
+          {!isPdf && !isVideo && <File className="h-5 w-5 text-slate-400" />}
         </div>
       )}
       
-      {/* Remove button */}
       <button
         onClick={onRemove}
-        className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+        className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
       >
-        <X className="h-3 w-3 text-white" />
+        <X className="h-2 w-2 text-white" />
       </button>
-      
-      {/* File name */}
-      <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-1 py-0.5">
-        <p className="text-[8px] text-white truncate">{file.fileName}</p>
-      </div>
     </div>
   );
 }
 
-// ==================== PRODUCT CARD ====================
+// ==================== PRODUCT ROW ====================
 
-function ProductCard({ 
+function ProductRow({ 
   product, 
   onRemove,
   onFileUpload,
@@ -155,49 +272,17 @@ function ProductCard({
   const totalPrice = product.price + totalAddonsPrice;
 
   return (
-    <div className="flex items-center gap-3 p-3 bg-white rounded-xl border border-slate-200 hover:border-blue-300 transition-all shadow-sm">
-      {/* Product Info */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <Package className="h-4 w-4 text-blue-500 shrink-0" />
-          <span className="font-medium text-slate-900 truncate">{product.productName}</span>
-        </div>
-        <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
-          <span>{product.sizeName}</span>
-          {product.sizeDimensions && (
-            <>
-              <span>•</span>
-              <span>{product.sizeDimensions}</span>
-            </>
-          )}
-          <span>•</span>
-          <span>{product.quantity} יח'</span>
-        </div>
-        {product.addons.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-1">
-            {product.addons.map(addon => (
-              <Badge key={addon.id} variant="secondary" className="text-[10px] py-0">
-                {addon.name}
-              </Badge>
-            ))}
-          </div>
-        )}
-        <div className="mt-1 text-sm font-semibold text-emerald-600">
-          ₪{totalPrice.toFixed(2)}
-        </div>
-      </div>
-
-      {/* File Upload Area */}
+    <div className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg border border-slate-200">
+      {/* File */}
       <div className="shrink-0">
         {product.file ? (
           <FileThumbnail file={product.file} onRemove={onFileRemove} />
         ) : (
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="w-16 h-16 rounded-lg border-2 border-dashed border-slate-300 hover:border-blue-400 flex flex-col items-center justify-center bg-slate-50 hover:bg-blue-50 transition-colors"
+            className="w-12 h-12 rounded-lg border-2 border-dashed border-slate-300 hover:border-blue-400 flex items-center justify-center bg-white hover:bg-blue-50 transition-colors"
           >
-            <Upload className="h-5 w-5 text-slate-400" />
-            <span className="text-[9px] text-slate-400 mt-1">העלה קובץ</span>
+            <Upload className="h-4 w-4 text-slate-400" />
           </button>
         )}
         <input
@@ -213,11 +298,22 @@ function ProductCard({
         />
       </div>
 
-      {/* Remove Button */}
-      <button
-        onClick={onRemove}
-        className="p-2 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-500 transition-colors"
-      >
+      {/* Info */}
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-medium text-slate-900 truncate">{product.productName}</div>
+        <div className="text-xs text-slate-500">
+          {product.sizeName} • {product.quantity} יח'
+          {product.addons.length > 0 && ` • ${product.addons.length} תוספות`}
+        </div>
+      </div>
+
+      {/* Price */}
+      <div className="text-sm font-bold text-emerald-600 shrink-0">
+        ₪{totalPrice.toFixed(0)}
+      </div>
+
+      {/* Remove */}
+      <button onClick={onRemove} className="p-1 hover:bg-red-100 rounded text-slate-400 hover:text-red-500">
         <Trash2 className="h-4 w-4" />
       </button>
     </div>
@@ -234,7 +330,6 @@ export function CreateQuoteDialog({
 }: CreateQuoteDialogProps) {
   // Customer selection
   const [customerId, setCustomerId] = useState<number | null>(null);
-  const [customerSearch, setCustomerSearch] = useState("");
   
   // Product selection
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
@@ -276,9 +371,44 @@ export function CreateQuoteDialog({
   
   const createQuoteMutation = trpc.quotes.create.useMutation();
 
+  // ==================== COMPUTED OPTIONS ====================
+  
+  const customerOptions: ComboboxOption[] = useMemo(() => 
+    customers
+      .filter(c => c.status === 'active')
+      .map(c => ({
+        id: c.id,
+        label: c.name || 'ללא שם',
+        sublabel: c.companyName || undefined,
+      }))
+  , [customers]);
+
+  const categoryOptions: ComboboxOption[] = useMemo(() => 
+    categories?.map(c => ({ id: c.id, label: c.name })) || []
+  , [categories]);
+
+  const productOptions: ComboboxOption[] = useMemo(() => 
+    products?.map(p => ({ id: p.id, label: p.name })) || []
+  , [products]);
+
+  const sizeOptions: ComboboxOption[] = useMemo(() => 
+    sizes?.map(s => ({ 
+      id: s.id, 
+      label: s.name,
+      sublabel: s.dimensions || undefined 
+    })) || []
+  , [sizes]);
+
+  const quantityOptions: ComboboxOption[] = useMemo(() => 
+    quantities?.map(q => ({ 
+      id: q.id, 
+      label: `${q.quantity} יח'`,
+      price: q.price 
+    })) || []
+  , [quantities]);
+
   // ==================== COMPUTED VALUES ====================
   
-  const selectedCustomer = customers.find(c => c.id === customerId);
   const selectedProduct = products?.find(p => p.id === selectedProductId);
   const selectedSize = sizes?.find(s => s.id === selectedSizeId);
   const selectedQuantity = quantities?.find(q => q.id === selectedQuantityId);
@@ -354,13 +484,13 @@ export function CreateQuoteDialog({
 
     setSelectedProducts(prev => [...prev, newProduct]);
     
-    // Reset selection
+    // Reset selection (keep category)
     setSelectedProductId(null);
     setSelectedSizeId(null);
     setSelectedQuantityId(null);
     setSelectedAddonIds([]);
     
-    toast.success("המוצר נוסף לרשימה");
+    toast.success("המוצר נוסף");
   };
 
   const handleRemoveProduct = (productId: string) => {
@@ -368,7 +498,6 @@ export function CreateQuoteDialog({
   };
 
   const handleFileUpload = async (productId: string, file: File) => {
-    // Update product with uploading state
     setSelectedProducts(prev => prev.map(p => 
       p.id === productId 
         ? { ...p, file: { file, fileName: file.name, fileSize: file.size, mimeType: file.type, uploading: true } }
@@ -384,14 +513,14 @@ export function CreateQuoteDialog({
           : p
       ));
       
-      toast.success("הקובץ הועלה בהצלחה");
+      toast.success("הקובץ הועלה");
     } catch (error) {
       setSelectedProducts(prev => prev.map(p => 
         p.id === productId 
-          ? { ...p, file: { file, fileName: file.name, fileSize: file.size, mimeType: file.type, uploading: false, error: 'שגיאה בהעלאה' } }
+          ? { ...p, file: { file, fileName: file.name, fileSize: file.size, mimeType: file.type, uploading: false, error: 'שגיאה' } }
           : p
       ));
-      toast.error("שגיאה בהעלאת הקובץ");
+      toast.error("שגיאה בהעלאה");
     }
   };
 
@@ -407,10 +536,9 @@ export function CreateQuoteDialog({
     setIsSubmitting(true);
     
     try {
-      // Prepare items
       const items = selectedProducts.map(p => ({
         sizeQuantityId: p.sizeQuantityId,
-        quantity: 1, // כמות הזמנות (לא כמות יחידות)
+        quantity: 1,
         priceAtTimeOfQuote: p.price,
         addonIds: p.addons.map(a => a.id),
         attachment: p.file?.s3Url ? {
@@ -428,11 +556,11 @@ export function CreateQuoteDialog({
         status: sendToProduction ? 'approved' : 'draft',
       });
 
-      toast.success(sendToProduction ? "ההצעה נוצרה והועברה לייצור!" : "הצעת המחיר נוצרה בהצלחה!");
+      toast.success(sendToProduction ? "הועבר לייצור!" : "ההצעה נוצרה!");
       onSuccess();
       handleClose();
     } catch (error: any) {
-      toast.error("שגיאה ביצירת ההצעה: " + error.message);
+      toast.error("שגיאה: " + error.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -440,7 +568,6 @@ export function CreateQuoteDialog({
 
   const handleClose = () => {
     setCustomerId(null);
-    setCustomerSearch("");
     setSelectedCategoryId(null);
     setSelectedProductId(null);
     setSelectedSizeId(null);
@@ -455,184 +582,75 @@ export function CreateQuoteDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader className="pb-4 border-b">
-          <DialogTitle className="text-xl font-bold text-slate-900">הצעת מחיר חדשה</DialogTitle>
-          <DialogDescription>בחר לקוח, הוסף מוצרים וקבצים</DialogDescription>
+      <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-hidden flex flex-col">
+        <DialogHeader className="pb-3 border-b">
+          <DialogTitle className="text-lg font-bold">הצעת מחיר חדשה</DialogTitle>
+          <DialogDescription className="text-sm">בחר לקוח, הוסף מוצרים וקבצים</DialogDescription>
         </DialogHeader>
         
-        <div className="flex-1 overflow-y-auto py-4 space-y-6">
-          {/* ==================== CUSTOMER SELECTION ==================== */}
-          <div className="space-y-2">
-            <Label className="text-sm font-semibold text-slate-700">בחירת לקוח</Label>
-            <div className="relative">
-              <Input
-                placeholder="חפש לקוח לפי שם או חברה..."
-                value={customerSearch}
-                onChange={(e) => setCustomerSearch(e.target.value)}
-                className="pr-10"
-              />
-              <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            </div>
-            
-            {customerSearch && !customerId && (
-              <div className="border rounded-lg max-h-40 overflow-y-auto bg-white shadow-lg">
-                {customers
-                  .filter(c => 
-                    c.status === 'active' && 
-                    (c.name?.toLowerCase().includes(customerSearch.toLowerCase()) ||
-                     c.companyName?.toLowerCase().includes(customerSearch.toLowerCase()))
-                  )
-                  .slice(0, 8)
-                  .map(customer => (
-                    <div
-                      key={customer.id}
-                      className="p-3 hover:bg-blue-50 cursor-pointer border-b last:border-b-0 transition-colors"
-                      onClick={() => {
-                        setCustomerId(customer.id);
-                        setCustomerSearch(customer.name + (customer.companyName ? ` (${customer.companyName})` : ''));
-                      }}
-                    >
-                      <div className="font-medium text-slate-900">{customer.name}</div>
-                      {customer.companyName && (
-                        <div className="text-xs text-slate-500">{customer.companyName}</div>
-                      )}
-                    </div>
-                  ))}
-                {customers.filter(c => 
-                  c.status === 'active' && 
-                  (c.name?.toLowerCase().includes(customerSearch.toLowerCase()) ||
-                   c.companyName?.toLowerCase().includes(customerSearch.toLowerCase()))
-                ).length === 0 && (
-                  <div className="p-3 text-sm text-slate-500 text-center">לא נמצאו לקוחות</div>
-                )}
-              </div>
-            )}
-            
-            {selectedCustomer && (
-              <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg">
-                <Check className="h-4 w-4 text-blue-600" />
-                <span className="text-sm font-medium text-blue-900">{selectedCustomer.name}</span>
-                {selectedCustomer.companyName && (
-                  <span className="text-xs text-blue-600">({selectedCustomer.companyName})</span>
-                )}
-                <button 
-                  onClick={() => { setCustomerId(null); setCustomerSearch(''); }}
-                  className="mr-auto p-1 hover:bg-blue-100 rounded"
-                >
-                  <X className="h-3 w-3 text-blue-600" />
-                </button>
-              </div>
-            )}
+        <div className="flex-1 overflow-y-auto py-4 space-y-4">
+          {/* ==================== CUSTOMER ==================== */}
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">לקוח</Label>
+            <Combobox
+              options={customerOptions}
+              value={customerId}
+              onChange={setCustomerId}
+              placeholder="בחר או חפש לקוח..."
+            />
           </div>
 
           {/* ==================== PRODUCT SELECTION ==================== */}
-          <div className="space-y-3 p-4 bg-gradient-to-br from-slate-50 to-blue-50/30 rounded-xl border border-slate-200">
-            <Label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+          <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-3">
+            <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
               <Package className="h-4 w-4 text-blue-600" />
               הוספת מוצר
-            </Label>
+            </div>
             
-            {/* Category Selection */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {categories?.map(category => (
-                <button
-                  key={category.id}
-                  onClick={() => handleCategoryChange(category.id)}
-                  className={`p-2 rounded-lg border text-sm font-medium transition-all ${
-                    selectedCategoryId === category.id
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-white text-slate-700 border-slate-200 hover:border-blue-300'
-                  }`}
-                >
-                  {category.name}
-                </button>
-              ))}
+            {/* Selection Row */}
+            <div className="grid grid-cols-2 gap-2">
+              <Combobox
+                options={categoryOptions}
+                value={selectedCategoryId}
+                onChange={handleCategoryChange}
+                placeholder="קטגוריה"
+              />
+              <Combobox
+                options={productOptions}
+                value={selectedProductId}
+                onChange={handleProductChange}
+                placeholder="מוצר"
+                disabled={!selectedCategoryId}
+              />
+              <Combobox
+                options={sizeOptions}
+                value={selectedSizeId}
+                onChange={handleSizeChange}
+                placeholder="גודל"
+                disabled={!selectedProductId}
+              />
+              <Combobox
+                options={quantityOptions}
+                value={selectedQuantityId}
+                onChange={setSelectedQuantityId}
+                placeholder="כמות"
+                disabled={!selectedSizeId}
+              />
             </div>
 
-            {/* Product Selection */}
-            {selectedCategoryId && products && products.length > 0 && (
-              <div className="space-y-2">
-                <Label className="text-xs text-slate-500">מוצר</Label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {products.map(product => (
-                    <button
-                      key={product.id}
-                      onClick={() => handleProductChange(product.id)}
-                      className={`p-2 rounded-lg border text-sm transition-all ${
-                        selectedProductId === product.id
-                          ? 'bg-blue-100 text-blue-900 border-blue-400'
-                          : 'bg-white text-slate-700 border-slate-200 hover:border-blue-300'
-                      }`}
-                    >
-                      {product.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Size Selection */}
-            {selectedProductId && sizes && sizes.length > 0 && (
-              <div className="space-y-2">
-                <Label className="text-xs text-slate-500">גודל</Label>
-                <div className="flex flex-wrap gap-2">
-                  {sizes.map(size => (
-                    <button
-                      key={size.id}
-                      onClick={() => handleSizeChange(size.id)}
-                      className={`px-3 py-2 rounded-lg border text-sm transition-all ${
-                        selectedSizeId === size.id
-                          ? 'bg-emerald-100 text-emerald-900 border-emerald-400'
-                          : 'bg-white text-slate-700 border-slate-200 hover:border-emerald-300'
-                      }`}
-                    >
-                      <div>{size.name}</div>
-                      {size.dimensions && (
-                        <div className="text-[10px] text-slate-500">{size.dimensions}</div>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Quantity Selection */}
-            {selectedSizeId && quantities && quantities.length > 0 && (
-              <div className="space-y-2">
-                <Label className="text-xs text-slate-500">כמות</Label>
-                <div className="flex flex-wrap gap-2">
-                  {quantities.map(qty => (
-                    <button
-                      key={qty.id}
-                      onClick={() => setSelectedQuantityId(qty.id)}
-                      className={`px-3 py-2 rounded-lg border text-sm transition-all ${
-                        selectedQuantityId === qty.id
-                          ? 'bg-amber-100 text-amber-900 border-amber-400'
-                          : 'bg-white text-slate-700 border-slate-200 hover:border-amber-300'
-                      }`}
-                    >
-                      <div>{qty.quantity} יח'</div>
-                      <div className="text-xs font-semibold text-emerald-600">₪{qty.price}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Addons Selection */}
+            {/* Addons */}
             {selectedProductId && addons && addons.length > 0 && (
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <Label className="text-xs text-slate-500 flex items-center gap-1">
                   <Tag className="h-3 w-3" />
                   תוספות
                 </Label>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-1.5">
                   {addons.map(addon => (
                     <button
                       key={addon.id}
                       onClick={() => handleAddonToggle(addon.id)}
-                      className={`px-3 py-1.5 rounded-full border text-xs transition-all ${
+                      className={`px-2 py-1 rounded-full border text-xs transition-all ${
                         selectedAddonIds.includes(addon.id)
                           ? 'bg-purple-100 text-purple-900 border-purple-400'
                           : 'bg-white text-slate-600 border-slate-200 hover:border-purple-300'
@@ -648,32 +666,33 @@ export function CreateQuoteDialog({
               </div>
             )}
 
-            {/* Add Product Button */}
+            {/* Add Button */}
             <Button
               onClick={handleAddProduct}
               disabled={!canAddProduct}
+              size="sm"
               className="w-full bg-blue-600 hover:bg-blue-700"
             >
-              <Plus className="h-4 w-4 ml-2" />
-              הוסף מוצר לרשימה
+              <Plus className="h-4 w-4 ml-1" />
+              הוסף לרשימה
             </Button>
           </div>
 
-          {/* ==================== SELECTED PRODUCTS LIST ==================== */}
+          {/* ==================== PRODUCTS LIST ==================== */}
           {selectedProducts.length > 0 && (
-            <div className="space-y-3">
+            <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label className="text-sm font-semibold text-slate-700">
-                  מוצרים נבחרים ({selectedProducts.length})
+                <Label className="text-sm font-medium">
+                  מוצרים ({selectedProducts.length})
                 </Label>
-                <div className="text-lg font-bold text-emerald-600">
-                  סה"כ: ₪{totalPrice.toFixed(2)}
-                </div>
+                <span className="text-sm font-bold text-emerald-600">
+                  סה"כ: ₪{totalPrice.toFixed(0)}
+                </span>
               </div>
               
-              <div className="space-y-2">
+              <div className="space-y-1.5 max-h-40 overflow-y-auto">
                 {selectedProducts.map(product => (
-                  <ProductCard
+                  <ProductRow
                     key={product.id}
                     product={product}
                     onRemove={() => handleRemoveProduct(product.id)}
@@ -686,21 +705,21 @@ export function CreateQuoteDialog({
           )}
 
           {/* ==================== NOTES ==================== */}
-          <div className="space-y-2">
-            <Label className="text-sm font-semibold text-slate-700">הערות</Label>
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">הערות</Label>
             <Textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="הערות להצעת המחיר..."
+              placeholder="הערות להצעה..."
               rows={2}
-              className="resize-none"
+              className="resize-none text-sm"
             />
           </div>
         </div>
 
         {/* ==================== FOOTER ==================== */}
-        <DialogFooter className="pt-4 border-t gap-2 sm:gap-3">
-          <Button variant="outline" onClick={handleClose} disabled={isSubmitting}>
+        <DialogFooter className="pt-3 border-t gap-2">
+          <Button variant="outline" onClick={handleClose} disabled={isSubmitting} size="sm">
             ביטול
           </Button>
           
@@ -708,13 +727,10 @@ export function CreateQuoteDialog({
           <Button
             onClick={() => handleSubmit(false)}
             disabled={isSubmitting || !customerId || selectedProducts.length === 0}
+            size="sm"
             className="bg-amber-500 hover:bg-amber-600 text-white"
           >
-            {isSubmitting ? (
-              <Loader2 className="h-4 w-4 animate-spin ml-2" />
-            ) : (
-              <Send className="h-4 w-4 ml-2" />
-            )}
+            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin ml-1" /> : <Send className="h-4 w-4 ml-1" />}
             צור הצעה
           </Button>
           
@@ -722,13 +738,10 @@ export function CreateQuoteDialog({
           <Button
             onClick={() => handleSubmit(true)}
             disabled={isSubmitting || !customerId || selectedProducts.length === 0}
+            size="sm"
             className="bg-blue-600 hover:bg-blue-700 text-white"
           >
-            {isSubmitting ? (
-              <Loader2 className="h-4 w-4 animate-spin ml-2" />
-            ) : (
-              <Rocket className="h-4 w-4 ml-2" />
-            )}
+            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin ml-1" /> : <Rocket className="h-4 w-4 ml-1" />}
             העבר לייצור
           </Button>
         </DialogFooter>
