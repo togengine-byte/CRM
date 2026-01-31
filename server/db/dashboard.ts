@@ -295,6 +295,7 @@ export async function getRecentQuotes(limit: number = 5) {
 
 /**
  * Get pending customer signup requests
+ * Now fetches from users table with status='pending_approval' + activity_log for details
  */
 export async function getPendingSignups(limit: number = 5) {
   const db = await getDb();
@@ -303,47 +304,56 @@ export async function getPendingSignups(limit: number = 5) {
   }
 
   try {
-    const pending = await db.select({
-      id: customerSignupRequests.id,
-      name: customerSignupRequests.name,
-      email: customerSignupRequests.email,
-      phone: customerSignupRequests.phone,
-      companyName: customerSignupRequests.companyName,
-      description: customerSignupRequests.description,
-      productId: customerSignupRequests.productId,
-      queueNumber: customerSignupRequests.queueNumber,
-      status: customerSignupRequests.status,
-      files: customerSignupRequests.files,
-      fileValidationWarnings: customerSignupRequests.fileValidationWarnings,
-      createdAt: customerSignupRequests.createdAt,
-    })
-      .from(customerSignupRequests)
-      .where(eq(customerSignupRequests.status, "pending"))
-      .orderBy(customerSignupRequests.queueNumber)
-      .limit(limit);
+    // Get pending approval users with their signup details from activity_log
+    const result = await db.execute(sql`
+      SELECT 
+        u.id,
+        u.name,
+        u.email,
+        u.phone,
+        u."companyName",
+        u."customerNumber",
+        u."createdAt",
+        al.details,
+        al.id as "activityLogId"
+      FROM users u
+      LEFT JOIN activity_log al ON 
+        al."actionType" = 'new_customer_signup_pending' 
+        AND (al.details::jsonb->>'customerId')::int = u.id
+      WHERE u.status = 'pending_approval'
+        AND u.role = 'customer'
+      ORDER BY u."createdAt" DESC
+      LIMIT ${limit}
+    `);
 
-    return pending;
+    // Parse and format the results
+    return (result.rows as any[]).map(row => {
+      let details: any = {};
+      if (row.details) {
+        try {
+          details = typeof row.details === 'string' ? JSON.parse(row.details) : row.details;
+        } catch (e) {
+          console.log('[getPendingSignups] Error parsing details:', e);
+        }
+      }
+
+      return {
+        id: row.id,
+        name: row.name,
+        email: row.email,
+        phone: row.phone,
+        companyName: row.companyName,
+        customerNumber: row.customerNumber,
+        createdAt: row.createdAt,
+        notes: details.notes || '',
+        itemCount: details.itemCount || 0,
+        attachmentCount: details.attachmentCount || 0,
+        activityLogId: row.activityLogId
+      };
+    });
   } catch (error) {
-    console.log('[getPendingSignups] Falling back without fileValidationWarnings column');
-    const pending = await db.select({
-      id: customerSignupRequests.id,
-      name: customerSignupRequests.name,
-      email: customerSignupRequests.email,
-      phone: customerSignupRequests.phone,
-      companyName: customerSignupRequests.companyName,
-      description: customerSignupRequests.description,
-      productId: customerSignupRequests.productId,
-      queueNumber: customerSignupRequests.queueNumber,
-      status: customerSignupRequests.status,
-      files: customerSignupRequests.files,
-      createdAt: customerSignupRequests.createdAt,
-    })
-      .from(customerSignupRequests)
-      .where(eq(customerSignupRequests.status, "pending"))
-      .orderBy(customerSignupRequests.queueNumber)
-      .limit(limit);
-
-    return pending;
+    console.error('[getPendingSignups] Error:', error);
+    return [];
   }
 }
 
