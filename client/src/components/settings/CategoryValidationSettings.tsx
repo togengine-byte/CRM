@@ -16,14 +16,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
   Accordion,
   AccordionContent,
   AccordionItem,
@@ -44,11 +36,17 @@ import {
   Plus,
   Pencil,
   Trash2,
+  Layers,
+  PenTool,
+  Droplets,
+  Square,
+  Ruler,
+  AlertTriangle,
 } from "lucide-react";
 
 // Constants
 const COLORSPACE_OPTIONS = ["CMYK", "RGB", "Grayscale", "LAB"];
-const FORMAT_OPTIONS = ["pdf", "ai", "eps", "tiff", "jpg", "jpeg", "png"];
+const FORMAT_OPTIONS = ["pdf", "ai", "eps", "tiff", "jpg", "jpeg", "png", "dxf", "svg"];
 
 interface CategoryValidationData {
   validationEnabled: boolean;
@@ -65,6 +63,20 @@ interface CategoryValidationData {
   maxFileSizeMb: number;
   allowedFormats: string[];
   aspectRatioTolerance: number;
+  // New advanced settings
+  requireVectorFormat: boolean;
+  maxColors?: number;
+  requireTransparentBackground: boolean;
+  allowTransparentBackground: boolean;
+  checkSpotColors: boolean;
+  convertSpotToProcess: boolean;
+  minLineWeightMm?: number;
+  minFontSizePt?: number;
+  safeZoneMm?: number;
+  checkOverprint: boolean;
+  flattenTransparency: boolean;
+  maxDimensionMm?: number;
+  minDimensionMm?: number;
 }
 
 const DEFAULT_VALIDATION: CategoryValidationData = {
@@ -82,6 +94,20 @@ const DEFAULT_VALIDATION: CategoryValidationData = {
   maxFileSizeMb: 100,
   allowedFormats: ["pdf", "ai", "eps", "tiff", "jpg", "png"],
   aspectRatioTolerance: 5,
+  // New defaults
+  requireVectorFormat: false,
+  maxColors: undefined,
+  requireTransparentBackground: false,
+  allowTransparentBackground: true,
+  checkSpotColors: false,
+  convertSpotToProcess: true,
+  minLineWeightMm: undefined,
+  minFontSizePt: undefined,
+  safeZoneMm: undefined,
+  checkOverprint: false,
+  flattenTransparency: false,
+  maxDimensionMm: undefined,
+  minDimensionMm: undefined,
 };
 
 export function CategoryValidationSettings() {
@@ -125,6 +151,20 @@ export function CategoryValidationSettings() {
       maxFileSizeMb: category.maxFileSizeMb ?? 100,
       allowedFormats: parseArraySafe(category.allowedFormats) || ["pdf", "ai", "eps", "tiff", "jpg", "png"],
       aspectRatioTolerance: parseFloat(category.aspectRatioTolerance) || 5,
+      // New fields
+      requireVectorFormat: category.requireVectorFormat ?? false,
+      maxColors: category.maxColors || undefined,
+      requireTransparentBackground: category.requireTransparentBackground ?? false,
+      allowTransparentBackground: category.allowTransparentBackground ?? true,
+      checkSpotColors: category.checkSpotColors ?? false,
+      convertSpotToProcess: category.convertSpotToProcess ?? true,
+      minLineWeightMm: parseFloat(category.minLineWeightMm) || undefined,
+      minFontSizePt: parseFloat(category.minFontSizePt) || undefined,
+      safeZoneMm: parseFloat(category.safeZoneMm) || undefined,
+      checkOverprint: category.checkOverprint ?? false,
+      flattenTransparency: category.flattenTransparency ?? false,
+      maxDimensionMm: category.maxDimensionMm || undefined,
+      minDimensionMm: category.minDimensionMm || undefined,
     });
   };
 
@@ -197,7 +237,7 @@ export function CategoryValidationSettings() {
             הגדרות וולידציה לקטגוריות
           </CardTitle>
           <CardDescription>
-            הגדר כללי בדיקת קבצים לכל קטגוריית מוצרים (DPI, צבע, בליד, פאסרים)
+            הגדר כללי בדיקת קבצים לכל קטגוריית מוצרים - DPI, צבע, בליד, פאסרים, וקטור ועוד
           </CardDescription>
         </div>
         <div className="flex gap-2">
@@ -240,6 +280,12 @@ export function CategoryValidationSettings() {
                           וולידציה כבויה
                         </Badge>
                       )}
+                      {category.requireVectorFormat && (
+                        <Badge variant="secondary" className="bg-purple-50 text-purple-700">
+                          <PenTool className="h-3 w-3 ml-1" />
+                          וקטור
+                        </Badge>
+                      )}
                       {category.minDpi && (
                         <Badge variant="secondary">
                           {category.minDpi} DPI
@@ -274,6 +320,36 @@ export function CategoryValidationSettings() {
                       </div>
                     </div>
 
+                    {/* Advanced Settings Summary */}
+                    {(category.requireVectorFormat || category.maxColors || category.checkSpotColors) && (
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        {category.requireVectorFormat && (
+                          <div className="p-3 bg-purple-50 rounded border border-purple-200">
+                            <p className="text-purple-600 text-xs">פורמט</p>
+                            <p className="font-bold text-purple-700">וקטור בלבד</p>
+                          </div>
+                        )}
+                        {category.maxColors && (
+                          <div className="p-3 bg-orange-50 rounded border border-orange-200">
+                            <p className="text-orange-600 text-xs">מקסימום צבעים</p>
+                            <p className="font-bold text-orange-700">{category.maxColors}</p>
+                          </div>
+                        )}
+                        {category.minLineWeightMm && (
+                          <div className="p-3 bg-blue-50 rounded border border-blue-200">
+                            <p className="text-blue-600 text-xs">עובי קו מינימלי</p>
+                            <p className="font-bold text-blue-700">{category.minLineWeightMm}mm</p>
+                          </div>
+                        )}
+                        {category.minFontSizePt && (
+                          <div className="p-3 bg-teal-50 rounded border border-teal-200">
+                            <p className="text-teal-600 text-xs">גודל פונט מינימלי</p>
+                            <p className="font-bold text-teal-700">{category.minFontSizePt}pt</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Marks Requirements */}
                     <div className="flex flex-wrap gap-2">
                       <Badge variant={category.requireCropMarks ? "default" : "outline"}>
@@ -292,6 +368,18 @@ export function CategoryValidationSettings() {
                         <Type className="h-3 w-3 ml-1" />
                         פונטים מוטמעים {category.requireEmbeddedFonts !== false ? '✓' : '✗'}
                       </Badge>
+                      {category.checkSpotColors && (
+                        <Badge variant="default" className="bg-amber-500">
+                          <Droplets className="h-3 w-3 ml-1" />
+                          בדיקת Spot Colors
+                        </Badge>
+                      )}
+                      {category.checkOverprint && (
+                        <Badge variant="default" className="bg-rose-500">
+                          <Layers className="h-3 w-3 ml-1" />
+                          בדיקת Overprint
+                        </Badge>
+                      )}
                     </div>
 
                     {/* Allowed Formats */}
@@ -335,7 +423,7 @@ export function CategoryValidationSettings() {
 
       {/* Edit Dialog */}
       <Dialog open={!!editingCategory} onOpenChange={(open) => !open && setEditingCategory(null)}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" dir="rtl">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto" dir="rtl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Settings2 className="h-5 w-5 text-indigo-600" />
@@ -363,140 +451,232 @@ export function CategoryValidationSettings() {
               <>
                 <Separator />
 
-                {/* DPI Settings */}
-                <div className="space-y-4">
-                  <h4 className="font-medium flex items-center gap-2">
-                    <Maximize2 className="h-4 w-4" />
-                    הגדרות רזולוציה (DPI)
-                  </h4>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>DPI מינימלי *</Label>
-                      <Input
-                        type="number"
-                        value={formData.minDpi}
-                        onChange={(e) => setFormData(prev => ({ ...prev, minDpi: parseInt(e.target.value) || 300 }))}
-                      />
-                      <p className="text-xs text-muted-foreground">הרזולוציה המינימלית הנדרשת להדפסה</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>DPI מקסימלי</Label>
-                      <Input
-                        type="number"
-                        value={formData.maxDpi || ""}
-                        onChange={(e) => setFormData(prev => ({ ...prev, maxDpi: e.target.value ? parseInt(e.target.value) : undefined }))}
-                        placeholder="ללא הגבלה"
-                      />
-                      <p className="text-xs text-muted-foreground">אזהרה אם גבוה מדי (אופציונלי)</p>
+                {/* === BASIC SETTINGS === */}
+                <div className="p-4 bg-blue-50/50 rounded-lg border border-blue-100">
+                  <h3 className="font-semibold text-blue-800 mb-4 flex items-center gap-2">
+                    <FileCheck className="h-5 w-5" />
+                    הגדרות בסיסיות
+                  </h3>
+
+                  {/* DPI Settings */}
+                  <div className="space-y-4 mb-6">
+                    <h4 className="font-medium flex items-center gap-2">
+                      <Maximize2 className="h-4 w-4" />
+                      הגדרות רזולוציה (DPI)
+                    </h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>DPI מינימלי *</Label>
+                        <Input
+                          type="number"
+                          value={formData.minDpi}
+                          onChange={(e) => setFormData(prev => ({ ...prev, minDpi: parseInt(e.target.value) || 300 }))}
+                        />
+                        <p className="text-xs text-muted-foreground">הרזולוציה המינימלית הנדרשת להדפסה</p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>DPI מקסימלי</Label>
+                        <Input
+                          type="number"
+                          value={formData.maxDpi || ""}
+                          onChange={(e) => setFormData(prev => ({ ...prev, maxDpi: e.target.value ? parseInt(e.target.value) : undefined }))}
+                          placeholder="ללא הגבלה"
+                        />
+                        <p className="text-xs text-muted-foreground">אזהרה אם גבוה מדי (אופציונלי)</p>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <Separator />
-
-                {/* Colorspace */}
-                <div className="space-y-4">
-                  <h4 className="font-medium flex items-center gap-2">
-                    <Palette className="h-4 w-4" />
-                    מרחבי צבע מותרים
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {COLORSPACE_OPTIONS.map(cs => (
-                      <Badge
-                        key={cs}
-                        variant={formData.allowedColorspaces.includes(cs) ? "default" : "outline"}
-                        className="cursor-pointer text-sm py-1 px-3"
-                        onClick={() => toggleColorspace(cs)}
-                      >
-                        {cs}
-                      </Badge>
-                    ))}
+                  {/* Colorspace */}
+                  <div className="space-y-4 mb-6">
+                    <h4 className="font-medium flex items-center gap-2">
+                      <Palette className="h-4 w-4" />
+                      מרחבי צבע מותרים
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                      {COLORSPACE_OPTIONS.map(cs => (
+                        <Badge
+                          key={cs}
+                          variant={formData.allowedColorspaces.includes(cs) ? "default" : "outline"}
+                          className="cursor-pointer text-sm py-1 px-3"
+                          onClick={() => toggleColorspace(cs)}
+                        >
+                          {cs}
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
-                </div>
 
-                <Separator />
-
-                {/* Bleed Settings */}
-                <div className="space-y-4">
-                  <h4 className="font-medium flex items-center gap-2">
-                    <Scissors className="h-4 w-4" />
-                    הגדרות בליד (שפה)
-                  </h4>
-                  <div className="flex items-center gap-4">
+                  {/* Aspect Ratio */}
+                  <div className="space-y-4 mb-6">
+                    <h4 className="font-medium flex items-center gap-2">
+                      <Square className="h-4 w-4" />
+                      סטיית פרופורציה מותרת
+                    </h4>
                     <div className="flex items-center gap-2">
-                      <Switch
-                        checked={formData.requireBleed}
-                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, requireBleed: checked }))}
+                      <Input
+                        type="number"
+                        step="0.5"
+                        className="w-24"
+                        value={formData.aspectRatioTolerance}
+                        onChange={(e) => setFormData(prev => ({ ...prev, aspectRatioTolerance: parseFloat(e.target.value) || 5 }))}
                       />
-                      <Label>דרוש בליד</Label>
+                      <span className="text-sm text-muted-foreground">%</span>
                     </div>
-                    {formData.requireBleed && (
+                    <p className="text-xs text-muted-foreground">
+                      סטייה מותרת ביחס בין רוחב לגובה הקובץ לעומת מידות ההדפסה
+                    </p>
+                  </div>
+
+                  {/* File Size & Formats */}
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <h4 className="font-medium">גודל קובץ מקסימלי</h4>
                       <div className="flex items-center gap-2">
                         <Input
                           type="number"
-                          step="0.5"
                           className="w-24"
-                          value={formData.requiredBleedMm}
-                          onChange={(e) => setFormData(prev => ({ ...prev, requiredBleedMm: parseFloat(e.target.value) || 3 }))}
+                          value={formData.maxFileSizeMb}
+                          onChange={(e) => setFormData(prev => ({ ...prev, maxFileSizeMb: parseInt(e.target.value) || 100 }))}
                         />
-                        <span className="text-sm text-muted-foreground">מ"מ</span>
+                        <span className="text-sm text-muted-foreground">MB</span>
                       </div>
-                    )}
+                    </div>
                   </div>
-                </div>
 
-                <Separator />
-
-                {/* Marks Settings */}
-                <div className="space-y-4">
-                  <h4 className="font-medium flex items-center gap-2">
-                    <Target className="h-4 w-4" />
-                    סימנים ופאסרים
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="flex items-center gap-2 p-3 bg-muted/30 rounded">
-                      <Switch
-                        checked={formData.requireCropMarks}
-                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, requireCropMarks: checked }))}
-                      />
-                      <div>
-                        <Label className="text-sm">סימני חיתוך</Label>
-                        <p className="text-xs text-muted-foreground">Crop Marks</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 p-3 bg-muted/30 rounded">
-                      <Switch
-                        checked={formData.requireRegistrationMarks}
-                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, requireRegistrationMarks: checked }))}
-                      />
-                      <div>
-                        <Label className="text-sm">סימני רישום</Label>
-                        <p className="text-xs text-muted-foreground">Registration Marks</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 p-3 bg-muted/30 rounded">
-                      <Switch
-                        checked={formData.requireColorBars}
-                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, requireColorBars: checked }))}
-                      />
-                      <div>
-                        <Label className="text-sm">פסי צבע</Label>
-                        <p className="text-xs text-muted-foreground">Color Bars</p>
-                      </div>
+                  {/* Allowed Formats */}
+                  <div className="space-y-4 mt-6">
+                    <h4 className="font-medium flex items-center gap-2">
+                      <FileType className="h-4 w-4" />
+                      פורמטים מותרים
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                      {FORMAT_OPTIONS.map(fmt => (
+                        <Badge
+                          key={fmt}
+                          variant={formData.allowedFormats.includes(fmt) ? "default" : "outline"}
+                          className="cursor-pointer text-sm py-1 px-3"
+                          onClick={() => toggleFormat(fmt)}
+                        >
+                          .{fmt}
+                        </Badge>
+                      ))}
                     </div>
                   </div>
                 </div>
 
                 <Separator />
 
-                {/* Font Settings */}
-                <div className="space-y-4">
-                  <h4 className="font-medium flex items-center gap-2">
-                    <Type className="h-4 w-4" />
-                    הגדרות פונטים
-                  </h4>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="flex items-center gap-2 p-3 bg-muted/30 rounded">
+                {/* === BLEED & MARKS === */}
+                <div className="p-4 bg-green-50/50 rounded-lg border border-green-100">
+                  <h3 className="font-semibold text-green-800 mb-4 flex items-center gap-2">
+                    <Scissors className="h-5 w-5" />
+                    בליד וסימנים
+                  </h3>
+
+                  {/* Bleed Settings */}
+                  <div className="space-y-4 mb-6">
+                    <h4 className="font-medium flex items-center gap-2">
+                      <Scissors className="h-4 w-4" />
+                      הגדרות בליד (שפה)
+                    </h4>
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={formData.requireBleed}
+                          onCheckedChange={(checked) => setFormData(prev => ({ ...prev, requireBleed: checked }))}
+                        />
+                        <Label>דרוש בליד</Label>
+                      </div>
+                      {formData.requireBleed && (
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="number"
+                            step="0.5"
+                            className="w-24"
+                            value={formData.requiredBleedMm}
+                            onChange={(e) => setFormData(prev => ({ ...prev, requiredBleedMm: parseFloat(e.target.value) || 3 }))}
+                          />
+                          <span className="text-sm text-muted-foreground">מ"מ</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Safe Zone */}
+                  <div className="space-y-4 mb-6">
+                    <h4 className="font-medium flex items-center gap-2">
+                      <Square className="h-4 w-4" />
+                      אזור בטוח (Safe Zone)
+                    </h4>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        step="0.5"
+                        className="w-24"
+                        value={formData.safeZoneMm || ""}
+                        onChange={(e) => setFormData(prev => ({ ...prev, safeZoneMm: e.target.value ? parseFloat(e.target.value) : undefined }))}
+                        placeholder="לא מוגדר"
+                      />
+                      <span className="text-sm text-muted-foreground">מ"מ מהקצה</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      אזהרה אם יש תוכן חשוב קרוב מדי לקצוות (אופציונלי)
+                    </p>
+                  </div>
+
+                  {/* Marks Settings */}
+                  <div className="space-y-4">
+                    <h4 className="font-medium flex items-center gap-2">
+                      <Target className="h-4 w-4" />
+                      סימנים ופאסרים
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="flex items-center gap-2 p-3 bg-background rounded border">
+                        <Switch
+                          checked={formData.requireCropMarks}
+                          onCheckedChange={(checked) => setFormData(prev => ({ ...prev, requireCropMarks: checked }))}
+                        />
+                        <div>
+                          <Label className="text-sm">סימני חיתוך</Label>
+                          <p className="text-xs text-muted-foreground">Crop Marks</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 p-3 bg-background rounded border">
+                        <Switch
+                          checked={formData.requireRegistrationMarks}
+                          onCheckedChange={(checked) => setFormData(prev => ({ ...prev, requireRegistrationMarks: checked }))}
+                        />
+                        <div>
+                          <Label className="text-sm">סימני רישום</Label>
+                          <p className="text-xs text-muted-foreground">Registration Marks</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 p-3 bg-background rounded border">
+                        <Switch
+                          checked={formData.requireColorBars}
+                          onCheckedChange={(checked) => setFormData(prev => ({ ...prev, requireColorBars: checked }))}
+                        />
+                        <div>
+                          <Label className="text-sm">פסי צבע</Label>
+                          <p className="text-xs text-muted-foreground">Color Bars</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* === FONTS === */}
+                <div className="p-4 bg-purple-50/50 rounded-lg border border-purple-100">
+                  <h3 className="font-semibold text-purple-800 mb-4 flex items-center gap-2">
+                    <Type className="h-5 w-5" />
+                    הגדרות פונטים וטקסט
+                  </h3>
+
+                  <div className="grid grid-cols-2 gap-4 mb-6">
+                    <div className="flex items-center gap-2 p-3 bg-background rounded border">
                       <Switch
                         checked={formData.requireEmbeddedFonts}
                         onCheckedChange={(checked) => setFormData(prev => ({ ...prev, requireEmbeddedFonts: checked }))}
@@ -506,7 +686,7 @@ export function CategoryValidationSettings() {
                         <p className="text-xs text-muted-foreground">Embedded Fonts</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 p-3 bg-muted/30 rounded">
+                    <div className="flex items-center gap-2 p-3 bg-background rounded border">
                       <Switch
                         checked={formData.allowOutlinedFonts}
                         onCheckedChange={(checked) => setFormData(prev => ({ ...prev, allowOutlinedFonts: checked }))}
@@ -517,67 +697,204 @@ export function CategoryValidationSettings() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Min Font Size */}
+                  <div className="space-y-4">
+                    <h4 className="font-medium">גודל פונט מינימלי</h4>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        step="0.5"
+                        className="w-24"
+                        value={formData.minFontSizePt || ""}
+                        onChange={(e) => setFormData(prev => ({ ...prev, minFontSizePt: e.target.value ? parseFloat(e.target.value) : undefined }))}
+                        placeholder="לא מוגדר"
+                      />
+                      <span className="text-sm text-muted-foreground">pt</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      אזהרה אם יש טקסט קטן מדי שלא יודפס טוב (רלוונטי להדפסת משי)
+                    </p>
+                  </div>
                 </div>
 
                 <Separator />
 
-                {/* Aspect Ratio */}
-                <div className="space-y-4">
-                  <h4 className="font-medium flex items-center gap-2">
-                    <Maximize2 className="h-4 w-4" />
-                    סטיית פרופורציה מותרת
-                  </h4>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      type="number"
-                      step="0.5"
-                      className="w-24"
-                      value={formData.aspectRatioTolerance}
-                      onChange={(e) => setFormData(prev => ({ ...prev, aspectRatioTolerance: parseFloat(e.target.value) || 5 }))}
-                    />
-                    <span className="text-sm text-muted-foreground">%</span>
+                {/* === VECTOR & SCREEN PRINT === */}
+                <div className="p-4 bg-orange-50/50 rounded-lg border border-orange-100">
+                  <h3 className="font-semibold text-orange-800 mb-4 flex items-center gap-2">
+                    <PenTool className="h-5 w-5" />
+                    הגדרות וקטור והדפסת משי
+                  </h3>
+
+                  <div className="grid grid-cols-2 gap-4 mb-6">
+                    <div className="flex items-center gap-2 p-3 bg-background rounded border">
+                      <Switch
+                        checked={formData.requireVectorFormat}
+                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, requireVectorFormat: checked }))}
+                      />
+                      <div>
+                        <Label className="text-sm">דרוש פורמט וקטורי</Label>
+                        <p className="text-xs text-muted-foreground">AI, EPS, PDF, SVG, DXF</p>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>מספר צבעים מקסימלי</Label>
+                      <Input
+                        type="number"
+                        className="w-24"
+                        value={formData.maxColors || ""}
+                        onChange={(e) => setFormData(prev => ({ ...prev, maxColors: e.target.value ? parseInt(e.target.value) : undefined }))}
+                        placeholder="ללא הגבלה"
+                      />
+                      <p className="text-xs text-muted-foreground">להדפסת משי - הגבלת כמות צבעים</p>
+                    </div>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    סטייה מותרת ביחס בין רוחב לגובה הקובץ לעומת מידות ההדפסה
+
+                  {/* Min Line Weight */}
+                  <div className="space-y-4">
+                    <h4 className="font-medium flex items-center gap-2">
+                      <Ruler className="h-4 w-4" />
+                      עובי קו מינימלי
+                    </h4>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        className="w-24"
+                        value={formData.minLineWeightMm || ""}
+                        onChange={(e) => setFormData(prev => ({ ...prev, minLineWeightMm: e.target.value ? parseFloat(e.target.value) : undefined }))}
+                        placeholder="לא מוגדר"
+                      />
+                      <span className="text-sm text-muted-foreground">מ"מ</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      קווים דקים מדי לא יודפסו בהדפסת משי או חיתוך
+                    </p>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* === ADVANCED PRE-PRESS === */}
+                <div className="p-4 bg-rose-50/50 rounded-lg border border-rose-100">
+                  <h3 className="font-semibold text-rose-800 mb-4 flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5" />
+                    הגדרות Pre-Press מתקדמות
+                  </h3>
+
+                  <div className="grid grid-cols-2 gap-4 mb-6">
+                    <div className="flex items-center gap-2 p-3 bg-background rounded border">
+                      <Switch
+                        checked={formData.checkSpotColors}
+                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, checkSpotColors: checked }))}
+                      />
+                      <div>
+                        <Label className="text-sm">בדוק Spot Colors</Label>
+                        <p className="text-xs text-muted-foreground">אזהרה על צבעי Pantone</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 p-3 bg-background rounded border">
+                      <Switch
+                        checked={formData.convertSpotToProcess}
+                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, convertSpotToProcess: checked }))}
+                        disabled={!formData.checkSpotColors}
+                      />
+                      <div>
+                        <Label className="text-sm">המר ל-CMYK</Label>
+                        <p className="text-xs text-muted-foreground">המלצה להמיר Spot ל-Process</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 mb-6">
+                    <div className="flex items-center gap-2 p-3 bg-background rounded border">
+                      <Switch
+                        checked={formData.checkOverprint}
+                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, checkOverprint: checked }))}
+                      />
+                      <div>
+                        <Label className="text-sm">בדוק Overprint</Label>
+                        <p className="text-xs text-muted-foreground">אזהרה על הגדרות overprint</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 p-3 bg-background rounded border">
+                      <Switch
+                        checked={formData.flattenTransparency}
+                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, flattenTransparency: checked }))}
+                      />
+                      <div>
+                        <Label className="text-sm">שטח שקיפויות</Label>
+                        <p className="text-xs text-muted-foreground">Flatten Transparency</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Transparent Background */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex items-center gap-2 p-3 bg-background rounded border">
+                      <Switch
+                        checked={formData.requireTransparentBackground}
+                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, requireTransparentBackground: checked }))}
+                      />
+                      <div>
+                        <Label className="text-sm">דרוש רקע שקוף</Label>
+                        <p className="text-xs text-muted-foreground">לסובלימציה/DTG</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 p-3 bg-background rounded border">
+                      <Switch
+                        checked={formData.allowTransparentBackground}
+                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, allowTransparentBackground: checked }))}
+                      />
+                      <div>
+                        <Label className="text-sm">אפשר רקע שקוף</Label>
+                        <p className="text-xs text-muted-foreground">PNG עם שקיפות</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* === DIMENSIONS === */}
+                <div className="p-4 bg-cyan-50/50 rounded-lg border border-cyan-100">
+                  <h3 className="font-semibold text-cyan-800 mb-4 flex items-center gap-2">
+                    <Ruler className="h-5 w-5" />
+                    הגבלות מידות
+                  </h3>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>מידה מינימלית</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          className="w-24"
+                          value={formData.minDimensionMm || ""}
+                          onChange={(e) => setFormData(prev => ({ ...prev, minDimensionMm: e.target.value ? parseInt(e.target.value) : undefined }))}
+                          placeholder="ללא"
+                        />
+                        <span className="text-sm text-muted-foreground">מ"מ</span>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>מידה מקסימלית</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          className="w-24"
+                          value={formData.maxDimensionMm || ""}
+                          onChange={(e) => setFormData(prev => ({ ...prev, maxDimensionMm: e.target.value ? parseInt(e.target.value) : undefined }))}
+                          placeholder="ללא"
+                        />
+                        <span className="text-sm text-muted-foreground">מ"מ</span>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    הגבלת גודל פיזי של הקובץ (לא גודל MB)
                   </p>
-                </div>
-
-                <Separator />
-
-                {/* File Size */}
-                <div className="space-y-4">
-                  <h4 className="font-medium">גודל קובץ מקסימלי</h4>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      type="number"
-                      className="w-24"
-                      value={formData.maxFileSizeMb}
-                      onChange={(e) => setFormData(prev => ({ ...prev, maxFileSizeMb: parseInt(e.target.value) || 100 }))}
-                    />
-                    <span className="text-sm text-muted-foreground">MB</span>
-                  </div>
-                </div>
-
-                <Separator />
-
-                {/* Allowed Formats */}
-                <div className="space-y-4">
-                  <h4 className="font-medium flex items-center gap-2">
-                    <FileType className="h-4 w-4" />
-                    פורמטים מותרים
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {FORMAT_OPTIONS.map(fmt => (
-                      <Badge
-                        key={fmt}
-                        variant={formData.allowedFormats.includes(fmt) ? "default" : "outline"}
-                        className="cursor-pointer text-sm py-1 px-3"
-                        onClick={() => toggleFormat(fmt)}
-                      >
-                        .{fmt}
-                      </Badge>
-                    ))}
-                  </div>
                 </div>
               </>
             )}

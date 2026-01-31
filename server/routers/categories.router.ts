@@ -102,6 +102,7 @@ export const categoriesRouter = router({
   updateValidation: protectedProcedure
     .input(z.object({
       id: z.number(),
+      // Basic settings
       validationEnabled: z.boolean().optional(),
       minDpi: z.number().optional(),
       maxDpi: z.number().optional().nullable(),
@@ -116,6 +117,20 @@ export const categoriesRouter = router({
       maxFileSizeMb: z.number().optional(),
       allowedFormats: z.array(z.string()).optional(),
       aspectRatioTolerance: z.number().optional(),
+      // Advanced settings
+      requireVectorFormat: z.boolean().optional(),
+      maxColors: z.number().optional().nullable(),
+      requireTransparentBackground: z.boolean().optional(),
+      allowTransparentBackground: z.boolean().optional(),
+      checkSpotColors: z.boolean().optional(),
+      convertSpotToProcess: z.boolean().optional(),
+      minLineWeightMm: z.number().optional().nullable(),
+      minFontSizePt: z.number().optional().nullable(),
+      safeZoneMm: z.number().optional().nullable(),
+      checkOverprint: z.boolean().optional(),
+      flattenTransparency: z.boolean().optional(),
+      maxDimensionMm: z.number().optional().nullable(),
+      minDimensionMm: z.number().optional().nullable(),
     }))
     .mutation(async ({ ctx, input }) => {
       if (!ctx.user) throw new Error("Not authenticated");
@@ -129,6 +144,7 @@ export const categoriesRouter = router({
       const { id, ...data } = input;
       const updateData: Record<string, any> = {};
       
+      // Basic settings
       if (data.validationEnabled !== undefined) updateData.validationEnabled = data.validationEnabled;
       if (data.minDpi !== undefined) updateData.minDpi = data.minDpi;
       if (data.maxDpi !== undefined) updateData.maxDpi = data.maxDpi;
@@ -143,6 +159,22 @@ export const categoriesRouter = router({
       if (data.maxFileSizeMb !== undefined) updateData.maxFileSizeMb = data.maxFileSizeMb;
       if (data.allowedFormats !== undefined) updateData.allowedFormats = JSON.stringify(data.allowedFormats);
       if (data.aspectRatioTolerance !== undefined) updateData.aspectRatioTolerance = data.aspectRatioTolerance.toString();
+      
+      // Advanced settings
+      if (data.requireVectorFormat !== undefined) updateData.requireVectorFormat = data.requireVectorFormat;
+      if (data.maxColors !== undefined) updateData.maxColors = data.maxColors;
+      if (data.requireTransparentBackground !== undefined) updateData.requireTransparentBackground = data.requireTransparentBackground;
+      if (data.allowTransparentBackground !== undefined) updateData.allowTransparentBackground = data.allowTransparentBackground;
+      if (data.checkSpotColors !== undefined) updateData.checkSpotColors = data.checkSpotColors;
+      if (data.convertSpotToProcess !== undefined) updateData.convertSpotToProcess = data.convertSpotToProcess;
+      if (data.minLineWeightMm !== undefined) updateData.minLineWeightMm = data.minLineWeightMm?.toString() || null;
+      if (data.minFontSizePt !== undefined) updateData.minFontSizePt = data.minFontSizePt?.toString() || null;
+      if (data.safeZoneMm !== undefined) updateData.safeZoneMm = data.safeZoneMm?.toString() || null;
+      if (data.checkOverprint !== undefined) updateData.checkOverprint = data.checkOverprint;
+      if (data.flattenTransparency !== undefined) updateData.flattenTransparency = data.flattenTransparency;
+      if (data.maxDimensionMm !== undefined) updateData.maxDimensionMm = data.maxDimensionMm;
+      if (data.minDimensionMm !== undefined) updateData.minDimensionMm = data.minDimensionMm;
+      
       updateData.updatedAt = new Date();
       
       await db.update(categories).set(updateData).where(eq(categories.id, id));
@@ -160,7 +192,7 @@ export const categoriesRouter = router({
       const result = await db.select().from(categories).where(eq(categories.id, input.id)).limit(1);
       if (!result[0]) return null;
       
-      const cat = result[0];
+      const cat = result[0] as any;
       
       // Parse JSON arrays
       const parseArray = (val: any): string[] => {
@@ -172,6 +204,7 @@ export const categoriesRouter = router({
       };
       
       return {
+        // Basic settings
         validationEnabled: cat.validationEnabled ?? true,
         minDpi: cat.minDpi ?? 300,
         maxDpi: cat.maxDpi,
@@ -186,6 +219,20 @@ export const categoriesRouter = router({
         maxFileSizeMb: cat.maxFileSizeMb ?? 100,
         allowedFormats: parseArray(cat.allowedFormats),
         aspectRatioTolerance: parseFloat(String(cat.aspectRatioTolerance)) || 5,
+        // Advanced settings
+        requireVectorFormat: cat.requireVectorFormat ?? false,
+        maxColors: cat.maxColors,
+        requireTransparentBackground: cat.requireTransparentBackground ?? false,
+        allowTransparentBackground: cat.allowTransparentBackground ?? true,
+        checkSpotColors: cat.checkSpotColors ?? false,
+        convertSpotToProcess: cat.convertSpotToProcess ?? true,
+        minLineWeightMm: cat.minLineWeightMm ? parseFloat(String(cat.minLineWeightMm)) : null,
+        minFontSizePt: cat.minFontSizePt ? parseFloat(String(cat.minFontSizePt)) : null,
+        safeZoneMm: cat.safeZoneMm ? parseFloat(String(cat.safeZoneMm)) : null,
+        checkOverprint: cat.checkOverprint ?? false,
+        flattenTransparency: cat.flattenTransparency ?? false,
+        maxDimensionMm: cat.maxDimensionMm,
+        minDimensionMm: cat.minDimensionMm,
       };
     }),
 });

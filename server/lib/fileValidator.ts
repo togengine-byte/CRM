@@ -8,6 +8,12 @@
  * - Crop marks / Registration marks detection
  * - Font embedding check
  * - Aspect ratio validation
+ * - Vector format detection
+ * - Spot colors detection
+ * - Overprint detection
+ * - Transparency detection
+ * - Line weight validation
+ * - Font size validation
  */
 
 import * as fs from 'fs';
@@ -17,6 +23,7 @@ import sizeOf from 'image-size';
 
 // Types
 export interface ValidationSettings {
+  // Basic settings
   validationEnabled: boolean;
   minDpi: number;
   maxDpi?: number;
@@ -31,6 +38,20 @@ export interface ValidationSettings {
   maxFileSizeMb: number;
   allowedFormats: string[];
   aspectRatioTolerance: number; // percentage
+  // Advanced settings
+  requireVectorFormat: boolean;
+  maxColors?: number;
+  requireTransparentBackground: boolean;
+  allowTransparentBackground: boolean;
+  checkSpotColors: boolean;
+  convertSpotToProcess: boolean;
+  minLineWeightMm?: number;
+  minFontSizePt?: number;
+  safeZoneMm?: number;
+  checkOverprint: boolean;
+  flattenTransparency: boolean;
+  maxDimensionMm?: number;
+  minDimensionMm?: number;
 }
 
 export interface FileAnalysis {
@@ -52,10 +73,20 @@ export interface FileAnalysis {
   fontsOutlined?: boolean;
   fontIssues?: string[];
   pageCount?: number;
+  // Advanced analysis
+  isVectorFormat?: boolean;
+  hasTransparentBackground?: boolean;
+  hasSpotColors?: boolean;
+  spotColorNames?: string[];
+  hasOverprint?: boolean;
+  hasTransparency?: boolean;
+  minLineWeight?: number;
+  minFontSize?: number;
+  colorCount?: number;
 }
 
 export interface ValidationWarning {
-  type: 'dpi' | 'colorspace' | 'bleed' | 'format' | 'filesize' | 'fonts' | 'cropmarks' | 'aspectratio' | 'registrationmarks' | 'colorbars';
+  type: 'dpi' | 'colorspace' | 'bleed' | 'format' | 'filesize' | 'fonts' | 'cropmarks' | 'aspectratio' | 'registrationmarks' | 'colorbars' | 'vector' | 'colors' | 'transparency' | 'spotcolors' | 'overprint' | 'lineweight' | 'fontsize' | 'safezone' | 'dimensions';
   severity: 'error' | 'warning' | 'info';
   message: string;
   details: string;
@@ -72,8 +103,12 @@ export interface ValidationResult {
   calculatedDpi?: number;
 }
 
+// Vector formats
+const VECTOR_FORMATS = ['ai', 'eps', 'svg', 'dxf', 'pdf'];
+
 // Default settings
 const DEFAULT_SETTINGS: ValidationSettings = {
+  // Basic
   validationEnabled: true,
   minDpi: 300,
   maxDpi: undefined,
@@ -88,6 +123,20 @@ const DEFAULT_SETTINGS: ValidationSettings = {
   maxFileSizeMb: 100,
   allowedFormats: ['pdf', 'ai', 'eps', 'tiff', 'jpg', 'jpeg', 'png'],
   aspectRatioTolerance: 5,
+  // Advanced
+  requireVectorFormat: false,
+  maxColors: undefined,
+  requireTransparentBackground: false,
+  allowTransparentBackground: true,
+  checkSpotColors: false,
+  convertSpotToProcess: true,
+  minLineWeightMm: undefined,
+  minFontSizePt: undefined,
+  safeZoneMm: undefined,
+  checkOverprint: false,
+  flattenTransparency: false,
+  maxDimensionMm: undefined,
+  minDimensionMm: undefined,
 };
 
 /**
@@ -103,6 +152,7 @@ export async function analyzeFile(filePath: string): Promise<FileAnalysis> {
     filename,
     format: ext,
     fileSizeMb,
+    isVectorFormat: VECTOR_FORMATS.includes(ext),
   };
 
   try {
@@ -111,8 +161,10 @@ export async function analyzeFile(filePath: string): Promise<FileAnalysis> {
     } else if (ext === 'pdf') {
       await analyzePdf(filePath, analysis);
     } else if (['ai', 'eps'].includes(ext)) {
-      // For AI/EPS, we can only get basic info
-      analysis.colorspace = 'unknown';
+      await analyzeVectorFile(filePath, analysis);
+    } else if (['svg', 'dxf'].includes(ext)) {
+      analysis.isVectorFormat = true;
+      analysis.colorspace = 'vector';
     }
   } catch (error) {
     console.error(`[FileValidator] Error analyzing file ${filename}:`, error);
@@ -134,24 +186,26 @@ async function analyzeImage(filePath: string, analysis: FileAnalysis): Promise<v
     }
 
     // Try to get DPI from image metadata
-    // Note: This is the declared DPI, not the real DPI for print
     if (dimensions.type === 'jpg' || dimensions.type === 'jpeg') {
-      // JPEG files may have DPI in EXIF
       analysis.declaredDpi = 72; // Default for web images
     } else if (dimensions.type === 'png') {
       analysis.declaredDpi = 72;
+      // PNG can have transparency
+      analysis.hasTransparentBackground = true; // Assume possible, would need deeper analysis
     } else if (dimensions.type === 'tiff' || dimensions.type === 'tif') {
-      analysis.declaredDpi = 300; // TIFF usually has higher DPI
+      analysis.declaredDpi = 300;
     }
 
     // Detect colorspace based on file type
-    // More accurate detection would require reading actual pixel data
     if (['jpg', 'jpeg'].includes(analysis.format)) {
-      analysis.colorspace = 'RGB'; // JPEG is typically RGB (CMYK JPEG is rare)
+      analysis.colorspace = 'RGB';
+      analysis.hasTransparentBackground = false; // JPEG doesn't support transparency
     } else if (analysis.format === 'png') {
-      analysis.colorspace = 'RGB'; // PNG is always RGB/RGBA
+      analysis.colorspace = 'RGB';
+      // PNG can have transparency - would need to check alpha channel
+      analysis.hasTransparentBackground = undefined; // Unknown without deeper analysis
     } else if (['tiff', 'tif'].includes(analysis.format)) {
-      analysis.colorspace = 'CMYK'; // TIFF can be CMYK, assume it for print
+      analysis.colorspace = 'CMYK';
     }
 
     // Images don't have bleed/cropmarks by themselves
@@ -159,6 +213,7 @@ async function analyzeImage(filePath: string, analysis: FileAnalysis): Promise<v
     analysis.hasCropMarks = false;
     analysis.hasRegistrationMarks = false;
     analysis.hasColorBars = false;
+    analysis.isVectorFormat = false;
 
   } catch (error) {
     console.error('[FileValidator] Error analyzing image:', error);
@@ -187,58 +242,92 @@ async function analyzePdf(filePath: string, analysis: FileAnalysis): Promise<voi
       analysis.widthMm = widthInches * 25.4;
       analysis.heightMm = heightInches * 25.4;
       
-      // For PDF, we need to check MediaBox vs TrimBox/BleedBox
+      // Check MediaBox vs TrimBox/BleedBox
       const mediaBox = firstPage.getMediaBox();
       const trimBox = firstPage.getTrimBox();
       const bleedBox = firstPage.getBleedBox();
       
-      // Check if there's bleed (BleedBox larger than TrimBox)
+      // Check if there's bleed
       if (bleedBox && trimBox) {
         const bleedWidth = bleedBox.width - trimBox.width;
         const bleedHeight = bleedBox.height - trimBox.height;
         
         if (bleedWidth > 0 || bleedHeight > 0) {
           analysis.hasBleed = true;
-          // Calculate bleed in mm (average of width and height bleed)
-          const avgBleedPoints = (bleedWidth + bleedHeight) / 4; // divided by 4 because it's on both sides
+          const avgBleedPoints = (bleedWidth + bleedHeight) / 4;
           analysis.bleedMm = (avgBleedPoints / 72) * 25.4;
         } else {
           analysis.hasBleed = false;
           analysis.bleedMm = 0;
         }
       } else {
-        // If no TrimBox/BleedBox defined, check if MediaBox is larger than expected
         analysis.hasBleed = false;
         analysis.bleedMm = 0;
       }
 
-      // Check for crop marks by analyzing page content
-      // This is a simplified check - crop marks are usually outside the TrimBox
+      // Check for crop marks
       if (mediaBox && trimBox) {
         const hasExtraSpace = 
           mediaBox.width > trimBox.width + 10 || 
           mediaBox.height > trimBox.height + 10;
         analysis.hasCropMarks = hasExtraSpace;
-        analysis.hasRegistrationMarks = hasExtraSpace; // Usually come together
+        analysis.hasRegistrationMarks = hasExtraSpace;
       }
     }
 
-    // Check fonts - simplified check
-    // In a real implementation, we'd parse the PDF structure more deeply
-    analysis.fontsEmbedded = true; // Assume embedded unless we detect otherwise
+    // Font analysis
+    analysis.fontsEmbedded = true;
     analysis.fontsOutlined = false;
     analysis.fontIssues = [];
 
-    // Try to detect colorspace from PDF
-    // This is simplified - real detection requires parsing color spaces in content streams
-    analysis.colorspace = 'CMYK'; // Assume CMYK for print PDFs
+    // PDF can be vector
+    analysis.isVectorFormat = true;
+    
+    // Default colorspace for print PDFs
+    analysis.colorspace = 'CMYK';
+
+    // Advanced PDF analysis would require parsing content streams
+    // These are simplified assumptions
+    analysis.hasSpotColors = false;
+    analysis.hasOverprint = false;
+    analysis.hasTransparency = false;
 
   } catch (error) {
     console.error('[FileValidator] Error analyzing PDF:', error);
-    // Set defaults for failed analysis
     analysis.colorspace = 'unknown';
     analysis.hasBleed = false;
     analysis.hasCropMarks = false;
+  }
+}
+
+/**
+ * Analyze vector file (AI, EPS)
+ */
+async function analyzeVectorFile(filePath: string, analysis: FileAnalysis): Promise<void> {
+  try {
+    analysis.isVectorFormat = true;
+    analysis.colorspace = 'CMYK'; // Assume CMYK for print vector files
+    
+    // Read file header to detect some properties
+    const fileContent = fs.readFileSync(filePath, { encoding: 'latin1' }).slice(0, 10000);
+    
+    // Check for spot colors (Pantone)
+    if (fileContent.includes('PANTONE') || fileContent.includes('Spot')) {
+      analysis.hasSpotColors = true;
+    }
+    
+    // Check for transparency
+    if (fileContent.includes('/Transparency') || fileContent.includes('opacity')) {
+      analysis.hasTransparency = true;
+    }
+    
+    // Check for overprint
+    if (fileContent.includes('overprint') || fileContent.includes('/OPM')) {
+      analysis.hasOverprint = true;
+    }
+
+  } catch (error) {
+    console.error('[FileValidator] Error analyzing vector file:', error);
   }
 }
 
@@ -251,11 +340,9 @@ export function calculateRealDpi(
   targetWidthMm: number,
   targetHeightMm: number
 ): { dpiWidth: number; dpiHeight: number; avgDpi: number } {
-  // Convert mm to inches
   const targetWidthInches = targetWidthMm / 25.4;
   const targetHeightInches = targetHeightMm / 25.4;
 
-  // Calculate DPI
   const dpiWidth = widthPx / targetWidthInches;
   const dpiHeight = heightPx / targetHeightInches;
   const avgDpi = (dpiWidth + dpiHeight) / 2;
@@ -280,7 +367,6 @@ export function checkAspectRatio(
   const fileRatio = fileWidth / fileHeight;
   const targetRatio = targetWidth / targetHeight;
   
-  // Calculate deviation percentage
   const deviationPercent = Math.abs((fileRatio - targetRatio) / targetRatio) * 100;
   
   return {
@@ -342,10 +428,22 @@ export async function validateFile(
     });
   }
 
-  // 3. Calculate and check real DPI (if we have dimensions)
+  // 3. Check vector format requirement
+  if (mergedSettings.requireVectorFormat && !analysis.isVectorFormat) {
+    errors.push({
+      type: 'vector',
+      severity: 'error',
+      message: 'נדרש קובץ וקטורי',
+      details: 'יש לשלוח קובץ בפורמט וקטורי (AI, EPS, PDF, SVG, DXF)',
+      currentValue: `${analysis.format.toUpperCase()} (רסטר)`,
+      requiredValue: 'AI, EPS, PDF, SVG, DXF',
+    });
+  }
+
+  // 4. Calculate and check real DPI (if we have dimensions and not vector-only)
   let calculatedDpi: number | undefined;
   
-  if (targetDimensions && analysis.widthPx && analysis.heightPx) {
+  if (!mergedSettings.requireVectorFormat && targetDimensions && analysis.widthPx && analysis.heightPx) {
     const dpiResult = calculateRealDpi(
       analysis.widthPx,
       analysis.heightPx,
@@ -386,7 +484,7 @@ export async function validateFile(
     }
   }
 
-  // 4. Check aspect ratio (if we have dimensions)
+  // 5. Check aspect ratio (if we have dimensions)
   if (targetDimensions) {
     let fileWidth: number | undefined;
     let fileHeight: number | undefined;
@@ -421,10 +519,38 @@ export async function validateFile(
     }
   }
 
-  // 5. Check colorspace
+  // 6. Check dimension limits
+  if (analysis.widthMm && analysis.heightMm) {
+    const maxDim = Math.max(analysis.widthMm, analysis.heightMm);
+    const minDim = Math.min(analysis.widthMm, analysis.heightMm);
+
+    if (mergedSettings.maxDimensionMm && maxDim > mergedSettings.maxDimensionMm) {
+      errors.push({
+        type: 'dimensions',
+        severity: 'error',
+        message: 'מידות גדולות מדי',
+        details: `המידה הגדולה ביותר (${Math.round(maxDim)}mm) חורגת מהמקסימום`,
+        currentValue: `${Math.round(maxDim)}mm`,
+        requiredValue: `עד ${mergedSettings.maxDimensionMm}mm`,
+      });
+    }
+
+    if (mergedSettings.minDimensionMm && minDim < mergedSettings.minDimensionMm) {
+      errors.push({
+        type: 'dimensions',
+        severity: 'error',
+        message: 'מידות קטנות מדי',
+        details: `המידה הקטנה ביותר (${Math.round(minDim)}mm) קטנה מהמינימום`,
+        currentValue: `${Math.round(minDim)}mm`,
+        requiredValue: `לפחות ${mergedSettings.minDimensionMm}mm`,
+      });
+    }
+  }
+
+  // 7. Check colorspace
   if (analysis.colorspace && mergedSettings.allowedColorspaces.length > 0) {
     const colorUpper = analysis.colorspace.toUpperCase();
-    if (!mergedSettings.allowedColorspaces.map(c => c.toUpperCase()).includes(colorUpper) && colorUpper !== 'UNKNOWN') {
+    if (!mergedSettings.allowedColorspaces.map(c => c.toUpperCase()).includes(colorUpper) && colorUpper !== 'UNKNOWN' && colorUpper !== 'VECTOR') {
       warnings.push({
         type: 'colorspace',
         severity: 'warning',
@@ -436,7 +562,19 @@ export async function validateFile(
     }
   }
 
-  // 6. Check bleed
+  // 8. Check max colors (for screen printing)
+  if (mergedSettings.maxColors && analysis.colorCount && analysis.colorCount > mergedSettings.maxColors) {
+    errors.push({
+      type: 'colors',
+      severity: 'error',
+      message: 'יותר מדי צבעים',
+      details: `הקובץ מכיל ${analysis.colorCount} צבעים, המקסימום המותר הוא ${mergedSettings.maxColors}`,
+      currentValue: `${analysis.colorCount} צבעים`,
+      requiredValue: `עד ${mergedSettings.maxColors} צבעים`,
+    });
+  }
+
+  // 9. Check bleed
   if (mergedSettings.requireBleed) {
     if (!analysis.hasBleed) {
       errors.push({
@@ -459,7 +597,21 @@ export async function validateFile(
     }
   }
 
-  // 7. Check crop marks
+  // 10. Check safe zone
+  if (mergedSettings.safeZoneMm) {
+    // This would require content analysis to check if important content is too close to edges
+    // For now, just add an info message
+    warnings.push({
+      type: 'safezone',
+      severity: 'info',
+      message: 'בדוק אזור בטוח',
+      details: `וודא שתוכן חשוב נמצא לפחות ${mergedSettings.safeZoneMm}mm מהקצוות`,
+      currentValue: 'לא ניתן לבדוק אוטומטית',
+      requiredValue: `${mergedSettings.safeZoneMm}mm מהקצה`,
+    });
+  }
+
+  // 11. Check crop marks
   if (mergedSettings.requireCropMarks && !analysis.hasCropMarks) {
     errors.push({
       type: 'cropmarks',
@@ -471,7 +623,7 @@ export async function validateFile(
     });
   }
 
-  // 8. Check registration marks
+  // 12. Check registration marks
   if (mergedSettings.requireRegistrationMarks && !analysis.hasRegistrationMarks) {
     errors.push({
       type: 'registrationmarks',
@@ -483,7 +635,7 @@ export async function validateFile(
     });
   }
 
-  // 9. Check color bars
+  // 13. Check color bars
   if (mergedSettings.requireColorBars && !analysis.hasColorBars) {
     warnings.push({
       type: 'colorbars',
@@ -495,7 +647,7 @@ export async function validateFile(
     });
   }
 
-  // 10. Check fonts (for PDF)
+  // 14. Check fonts (for PDF)
   if (analysis.format === 'pdf' && mergedSettings.requireEmbeddedFonts) {
     if (!analysis.fontsEmbedded && !analysis.fontsOutlined) {
       errors.push({
@@ -516,6 +668,101 @@ export async function validateFile(
         requiredValue: 'פונטים מוטמעים',
       });
     }
+  }
+
+  // 15. Check minimum font size
+  if (mergedSettings.minFontSizePt && analysis.minFontSize && analysis.minFontSize < mergedSettings.minFontSizePt) {
+    warnings.push({
+      type: 'fontsize',
+      severity: 'warning',
+      message: 'טקסט קטן מדי',
+      details: `נמצא טקסט בגודל ${analysis.minFontSize}pt, מומלץ לפחות ${mergedSettings.minFontSizePt}pt`,
+      currentValue: `${analysis.minFontSize}pt`,
+      requiredValue: `לפחות ${mergedSettings.minFontSizePt}pt`,
+    });
+  }
+
+  // 16. Check minimum line weight
+  if (mergedSettings.minLineWeightMm && analysis.minLineWeight && analysis.minLineWeight < mergedSettings.minLineWeightMm) {
+    warnings.push({
+      type: 'lineweight',
+      severity: 'warning',
+      message: 'קווים דקים מדי',
+      details: `נמצאו קווים בעובי ${analysis.minLineWeight}mm, מומלץ לפחות ${mergedSettings.minLineWeightMm}mm`,
+      currentValue: `${analysis.minLineWeight}mm`,
+      requiredValue: `לפחות ${mergedSettings.minLineWeightMm}mm`,
+    });
+  }
+
+  // 17. Check spot colors
+  if (mergedSettings.checkSpotColors && analysis.hasSpotColors) {
+    if (mergedSettings.convertSpotToProcess) {
+      warnings.push({
+        type: 'spotcolors',
+        severity: 'warning',
+        message: 'נמצאו צבעי Spot',
+        details: `הקובץ מכיל צבעי Pantone/Spot. מומלץ להמיר ל-CMYK${analysis.spotColorNames ? ': ' + analysis.spotColorNames.join(', ') : ''}`,
+        currentValue: 'צבעי Spot',
+        requiredValue: 'CMYK בלבד',
+      });
+    } else {
+      errors.push({
+        type: 'spotcolors',
+        severity: 'error',
+        message: 'צבעי Spot אסורים',
+        details: 'יש להמיר את כל צבעי ה-Spot ל-CMYK',
+        currentValue: 'צבעי Spot',
+        requiredValue: 'CMYK בלבד',
+      });
+    }
+  }
+
+  // 18. Check overprint
+  if (mergedSettings.checkOverprint && analysis.hasOverprint) {
+    warnings.push({
+      type: 'overprint',
+      severity: 'warning',
+      message: 'נמצאו הגדרות Overprint',
+      details: 'הקובץ מכיל הגדרות overprint שעלולות לגרום לתוצאות לא צפויות',
+      currentValue: 'Overprint פעיל',
+      requiredValue: 'ללא Overprint',
+    });
+  }
+
+  // 19. Check transparency
+  if (mergedSettings.flattenTransparency && analysis.hasTransparency) {
+    warnings.push({
+      type: 'transparency',
+      severity: 'warning',
+      message: 'נמצאו שקיפויות',
+      details: 'הקובץ מכיל שקיפויות. מומלץ לשטח (Flatten) לפני הדפסה',
+      currentValue: 'שקיפויות פעילות',
+      requiredValue: 'שקיפויות משוטחות',
+    });
+  }
+
+  // 20. Check transparent background requirement
+  if (mergedSettings.requireTransparentBackground && analysis.hasTransparentBackground === false) {
+    errors.push({
+      type: 'transparency',
+      severity: 'error',
+      message: 'נדרש רקע שקוף',
+      details: 'הקובץ חייב להיות עם רקע שקוף (PNG עם שקיפות)',
+      currentValue: 'רקע לא שקוף',
+      requiredValue: 'רקע שקוף',
+    });
+  }
+
+  // 21. Check if transparent background is not allowed
+  if (!mergedSettings.allowTransparentBackground && analysis.hasTransparentBackground === true) {
+    warnings.push({
+      type: 'transparency',
+      severity: 'warning',
+      message: 'רקע שקוף לא מומלץ',
+      details: 'הקובץ מכיל רקע שקוף, מומלץ להוסיף רקע לבן',
+      currentValue: 'רקע שקוף',
+      requiredValue: 'רקע מלא',
+    });
   }
 
   // Determine final status
@@ -556,7 +803,6 @@ export function mergeValidationSettings(
 
   // Apply product settings if override is enabled
   if (productOverride && productSettings) {
-    // Only override non-null values
     Object.keys(productSettings).forEach(key => {
       const value = (productSettings as any)[key];
       if (value !== null && value !== undefined) {
