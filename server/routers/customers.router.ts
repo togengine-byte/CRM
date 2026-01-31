@@ -169,6 +169,7 @@ export const customersRouter = router({
       quoteItems: z.array(z.object({
         sizeQuantityId: z.number(),
         quantity: z.number().int().positive(),
+        addonIds: z.array(z.number()).optional(), // Selected addon IDs
       })).min(1),
       notes: z.string().optional(),
       attachments: z.array(attachmentSchema).optional(),

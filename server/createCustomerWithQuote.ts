@@ -21,6 +21,7 @@ interface CreateCustomerWithQuoteInput {
   quoteItems: Array<{
     sizeQuantityId: number;
     quantity: number;
+    addonIds?: number[]; // Selected addon IDs for this item
   }>;
   notes?: string;
   attachments?: Attachment[];
@@ -223,6 +224,9 @@ export async function createCustomerWithQuote(input: CreateCustomerWithQuoteInpu
       sizeQuantityId: item.sizeQuantityId,
       quantity: item.quantity,
       priceAtTimeOfQuote: "0", // Will be calculated by employee
+      addonIds: item.addonIds && item.addonIds.length > 0 
+        ? JSON.stringify(item.addonIds) 
+        : null,
     });
   }
 

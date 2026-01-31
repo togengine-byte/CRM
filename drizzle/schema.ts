@@ -227,6 +227,8 @@ export const quoteItems = pgTable("quote_items", {
   delivered: boolean("delivered").default(false),
   deliveredAt: timestamp("deliveredAt"),
   deliveredBy: integer("deliveredBy"),
+  // Selected product addons (stored as JSON array of addon IDs)
+  addonIds: text("addonIds"), // JSON array: [1, 2, 3]
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 

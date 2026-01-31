@@ -399,46 +399,42 @@ export default function LandingPage() {
       if (selectedProducts.length > 0) {
         // Quote with products
         await createWithQuoteMutation.mutateAsync({
-          name: customerData.name,
-          email: customerData.email,
-          phone: customerData.phone,
-          company: customerData.company || undefined,
-          items: selectedProducts.map((p) => ({
-            productId: p.productId,
-            sizeId: p.sizeId,
-            quantityId: p.quantityId,
-            notes: p.needsGraphicDesign
-              ? `עיצוב גרפי נדרש (₪${p.graphicDesignPrice})`
-              : undefined,
-            fileKey: p.file?.s3Key,
-            fileUrl: p.file?.s3Url,
-            fileName: p.file?.file.name,
-            // Include addon IDs for backend processing
+          customerInfo: {
+            name: customerData.name,
+            email: customerData.email,
+            phone: customerData.phone,
+            companyName: customerData.company || undefined,
+          },
+          quoteItems: selectedProducts.map((p) => ({
+            sizeQuantityId: p.quantityId, // This is the sizeQuantity ID
+            quantity: p.quantity,
             addonIds: p.addons?.map((a) => a.id),
           })),
           notes: notes.join("\n"),
           attachments: generalFiles
             .filter((f) => f.s3Key)
             .map((f) => ({
-              key: f.s3Key!,
-              url: f.s3Url!,
-              name: f.file.name,
+              fileName: f.file.name,
+              fileUrl: f.s3Url!,
+              s3Key: f.s3Key!,
             })),
         });
       } else {
         // Quote with files only
         await createQuoteFilesOnlyMutation.mutateAsync({
-          name: customerData.name,
-          email: customerData.email,
-          phone: customerData.phone,
-          company: customerData.company || undefined,
+          customerInfo: {
+            name: customerData.name,
+            email: customerData.email,
+            phone: customerData.phone,
+            companyName: customerData.company || undefined,
+          },
           description: description,
           attachments: generalFiles
             .filter((f) => f.s3Key)
             .map((f) => ({
-              key: f.s3Key!,
-              url: f.s3Url!,
-              name: f.file.name,
+              fileName: f.file.name,
+              fileUrl: f.s3Url!,
+              s3Key: f.s3Key!,
             })),
         });
       }

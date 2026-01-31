@@ -146,14 +146,28 @@ export const validateFileForProduct = async (
       const targetRatio = targetDims.widthMm / targetDims.heightMm;
       const ratioDiff = Math.abs(fileRatio - targetRatio) / targetRatio * 100;
 
+      // Aspect ratio validation:
+      // - Less than 0.1% difference: OK, no message
+      // - 0.1% to tolerance: Warning (can submit)
+      // - Above tolerance: Error (cannot submit without graphic design)
       if (ratioDiff > aspectRatioTolerance) {
+        // Above tolerance = ERROR - cannot submit
+        errors.push({
+          type: 'aspectratio',
+          severity: 'error',
+          message: 'פרופורציה שונה מדי',
+          details: `סטיית הפרופורציה (${ratioDiff.toFixed(1)}%) חורגת מהמותר (${aspectRatioTolerance}%) - לא ניתן להתאים`,
+        });
+      } else if (ratioDiff >= 0.1) {
+        // Within tolerance but noticeable = WARNING - can submit
         warnings.push({
           type: 'aspectratio',
           severity: 'warning',
           message: 'פרופורציה שונה',
-          details: `יחס הקובץ שונה מהגודל הנבחר - הספק יתאים את הקובץ`,
+          details: `סטייה קלה בפרופורציה (${ratioDiff.toFixed(1)}%) - הספק יתאים את הקובץ`,
         });
       }
+      // Less than 0.1% = perfect, no message needed
     }
   }
 
