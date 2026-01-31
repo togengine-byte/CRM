@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import path from 'path';
 import crypto from 'crypto';
@@ -141,6 +141,66 @@ export function getS3Folder(context: 'quote' | 'work' | 'supplier' | 'customer' 
     general: 'uploads',
   };
   return folders[context] || 'uploads';
+}
+
+// List all files in S3 bucket (with optional prefix filter)
+export async function listS3Files(prefix?: string, maxKeys: number = 1000): Promise<Array<{
+  key: string;
+  size: number;
+  lastModified: Date;
+  folder: string;
+}>> {
+  try {
+    const command = new ListObjectsV2Command({
+      Bucket: BUCKET_NAME,
+      Prefix: prefix,
+      MaxKeys: maxKeys,
+    });
+
+    const response = await s3Client.send(command);
+    
+    return (response.Contents || []).map(obj => ({
+      key: obj.Key || '',
+      size: obj.Size || 0,
+      lastModified: obj.LastModified || new Date(),
+      folder: obj.Key?.split('/')[0] || 'unknown',
+    }));
+  } catch (error) {
+    console.error('Error listing S3 files:', error);
+    return [];
+  }
+}
+
+// Get S3 bucket statistics
+export async function getS3Stats(): Promise<{
+  totalFiles: number;
+  totalSizeMb: number;
+  byFolder: Record<string, { count: number; sizeMb: number }>;
+}> {
+  const files = await listS3Files();
+  
+  const byFolder: Record<string, { count: number; sizeMb: number }> = {};
+  let totalSize = 0;
+
+  for (const file of files) {
+    totalSize += file.size;
+    if (!byFolder[file.folder]) {
+      byFolder[file.folder] = { count: 0, sizeMb: 0 };
+    }
+    byFolder[file.folder].count++;
+    byFolder[file.folder].sizeMb += file.size / (1024 * 1024);
+  }
+
+  // Round sizeMb values
+  for (const folder in byFolder) {
+    byFolder[folder].sizeMb = Math.round(byFolder[folder].sizeMb * 100) / 100;
+  }
+
+  return {
+    totalFiles: files.length,
+    totalSizeMb: Math.round((totalSize / (1024 * 1024)) * 100) / 100,
+    byFolder,
+  };
 }
 
 // Export the client for advanced usage

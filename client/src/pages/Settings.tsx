@@ -12,6 +12,7 @@ import {
   ExternalLink,
   ShoppingBag,
   Database,
+  Cloud,
 } from "lucide-react";
 import { useAuthContext } from "@/contexts/AuthContext";
 
@@ -26,6 +27,7 @@ import {
   GmailSettings,
   BackupSettings,
   CategoryValidationSettings,
+  S3StorageSettings,
 } from "@/components/settings";
 
 export default function Settings() {
@@ -42,7 +44,7 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="staff" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-9 lg:w-[1100px]">
+        <TabsList className="grid w-full grid-cols-10 lg:w-[1200px]">
           <TabsTrigger value="staff" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             עובדים
@@ -78,6 +80,10 @@ export default function Settings() {
           <TabsTrigger value="backup" className="flex items-center gap-2">
             <Database className="h-4 w-4" />
             גיבוי
+          </TabsTrigger>
+          <TabsTrigger value="s3" className="flex items-center gap-2">
+            <Cloud className="h-4 w-4" />
+            אחסון S3
           </TabsTrigger>
         </TabsList>
 
@@ -160,6 +166,20 @@ export default function Settings() {
               <CardContent className="py-8 text-center text-gray-500">
                 <Shield className="h-12 w-12 mx-auto mb-4 text-gray-300" />
                 <p>רק מנהל מערכת יכול לגשת להגדרות גיבוי</p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* S3 Storage Tab */}
+        <TabsContent value="s3" className="space-y-6">
+          {isAdmin ? (
+            <S3StorageSettings />
+          ) : (
+            <Card>
+              <CardContent className="py-8 text-center text-gray-500">
+                <Shield className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                <p>רק מנהל מערכת יכול לגשת לניהול אחסון S3</p>
               </CardContent>
             </Card>
           )}

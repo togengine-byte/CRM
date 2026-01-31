@@ -6,7 +6,9 @@ import {
   getSignedUploadUrl, 
   deleteFromS3, 
   fileExistsInS3,
-  getS3Folder 
+  getS3Folder,
+  listS3Files,
+  getS3Stats,
 } from '../lib/s3Service';
 
 const router = Router();
@@ -146,6 +148,55 @@ router.delete('/delete/:key(*)', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error deleting from S3:', error);
     res.status(500).json({ error: 'Failed to delete file' });
+  }
+});
+
+// List all files in S3 (admin only)
+router.get('/files', async (req: Request, res: Response) => {
+  try {
+    const prefix = req.query.prefix as string | undefined;
+    const files = await listS3Files(prefix);
+    res.json({ success: true, files });
+  } catch (error) {
+    console.error('Error listing S3 files:', error);
+    res.status(500).json({ error: 'Failed to list files' });
+  }
+});
+
+// Get S3 statistics (admin only)
+router.get('/stats', async (req: Request, res: Response) => {
+  try {
+    const stats = await getS3Stats();
+    res.json({ success: true, ...stats });
+  } catch (error) {
+    console.error('Error getting S3 stats:', error);
+    res.status(500).json({ error: 'Failed to get statistics' });
+  }
+});
+
+// Delete multiple files from S3 (admin only)
+router.post('/delete-multiple', async (req: Request, res: Response) => {
+  try {
+    const { keys } = req.body;
+    if (!keys || !Array.isArray(keys) || keys.length === 0) {
+      return res.status(400).json({ error: 'No keys provided' });
+    }
+
+    const results = await Promise.all(
+      keys.map(async (key: string) => {
+        try {
+          await deleteFromS3(key);
+          return { key, success: true };
+        } catch (error) {
+          return { key, success: false, error: 'Failed to delete' };
+        }
+      })
+    );
+
+    res.json({ success: true, results });
+  } catch (error) {
+    console.error('Error deleting multiple files:', error);
+    res.status(500).json({ error: 'Failed to delete files' });
   }
 });
 
