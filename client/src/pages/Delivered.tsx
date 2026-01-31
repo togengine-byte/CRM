@@ -50,11 +50,8 @@ export default function Delivered() {
   const [selectedJobId, setSelectedJobId] = useState<number | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
-  // Get all jobs and filter for delivered status
-  const { data: allJobs, isLoading, refetch } = trpc.jobs.list.useQuery();
-  
-  // Filter for delivered status
-  const jobs = allJobs?.filter((job: Job) => job.status === "delivered") || [];
+  // Get delivered jobs directly
+  const { data: jobs = [], isLoading, refetch } = trpc.jobs.delivered.useQuery();
 
   // Filter jobs by search
   const filteredJobs = jobs.filter((job: Job) => {
@@ -69,7 +66,7 @@ export default function Delivered() {
   });
 
   // Get selected job details
-  const jobDetails = selectedJobId ? jobs.find((j: Job) => j.id === selectedJobId) : null;
+  const jobDetails = selectedJobId ? (jobs as Job[]).find((j: Job) => j.id === selectedJobId) : null;
 
   // Calculate stats
   const totalValue = filteredJobs.reduce((sum: number, j: Job) => 

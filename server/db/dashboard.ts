@@ -544,3 +544,90 @@ export async function getJobsReadyForPickup() {
     productName: row.productName,
   }));
 }
+
+
+/**
+ * Get delivered jobs (for Delivered page)
+ */
+export async function getDeliveredJobs() {
+  const db = await getDb();
+  if (!db) return [];
+
+  const result = await db.execute(sql`
+    SELECT 
+      sj.id,
+      sj."quoteId",
+      sj."supplierId",
+      COALESCE(sj."customerId", q."customerId") as "customerId",
+      sj."sizeQuantityId",
+      sj.quantity,
+      sj."pricePerUnit",
+      sj.status,
+      sj."supplierMarkedReady",
+      sj."supplierReadyAt",
+      sj."promisedDeliveryDays",
+      sj."createdAt",
+      sj."updatedAt",
+      sj."pickedUpAt",
+      sj."deliveredAt",
+      supplier.name as "supplierName",
+      supplier."companyName" as "supplierCompany",
+      supplier.phone as "supplierPhone",
+      supplier.email as "supplierEmail",
+      supplier.address as "supplierAddress",
+      COALESCE(customer.name, q_customer.name) as "customerName",
+      COALESCE(customer."companyName", q_customer."companyName") as "customerCompany",
+      COALESCE(customer.phone, q_customer.phone) as "customerPhone",
+      COALESCE(customer.email, q_customer.email) as "customerEmail",
+      COALESCE(customer.address, q_customer.address) as "customerAddress",
+      ps.name as "sizeName",
+      ps.dimensions as "dimensions",
+      bp.name as "productName",
+      bp.description as "productDescription",
+      (sj.quantity * sj."pricePerUnit") as "totalJobPrice"
+    FROM supplier_jobs sj
+    LEFT JOIN quotes q ON sj."quoteId" = q.id
+    LEFT JOIN users supplier ON sj."supplierId" = supplier.id
+    LEFT JOIN users customer ON sj."customerId" = customer.id
+    LEFT JOIN users q_customer ON q."customerId" = q_customer.id
+    LEFT JOIN size_quantities sq ON sj."sizeQuantityId" = sq.id
+    LEFT JOIN product_sizes ps ON sq.size_id = ps.id
+    LEFT JOIN base_products bp ON ps.product_id = bp.id
+    WHERE sj.status = 'delivered'
+    AND sj."isCancelled" IS NOT TRUE
+    ORDER BY sj."deliveredAt" DESC
+  `);
+
+  return result.rows.map((row: any) => ({
+    id: row.id,
+    quoteId: row.quoteId,
+    supplierId: row.supplierId,
+    customerId: row.customerId,
+    sizeQuantityId: row.sizeQuantityId,
+    quantity: row.quantity,
+    pricePerUnit: row.pricePerUnit,
+    status: row.status,
+    supplierMarkedReady: row.supplierMarkedReady,
+    supplierReadyAt: row.supplierReadyAt,
+    promisedDeliveryDays: row.promisedDeliveryDays,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    pickedUpAt: row.pickedUpAt,
+    deliveredAt: row.deliveredAt,
+    supplierName: row.supplierName,
+    supplierCompany: row.supplierCompany,
+    supplierPhone: row.supplierPhone,
+    supplierEmail: row.supplierEmail,
+    supplierAddress: row.supplierAddress,
+    customerName: row.customerName,
+    customerCompany: row.customerCompany,
+    customerPhone: row.customerPhone,
+    customerEmail: row.customerEmail,
+    customerAddress: row.customerAddress,
+    sizeName: row.sizeName,
+    dimensions: row.dimensions,
+    productName: row.productName,
+    productDescription: row.productDescription,
+    totalJobPrice: row.totalJobPrice,
+  }));
+}

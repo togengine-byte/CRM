@@ -5,7 +5,7 @@
 
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
-import { getActiveJobs, getJobsReadyForPickup, updateJobStatus, sendJobStatusEmail, getSupplierJobById } from "../db";
+import { getActiveJobs, getJobsReadyForPickup, getDeliveredJobs, updateJobStatus, sendJobStatusEmail, getSupplierJobById } from "../db";
 
 export const jobsRouter = router({
   // Get all active jobs
@@ -16,6 +16,11 @@ export const jobsRouter = router({
   // Get jobs ready for pickup
   readyForPickup: protectedProcedure.query(async () => {
     return await getJobsReadyForPickup();
+  }),
+
+  // Get delivered jobs
+  delivered: protectedProcedure.query(async () => {
+    return await getDeliveredJobs();
   }),
 
   // Update job status
