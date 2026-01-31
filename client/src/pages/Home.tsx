@@ -11,7 +11,7 @@ import {
 import { KPICard } from "@/components/dashboard/KPICard";
 import { UnifiedPipelineCard } from "@/components/dashboard/UnifiedPipelineCard";
 import { DeliveryCalendarCard } from "@/components/dashboard/DeliveryCalendarCard";
-import { PendingSignupsCard } from "@/components/dashboard/PendingSignupsCard";
+import { NewQuoteRequestsCard } from "@/components/dashboard/NewQuoteRequestsCard";
 import { ActivityLogCard } from "@/components/dashboard/ActivityLogCard";
 
 // Import utility functions
@@ -21,13 +21,7 @@ import { formatCurrency, formatNumber } from "@/utils/dashboardHelpers";
 
 export default function Home() {
   const { data: kpis, isLoading: kpisLoading } = trpc.dashboard.kpis.useQuery();
-  const { data: signups, isLoading: signupsLoading, refetch: refetchSignups } = trpc.dashboard.pendingSignups.useQuery();
-  const { data: activities, isLoading: activitiesLoading, refetch: refetchActivities } = trpc.dashboard.recentActivity.useQuery();
-
-  const handleSignupsRefresh = () => {
-    refetchSignups();
-    refetchActivities();
-  };
+  const { data: activities, isLoading: activitiesLoading } = trpc.dashboard.recentActivity.useQuery();
 
   return (
     <div className="space-y-4 max-w-7xl mx-auto">
@@ -89,12 +83,8 @@ export default function Home() {
       {/* Delivery Calendar - Full Width */}
       <DeliveryCalendarCard isLoading={kpisLoading} />
 
-      {/* Pending Signups - Full Width */}
-      <PendingSignupsCard 
-        signups={signups || []} 
-        isLoading={signupsLoading} 
-        onRefresh={handleSignupsRefresh} 
-      />
+      {/* New Quote Requests - Full Width */}
+      <NewQuoteRequestsCard />
 
       {/* Activity Log - Full Width at Bottom */}
       <ActivityLogCard 

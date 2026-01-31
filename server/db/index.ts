@@ -270,6 +270,7 @@ export {
   getJobsReadyForPickup,
   getUrgentAlerts,
   getDeliveredJobs,
+  getNewQuoteRequests,
 } from "./dashboard";
 
 // ==================== COURIERS ====================

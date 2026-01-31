@@ -12,7 +12,10 @@ import {
   supplierJobs,
   sizeQuantities,
   productSizes,
-  baseProducts
+  baseProducts,
+  quoteItems,
+  quoteAttachments,
+  productAddons
 } from "../../drizzle/schema";
 
 // ==================== URGENT ALERTS ====================
@@ -630,4 +633,159 @@ export async function getDeliveredJobs() {
     productDescription: row.productDescription,
     totalJobPrice: row.totalJobPrice,
   }));
+}
+
+
+// ==================== NEW QUOTE REQUESTS ====================
+
+export interface NewQuoteRequest {
+  id: number;
+  customerId: number;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  customerCompany?: string | null;
+  status: string;
+  createdAt: Date;
+  items: Array<{
+    id: number;
+    productName: string;
+    sizeName: string;
+    dimensions?: string | null;
+    quantity: number;
+    addonIds?: number[];
+    addonNames?: string[];
+  }>;
+  attachments: Array<{
+    id: number;
+    fileName: string;
+    fileUrl: string;
+    fileSize?: number | null;
+    mimeType?: string | null;
+    quoteItemId?: number | null;
+  }>;
+  notes?: string | null;
+}
+
+/**
+ * Get new quote requests (quotes with status 'draft' or 'pending')
+ * These are requests from the landing page waiting for review
+ */
+export async function getNewQuoteRequests(limit: number = 10): Promise<NewQuoteRequest[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  try {
+    // Get quotes with customer info
+    const quotesResult = await db.execute(sql`
+      SELECT 
+        q.id,
+        q."customerId",
+        q.status,
+        q."createdAt",
+        u.name as "customerName",
+        u.email as "customerEmail",
+        u.phone as "customerPhone",
+        u."companyName" as "customerCompany"
+      FROM quotes q
+      LEFT JOIN users u ON q."customerId" = u.id
+      WHERE q.status IN ('draft', 'pending')
+      ORDER BY q."createdAt" DESC
+      LIMIT ${limit}
+    `);
+
+    const quotesList = quotesResult.rows as any[];
+    if (quotesList.length === 0) return [];
+
+    // Get items for all quotes
+    const quoteIds = quotesList.map(q => q.id);
+    const itemsResult = await db.execute(sql`
+      SELECT 
+        qi.id,
+        qi."quoteId",
+        qi.quantity,
+        qi."addonIds",
+        bp.name as "productName",
+        ps.name as "sizeName",
+        ps.dimensions
+      FROM quote_items qi
+      LEFT JOIN size_quantities sq ON qi."sizeQuantityId" = sq.id
+      LEFT JOIN product_sizes ps ON sq."sizeId" = ps.id
+      LEFT JOIN base_products bp ON ps."productId" = bp.id
+      WHERE qi."quoteId" = ANY(${quoteIds}::int[])
+    `);
+
+    // Get attachments for all quotes
+    const attachmentsResult = await db.execute(sql`
+      SELECT 
+        id,
+        "quoteId",
+        "quoteItemId",
+        "fileName",
+        "fileUrl",
+        "fileSize",
+        "mimeType"
+      FROM quote_attachments
+      WHERE "quoteId" = ANY(${quoteIds}::int[])
+    `);
+
+    // Get all addon names for addon IDs
+    const addonsResult = await db.execute(sql`
+      SELECT id, name FROM product_addons
+    `);
+    const addonsMap = new Map((addonsResult.rows as any[]).map(a => [a.id, a.name]));
+
+    // Build the response
+    const result: NewQuoteRequest[] = quotesList.map(quote => {
+      const items = (itemsResult.rows as any[])
+        .filter(item => item.quoteId === quote.id)
+        .map(item => {
+          let addonIds: number[] = [];
+          try {
+            if (item.addonIds) {
+              addonIds = JSON.parse(item.addonIds);
+            }
+          } catch (e) {}
+          
+          return {
+            id: item.id,
+            productName: item.productName || 'מוצר לא ידוע',
+            sizeName: item.sizeName || 'גודל לא ידוע',
+            dimensions: item.dimensions,
+            quantity: item.quantity,
+            addonIds,
+            addonNames: addonIds.map(id => addonsMap.get(id) || `תוספת ${id}`),
+          };
+        });
+
+      const attachments = (attachmentsResult.rows as any[])
+        .filter(att => att.quoteId === quote.id)
+        .map(att => ({
+          id: att.id,
+          fileName: att.fileName,
+          fileUrl: att.fileUrl,
+          fileSize: att.fileSize,
+          mimeType: att.mimeType,
+          quoteItemId: att.quoteItemId,
+        }));
+
+      return {
+        id: quote.id,
+        customerId: quote.customerId,
+        customerName: quote.customerName || 'לקוח חדש',
+        customerEmail: quote.customerEmail || '',
+        customerPhone: quote.customerPhone || '',
+        customerCompany: quote.customerCompany,
+        status: quote.status,
+        createdAt: quote.createdAt,
+        items,
+        attachments,
+      };
+    });
+
+    return result;
+  } catch (error) {
+    console.error('[getNewQuoteRequests] Error:', error);
+    return [];
+  }
 }

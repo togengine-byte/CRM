@@ -14,6 +14,7 @@ import {
   getActiveJobs,
   getJobsReadyForPickup,
   getUrgentAlerts,
+  getNewQuoteRequests,
 } from "../db";
 
 export const dashboardRouter = router({
@@ -55,5 +56,10 @@ export const dashboardRouter = router({
   // Urgent alerts for dashboard
   urgentAlerts: protectedProcedure.query(async () => {
     return await getUrgentAlerts();
+  }),
+
+  // New quote requests from landing page
+  newQuoteRequests: protectedProcedure.query(async () => {
+    return await getNewQuoteRequests(10);
   }),
 });
