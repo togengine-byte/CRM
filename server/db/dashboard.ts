@@ -305,6 +305,7 @@ export async function getPendingSignups(limit: number = 5) {
 
   try {
     // Get pending approval users with their signup details from activity_log
+    // Join with pending_quote_request_data to get attachments
     const result = await db.execute(sql`
       SELECT 
         u.id,
@@ -314,12 +315,16 @@ export async function getPendingSignups(limit: number = 5) {
         u."companyName",
         u."customerNumber",
         u."createdAt",
-        al.details,
-        al.id as "activityLogId"
+        al.details as "signupDetails",
+        al.id as "activityLogId",
+        pqr.details as "requestDetails"
       FROM users u
       LEFT JOIN activity_log al ON 
         al."actionType" = 'new_customer_signup_pending' 
         AND (al.details::jsonb->>'customerId')::int = u.id
+      LEFT JOIN activity_log pqr ON 
+        pqr."actionType" = 'pending_quote_request_data' 
+        AND pqr."userId" = u.id
       WHERE u.status = 'pending_approval'
         AND u.role = 'customer'
       ORDER BY u."createdAt" DESC
@@ -328,14 +333,32 @@ export async function getPendingSignups(limit: number = 5) {
 
     // Parse and format the results
     return (result.rows as any[]).map(row => {
-      let details: any = {};
-      if (row.details) {
+      let signupDetails: any = {};
+      let requestDetails: any = {};
+      
+      if (row.signupDetails) {
         try {
-          details = typeof row.details === 'string' ? JSON.parse(row.details) : row.details;
+          signupDetails = typeof row.signupDetails === 'string' ? JSON.parse(row.signupDetails) : row.signupDetails;
         } catch (e) {
-          console.log('[getPendingSignups] Error parsing details:', e);
+          console.log('[getPendingSignups] Error parsing signupDetails:', e);
         }
       }
+      
+      if (row.requestDetails) {
+        try {
+          requestDetails = typeof row.requestDetails === 'string' ? JSON.parse(row.requestDetails) : row.requestDetails;
+        } catch (e) {
+          console.log('[getPendingSignups] Error parsing requestDetails:', e);
+        }
+      }
+
+      // Get attachments from requestDetails
+      const attachments = (requestDetails.attachments || []).map((att: any) => ({
+        fileName: att.fileName || 'קובץ',
+        fileUrl: att.fileUrl || '',
+        mimeType: att.mimeType || '',
+        fileSize: att.fileSize || 0,
+      }));
 
       return {
         id: row.id,
@@ -345,9 +368,10 @@ export async function getPendingSignups(limit: number = 5) {
         companyName: row.companyName,
         customerNumber: row.customerNumber,
         createdAt: row.createdAt,
-        notes: details.notes || '',
-        itemCount: details.itemCount || 0,
-        attachmentCount: details.attachmentCount || 0,
+        notes: signupDetails.notes || requestDetails.notes || '',
+        itemCount: signupDetails.itemCount || (requestDetails.quoteItems?.length || 0),
+        attachmentCount: attachments.length,
+        attachments,
         activityLogId: row.activityLogId
       };
     });

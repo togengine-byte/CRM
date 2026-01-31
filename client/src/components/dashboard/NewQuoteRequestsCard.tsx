@@ -16,12 +16,25 @@ import {
   UserCheck,
   XCircle,
   Loader2,
-  Package
+  Package,
+  Image as ImageIcon,
+  Video,
+  File,
+  X,
+  Download,
+  ExternalLink
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
 // ==================== INTERFACES ====================
+
+interface Attachment {
+  fileName: string;
+  fileUrl: string;
+  mimeType: string;
+  fileSize: number;
+}
 
 interface PendingSignup {
   id: number;
@@ -34,7 +47,164 @@ interface PendingSignup {
   notes: string;
   itemCount: number;
   attachmentCount: number;
+  attachments: Attachment[];
   activityLogId: number | null;
+}
+
+// ==================== FILE PREVIEW MODAL ====================
+
+function FilePreviewModal({ 
+  file, 
+  onClose 
+}: { 
+  file: Attachment | null; 
+  onClose: () => void;
+}) {
+  if (!file) return null;
+
+  const isImage = file.mimeType?.startsWith('image/') || 
+    /\.(jpg|jpeg|png|gif|webp|tiff|tif)$/i.test(file.fileName);
+  const isVideo = file.mimeType?.startsWith('video/') || 
+    /\.(mp4|mov|avi|webm)$/i.test(file.fileName);
+  const isPdf = file.mimeType === 'application/pdf' || 
+    /\.pdf$/i.test(file.fileName);
+
+  return (
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div 
+        className="relative bg-white rounded-2xl shadow-2xl max-w-4xl max-h-[90vh] w-full mx-4 overflow-hidden"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-slate-50">
+          <div className="flex items-center gap-3">
+            {isImage && <ImageIcon className="h-5 w-5 text-blue-600" />}
+            {isVideo && <Video className="h-5 w-5 text-purple-600" />}
+            {isPdf && <FileText className="h-5 w-5 text-red-600" />}
+            {!isImage && !isVideo && !isPdf && <File className="h-5 w-5 text-slate-600" />}
+            <div>
+              <p className="font-medium text-slate-900 truncate max-w-md">{file.fileName}</p>
+              {file.fileSize > 0 && (
+                <p className="text-xs text-slate-500">
+                  {(file.fileSize / 1024 / 1024).toFixed(2)} MB
+                </p>
+              )}
+            </div>
+          </div>
+          <button 
+            onClick={onClose}
+            className="p-2 rounded-full hover:bg-slate-200 transition-colors"
+          >
+            <X className="h-5 w-5 text-slate-600" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-4 max-h-[calc(90vh-140px)] overflow-auto">
+          {isImage && (
+            <div className="flex items-center justify-center bg-slate-100 rounded-xl p-4">
+              <img 
+                src={file.fileUrl} 
+                alt={file.fileName}
+                className="max-w-full max-h-[60vh] object-contain rounded-lg shadow-lg"
+              />
+            </div>
+          )}
+          
+          {isVideo && (
+            <div className="flex items-center justify-center bg-slate-900 rounded-xl p-4">
+              <video 
+                src={file.fileUrl}
+                controls
+                className="max-w-full max-h-[60vh] rounded-lg"
+              />
+            </div>
+          )}
+          
+          {isPdf && (
+            <div className="bg-slate-100 rounded-xl p-4 h-[60vh]">
+              <iframe 
+                src={file.fileUrl}
+                className="w-full h-full rounded-lg border border-slate-200"
+                title={file.fileName}
+              />
+            </div>
+          )}
+          
+          {!isImage && !isVideo && !isPdf && (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <File className="h-20 w-20 text-slate-300 mb-4" />
+              <p className="text-slate-500 mb-4">לא ניתן להציג תצוגה מקדימה לקובץ זה</p>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end gap-3 p-4 border-t border-slate-200 bg-slate-50">
+          <Button variant="outline" onClick={onClose}>
+            סגור
+          </Button>
+          <a href={file.fileUrl} target="_blank" rel="noopener noreferrer">
+            <Button className="bg-blue-600 hover:bg-blue-700">
+              <ExternalLink className="h-4 w-4 ml-2" />
+              פתח בחלון חדש
+            </Button>
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ==================== FILE THUMBNAIL ====================
+
+function FileThumbnail({ 
+  file, 
+  onClick 
+}: { 
+  file: Attachment; 
+  onClick: () => void;
+}) {
+  const isImage = file.mimeType?.startsWith('image/') || 
+    /\.(jpg|jpeg|png|gif|webp|tiff|tif)$/i.test(file.fileName);
+  const isVideo = file.mimeType?.startsWith('video/') || 
+    /\.(mp4|mov|avi|webm)$/i.test(file.fileName);
+  const isPdf = file.mimeType === 'application/pdf' || 
+    /\.pdf$/i.test(file.fileName);
+
+  return (
+    <div 
+      onClick={onClick}
+      className="relative w-20 h-20 rounded-lg border border-slate-200 overflow-hidden cursor-pointer hover:border-blue-400 hover:shadow-md transition-all group"
+    >
+      {isImage ? (
+        <img 
+          src={file.fileUrl} 
+          alt={file.fileName}
+          className="w-full h-full object-cover"
+        />
+      ) : (
+        <div className="w-full h-full flex flex-col items-center justify-center bg-slate-50">
+          {isVideo && <Video className="h-8 w-8 text-purple-500" />}
+          {isPdf && <FileText className="h-8 w-8 text-red-500" />}
+          {!isVideo && !isPdf && <File className="h-8 w-8 text-slate-400" />}
+        </div>
+      )}
+      
+      {/* Hover overlay */}
+      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+        <ExternalLink className="h-5 w-5 text-white" />
+      </div>
+      
+      {/* File name tooltip */}
+      <div className="absolute bottom-0 left-0 right-0 bg-black/70 px-1 py-0.5">
+        <p className="text-[9px] text-white truncate text-center">{file.fileName}</p>
+      </div>
+    </div>
+  );
 }
 
 // ==================== EXPANDED REQUEST DETAILS ====================
@@ -52,6 +222,8 @@ function RequestDetails({
   isApproving: boolean;
   isRejecting: boolean;
 }) {
+  const [selectedFile, setSelectedFile] = useState<Attachment | null>(null);
+
   const formatDate = (date: Date) => {
     return new Date(date).toLocaleDateString('he-IL', {
       day: '2-digit',
@@ -120,6 +292,25 @@ function RequestDetails({
         </div>
       )}
 
+      {/* Attachments Preview */}
+      {request.attachments && request.attachments.length > 0 && (
+        <div className="p-3 bg-white rounded-lg border border-slate-100 shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <ImageIcon className="h-4 w-4 text-blue-500" />
+            <p className="text-sm font-medium text-slate-700">קבצים מצורפים ({request.attachments.length})</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {request.attachments.map((file, index) => (
+              <FileThumbnail 
+                key={index} 
+                file={file} 
+                onClick={() => setSelectedFile(file)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Summary */}
       <div className="flex items-center gap-4 p-3 bg-white rounded-lg border border-slate-100 shadow-sm">
         <div className="flex items-center gap-2">
@@ -162,6 +353,12 @@ function RequestDetails({
           אשר לקוח
         </Button>
       </div>
+
+      {/* File Preview Modal */}
+      <FilePreviewModal 
+        file={selectedFile} 
+        onClose={() => setSelectedFile(null)} 
+      />
     </div>
   );
 }
@@ -310,7 +507,7 @@ export function NewQuoteRequestsCard() {
                 {/* Expanded Details - In Page */}
                 {expandedId === request.id && (
                   <RequestDetails 
-                    request={request}
+                    request={request as PendingSignup}
                     onApprove={() => handleApprove(request.id)}
                     onReject={() => handleReject(request.id)}
                     isApproving={approvingId === request.id}
