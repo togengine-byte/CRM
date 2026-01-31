@@ -18,7 +18,6 @@ import { customersRouter } from "./customers.router";
 import { suppliersRouter } from "./suppliers.router";
 import { courierRouter } from "./courier.router";
 import { notesRouter } from "./notes.router";
-import { validationRouter } from "./validation.router";
 import { analyticsRouter } from "./analytics.router";
 import { settingsRouter } from "./settings.router";
 import { userManagementRouter } from "./userManagement.router";
@@ -54,7 +53,6 @@ export const appRouter = router({
   suppliers: suppliersRouter,
   courier: courierRouter,
   notes: notesRouter,
-  validation: validationRouter,
   analytics: analyticsRouter,
   settings: settingsRouter,
   userManagement: userManagementRouter,

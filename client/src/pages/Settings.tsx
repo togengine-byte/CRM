@@ -22,7 +22,6 @@ import {
   SupplierWeightsSettings,
   PricelistSettings,
   StaffManagementSettings,
-  ValidationProfilesSettings,
   PortalsSettings,
   GmailSettings,
   BackupSettings,
@@ -105,7 +104,6 @@ export default function Settings() {
         {/* Validation Tab */}
         <TabsContent value="validation" className="space-y-6">
           <CategoryValidationSettings />
-          <ValidationProfilesSettings />
         </TabsContent>
 
         {/* General Tab - Gmail Settings */}

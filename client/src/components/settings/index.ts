@@ -4,7 +4,6 @@ export { EmailNotificationSettings } from "./EmailNotificationSettings";
 export { SupplierWeightsSettings } from "./SupplierWeightsSettings";
 export { PricelistSettings } from "./PricelistSettings";
 export { StaffManagementSettings } from "./StaffManagementSettings";
-export { ValidationProfilesSettings } from "./ValidationProfilesSettings";
 export { PortalsSettings } from "./PortalsSettings";
 export { GmailSettings } from "./GmailSettings";
 export { BackupSettings } from "./BackupSettings";
