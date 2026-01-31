@@ -726,7 +726,15 @@ export async function getNewQuoteRequests(limit: number = 10): Promise<NewQuoteR
     const result: NewQuoteRequest[] = [];
     
     for (const customer of customersList) {
-      const requestDetails = customer.requestDetails as any;
+      // Parse requestDetails - might be string or object
+      let requestDetails = customer.requestDetails;
+      if (typeof requestDetails === 'string') {
+        try {
+          requestDetails = JSON.parse(requestDetails);
+        } catch (e) {
+          requestDetails = null;
+        }
+      }
       
       // Parse items from request details
       const items: NewQuoteRequest['items'] = [];
