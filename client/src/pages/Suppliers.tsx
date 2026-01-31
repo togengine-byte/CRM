@@ -48,6 +48,14 @@ import {
   ChevronDown,
   ChevronUp,
   History,
+  MessageCircle,
+  Building2,
+  CreditCard,
+  Clock,
+  User,
+  Banknote,
+  Package,
+  TrendingUp,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -68,6 +76,11 @@ export default function Suppliers() {
     phone: "",
     companyName: "",
     address: "",
+    contactPerson: "",
+    contactPhone: "",
+    whatsapp: "",
+    taxId: "",
+    paymentTerms: "",
   });
   const [editingJob, setEditingJob] = useState<number | null>(null);
   const [editJobForm, setEditJobForm] = useState({
@@ -75,6 +88,19 @@ export default function Suppliers() {
     courierConfirmedReady: true,
     promisedDeliveryDays: 3,
     supplierReadyAt: "" as string | null,
+  });
+  const [isEditingSupplier, setIsEditingSupplier] = useState(false);
+  const [editSupplierForm, setEditSupplierForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    companyName: "",
+    address: "",
+    contactPerson: "",
+    contactPhone: "",
+    whatsapp: "",
+    taxId: "",
+    paymentTerms: "",
   });
 
   const utils = trpc.useUtils();
@@ -106,7 +132,7 @@ export default function Suppliers() {
     onSuccess: () => {
       toast.success("ספק נוצר בהצלחה");
       setIsCreateDialogOpen(false);
-      setCreateForm({ name: "", email: "", phone: "", companyName: "", address: "" });
+      setCreateForm({ name: "", email: "", phone: "", companyName: "", address: "", contactPerson: "", contactPhone: "", whatsapp: "", taxId: "", paymentTerms: "" });
       refetchSuppliers();
       utils.suppliers.stats.refetch();
     },
@@ -184,6 +210,37 @@ export default function Suppliers() {
 
   const handleShowHistory = (supplierId: number) => {
     setShowHistoryForSupplier(supplierId);
+  };
+
+  const handleStartEditSupplier = () => {
+    if (supplierDetails) {
+      setEditSupplierForm({
+        name: supplierDetails.name || "",
+        email: supplierDetails.email || "",
+        phone: supplierDetails.phone || "",
+        companyName: supplierDetails.companyName || "",
+        address: supplierDetails.address || "",
+        contactPerson: supplierDetails.contactPerson || "",
+        contactPhone: supplierDetails.contactPhone || "",
+        whatsapp: supplierDetails.whatsapp || "",
+        taxId: supplierDetails.taxId || "",
+        paymentTerms: supplierDetails.paymentTerms || "",
+      });
+      setIsEditingSupplier(true);
+    }
+  };
+
+  const handleSaveSupplier = () => {
+    if (!expandedSupplierId) return;
+    updateMutation.mutate({
+      id: expandedSupplierId,
+      ...editSupplierForm,
+    });
+    setIsEditingSupplier(false);
+  };
+
+  const handleCancelEditSupplier = () => {
+    setIsEditingSupplier(false);
   };
 
   const getStatusBadge = (status: string) => {
@@ -292,6 +349,58 @@ export default function Suppliers() {
                   value={createForm.address}
                   onChange={(e) => setCreateForm({ ...createForm, address: e.target.value })}
                   placeholder="כתובת מלאה"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="contactPerson">איש קשר נוסף</Label>
+                  <Input
+                    id="contactPerson"
+                    value={createForm.contactPerson}
+                    onChange={(e) => setCreateForm({ ...createForm, contactPerson: e.target.value })}
+                    placeholder="שם איש קשר"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="contactPhone">טלפון נוסף</Label>
+                  <Input
+                    id="contactPhone"
+                    value={createForm.contactPhone}
+                    onChange={(e) => setCreateForm({ ...createForm, contactPhone: e.target.value })}
+                    placeholder="050-0000000"
+                    dir="ltr"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="whatsapp">וואטסאפ</Label>
+                  <Input
+                    id="whatsapp"
+                    value={createForm.whatsapp}
+                    onChange={(e) => setCreateForm({ ...createForm, whatsapp: e.target.value })}
+                    placeholder="050-0000000 (יומר אוטומטית)"
+                    dir="ltr"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="taxId">ח.פ / עוסק מורשה</Label>
+                  <Input
+                    id="taxId"
+                    value={createForm.taxId}
+                    onChange={(e) => setCreateForm({ ...createForm, taxId: e.target.value })}
+                    placeholder="123456789"
+                    dir="ltr"
+                  />
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="paymentTerms">תנאי תשלום</Label>
+                <Input
+                  id="paymentTerms"
+                  value={createForm.paymentTerms}
+                  onChange={(e) => setCreateForm({ ...createForm, paymentTerms: e.target.value })}
+                  placeholder="שוטף + 30 / מזומן / וכו'"
                 />
               </div>
             </div>
@@ -458,19 +567,228 @@ export default function Suppliers() {
                         <TableCell colSpan={8} className="p-0">
                           <div className="p-6 space-y-6" dir="rtl">
                             
-                            {/* פרטי קשר */}
-                            <div className="flex flex-wrap gap-6 text-sm border-b pb-4">
-                              <div className="flex items-center gap-2">
-                                <Mail className="h-4 w-4 text-muted-foreground" />
-                                <span dir="ltr">{supplierDetails.email || "-"}</span>
+                            {/* כפתור עריכה */}
+                            <div className="flex justify-end mb-4">
+                              {!isEditingSupplier ? (
+                                <Button variant="outline" size="sm" onClick={handleStartEditSupplier}>
+                                  <Edit className="ml-2 h-4 w-4" />
+                                  עריכת פרטים
+                                </Button>
+                              ) : (
+                                <div className="flex gap-2">
+                                  <Button variant="default" size="sm" onClick={handleSaveSupplier}>
+                                    <Save className="ml-2 h-4 w-4" />
+                                    שמור
+                                  </Button>
+                                  <Button variant="outline" size="sm" onClick={handleCancelEditSupplier}>
+                                    ביטול
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* פרטי קשר מורחבים */}
+                            <div className="space-y-3">
+                              <h4 className="font-semibold text-sm flex items-center gap-2">
+                                <Phone className="h-4 w-4" />
+                                פרטי קשר
+                              </h4>
+                              {isEditingSupplier ? (
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                  <div className="space-y-1">
+                                    <Label className="text-xs">שם</Label>
+                                    <Input
+                                      value={editSupplierForm.name}
+                                      onChange={(e) => setEditSupplierForm({...editSupplierForm, name: e.target.value})}
+                                      placeholder="שם הספק"
+                                    />
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-xs">אימייל</Label>
+                                    <Input
+                                      value={editSupplierForm.email}
+                                      onChange={(e) => setEditSupplierForm({...editSupplierForm, email: e.target.value})}
+                                      placeholder="email@example.com"
+                                      dir="ltr"
+                                    />
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-xs">טלפון</Label>
+                                    <Input
+                                      value={editSupplierForm.phone}
+                                      onChange={(e) => setEditSupplierForm({...editSupplierForm, phone: e.target.value})}
+                                      placeholder="050-0000000"
+                                      dir="ltr"
+                                    />
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-xs">שם חברה</Label>
+                                    <Input
+                                      value={editSupplierForm.companyName}
+                                      onChange={(e) => setEditSupplierForm({...editSupplierForm, companyName: e.target.value})}
+                                      placeholder="שם החברה"
+                                    />
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-xs">כתובת</Label>
+                                    <Input
+                                      value={editSupplierForm.address}
+                                      onChange={(e) => setEditSupplierForm({...editSupplierForm, address: e.target.value})}
+                                      placeholder="כתובת מלאה"
+                                    />
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-xs">וואטסאפ</Label>
+                                    <Input
+                                      value={editSupplierForm.whatsapp}
+                                      onChange={(e) => setEditSupplierForm({...editSupplierForm, whatsapp: e.target.value})}
+                                      placeholder="050-0000000"
+                                      dir="ltr"
+                                    />
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-xs">איש קשר נוסף</Label>
+                                    <Input
+                                      value={editSupplierForm.contactPerson}
+                                      onChange={(e) => setEditSupplierForm({...editSupplierForm, contactPerson: e.target.value})}
+                                      placeholder="שם איש קשר"
+                                    />
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-xs">טלפון נוסף</Label>
+                                    <Input
+                                      value={editSupplierForm.contactPhone}
+                                      onChange={(e) => setEditSupplierForm({...editSupplierForm, contactPhone: e.target.value})}
+                                      placeholder="050-0000000"
+                                      dir="ltr"
+                                    />
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-xs">ח.פ / עוסק מורשה</Label>
+                                    <Input
+                                      value={editSupplierForm.taxId}
+                                      onChange={(e) => setEditSupplierForm({...editSupplierForm, taxId: e.target.value})}
+                                      placeholder="123456789"
+                                      dir="ltr"
+                                    />
+                                  </div>
+                                  <div className="space-y-1">
+                                    <Label className="text-xs">תנאי תשלום</Label>
+                                    <Input
+                                      value={editSupplierForm.paymentTerms}
+                                      onChange={(e) => setEditSupplierForm({...editSupplierForm, paymentTerms: e.target.value})}
+                                      placeholder="שוטף + 30"
+                                    />
+                                  </div>
+                                </div>
+                              ) : (
+                                <>
+                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                    <div className="flex items-center gap-2">
+                                      <Mail className="h-4 w-4 text-muted-foreground" />
+                                      <span dir="ltr">{supplierDetails.email || "-"}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <Phone className="h-4 w-4 text-muted-foreground" />
+                                      <span dir="ltr">{supplierDetails.phone || "-"}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <MapPin className="h-4 w-4 text-muted-foreground" />
+                                      <span>{supplierDetails.address || "-"}</span>
+                                    </div>
+                                    {supplierDetails.whatsapp && (
+                                      <div className="flex items-center gap-2">
+                                        <MessageCircle className="h-4 w-4 text-green-600" />
+                                        <a 
+                                          href={`https://wa.me/${supplierDetails.whatsapp.replace(/[^0-9]/g, '')}`}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-green-600 hover:underline"
+                                          dir="ltr"
+                                        >
+                                          {supplierDetails.whatsapp}
+                                        </a>
+                                      </div>
+                                    )}
+                                  </div>
+                                  {(supplierDetails.contactPerson || supplierDetails.contactPhone) && (
+                                    <div className="flex flex-wrap gap-6 text-sm mt-2 pt-2 border-t border-dashed">
+                                      {supplierDetails.contactPerson && (
+                                        <div className="flex items-center gap-2">
+                                          <User className="h-4 w-4 text-muted-foreground" />
+                                          <span className="text-muted-foreground">איש קשר נוסף:</span>
+                                          <span>{supplierDetails.contactPerson}</span>
+                                        </div>
+                                      )}
+                                      {supplierDetails.contactPhone && (
+                                        <div className="flex items-center gap-2">
+                                          <Phone className="h-4 w-4 text-muted-foreground" />
+                                          <span className="text-muted-foreground">טלפון נוסף:</span>
+                                          <span dir="ltr">{supplierDetails.contactPhone}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                            </div>
+
+                            {/* פרטים עסקיים */}
+                            {!isEditingSupplier && (
+                              <div className="space-y-3 border-t pt-4">
+                                <h4 className="font-semibold text-sm flex items-center gap-2">
+                                  <Building2 className="h-4 w-4" />
+                                  פרטים עסקיים
+                                </h4>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                                  <div className="flex items-center gap-2">
+                                    <CreditCard className="h-4 w-4 text-muted-foreground" />
+                                    <span className="text-muted-foreground">ח.פ / ע.מ:</span>
+                                    <span dir="ltr">{supplierDetails.taxId || "-"}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Banknote className="h-4 w-4 text-muted-foreground" />
+                                    <span className="text-muted-foreground">תנאי תשלום:</span>
+                                    <span>{supplierDetails.paymentTerms || "-"}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Clock className="h-4 w-4 text-muted-foreground" />
+                                    <span className="text-muted-foreground">ימי אספקה ממוצעים:</span>
+                                    <span>{supplierDetails.ratings?.speed?.avgDeliveryDays || "-"} ימים</span>
+                                  </div>
+                                </div>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <Phone className="h-4 w-4 text-muted-foreground" />
-                                <span dir="ltr">{supplierDetails.phone || "-"}</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <MapPin className="h-4 w-4 text-muted-foreground" />
-                                <span>{supplierDetails.address || "-"}</span>
+                            )}
+
+                            {/* סטטיסטיקות */}
+                            <div className="space-y-3 border-t pt-4">
+                              <h4 className="font-semibold text-sm flex items-center gap-2">
+                                <TrendingUp className="h-4 w-4" />
+                                סטטיסטיקות
+                              </h4>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                <div className="flex items-center gap-2">
+                                  <Package className="h-4 w-4 text-muted-foreground" />
+                                  <span className="text-muted-foreground">סה"כ עבודות:</span>
+                                  <span className="font-medium">{scoreDetails?.totalJobs || 0}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Banknote className="h-4 w-4 text-muted-foreground" />
+                                  <span className="text-muted-foreground">מחזור כספי:</span>
+                                  <span className="font-medium">₪{(scoreDetails?.totalRevenue || 0).toLocaleString()}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Star className="h-4 w-4 text-muted-foreground" />
+                                  <span className="text-muted-foreground">ציון ממוצע:</span>
+                                  <span className={`font-bold ${getScoreColor(scoreDetails?.totalScore || 70)}`}>
+                                    {(scoreDetails?.totalScore || 70).toFixed(0)}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Clock className="h-4 w-4 text-muted-foreground" />
+                                  <span className="text-muted-foreground">עבודה אחרונה:</span>
+                                  <span>{scoreDetails?.lastJobDate ? new Date(scoreDetails.lastJobDate).toLocaleDateString('he-IL') : "-"}</span>
+                                </div>
                               </div>
                             </div>
 

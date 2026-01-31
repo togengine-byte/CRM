@@ -66,6 +66,11 @@ export const suppliersRouter = router({
       phone: z.string().optional(),
       companyName: z.string().optional(),
       address: z.string().optional(),
+      contactPerson: z.string().optional(),
+      contactPhone: z.string().optional(),
+      whatsapp: z.string().optional(),
+      taxId: z.string().optional(),
+      paymentTerms: z.string().optional(),
     }))
     .mutation(async ({ input }) => {
       return await createSupplier(input);
@@ -79,6 +84,11 @@ export const suppliersRouter = router({
       phone: z.string().optional(),
       companyName: z.string().optional(),
       address: z.string().optional(),
+      contactPerson: z.string().optional(),
+      contactPhone: z.string().optional(),
+      whatsapp: z.string().optional(),
+      taxId: z.string().optional(),
+      paymentTerms: z.string().optional(),
       status: z.enum(['pending_approval', 'active', 'rejected', 'deactivated']).optional(),
     }))
     .mutation(async ({ ctx, input }) => {

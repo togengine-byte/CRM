@@ -19,6 +19,12 @@ export const users = pgTable("users", {
   companyName: text("companyName"),
   address: text("address"),
   billingEmail: varchar("billingEmail", { length: 320 }),
+  // Supplier-specific fields
+  contactPerson: text("contactPerson"), // איש קשר נוסף
+  contactPhone: varchar("contactPhone", { length: 20 }), // טלפון נוסף
+  whatsapp: varchar("whatsapp", { length: 20 }), // מספר וואטסאפ
+  taxId: varchar("taxId", { length: 20 }), // ח.פ / עוסק מורשה
+  paymentTerms: varchar("paymentTerms", { length: 100 }), // תנאי תשלום
   permissions: jsonb("permissions").default('{}'),
   customerNumber: integer("customerNumber"),
   supplierNumber: integer("supplierNumber"),

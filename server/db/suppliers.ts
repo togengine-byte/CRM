@@ -74,7 +74,21 @@ export async function getSupplierById(id: number) {
   const db = await getDb();
   if (!db) return null;
 
-  const supplier = await db.select()
+  const supplier = await db.select({
+    id: users.id,
+    name: users.name,
+    email: users.email,
+    phone: users.phone,
+    companyName: users.companyName,
+    address: users.address,
+    contactPerson: users.contactPerson,
+    contactPhone: users.contactPhone,
+    whatsapp: users.whatsapp,
+    taxId: users.taxId,
+    paymentTerms: users.paymentTerms,
+    status: users.status,
+    createdAt: users.createdAt,
+  })
     .from(users)
     .where(and(eq(users.id, id), eq(users.role, 'supplier')))
     .limit(1);
@@ -172,12 +186,30 @@ export async function createSupplier(input: {
   phone?: string;
   companyName?: string;
   address?: string;
+  contactPerson?: string;
+  contactPhone?: string;
+  whatsapp?: string;
+  taxId?: string;
+  paymentTerms?: string;
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
   const seqResult = await db.execute(sql`SELECT nextval('supplier_number_seq') as next_num`) as any;
   const supplierNumber = Number(seqResult.rows?.[0]?.next_num || seqResult[0]?.next_num || Date.now());
+
+  // Convert phone to WhatsApp format (+972)
+  const formatWhatsApp = (phone?: string) => {
+    if (!phone) return null;
+    const cleaned = phone.replace(/[^0-9]/g, '');
+    if (cleaned.startsWith('0')) {
+      return '+972' + cleaned.substring(1);
+    }
+    if (cleaned.startsWith('972')) {
+      return '+' + cleaned;
+    }
+    return '+972' + cleaned;
+  };
 
   const result = await db.insert(users).values({
     openId: `supplier_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -186,6 +218,11 @@ export async function createSupplier(input: {
     phone: input.phone || null,
     companyName: input.companyName || null,
     address: input.address || null,
+    contactPerson: input.contactPerson || null,
+    contactPhone: input.contactPhone || null,
+    whatsapp: formatWhatsApp(input.whatsapp || input.phone),
+    taxId: input.taxId || null,
+    paymentTerms: input.paymentTerms || null,
     role: 'supplier',
     status: 'active',
     supplierNumber: supplierNumber,
@@ -206,10 +243,28 @@ export async function updateSupplier(input: {
   phone?: string;
   companyName?: string;
   address?: string;
+  contactPerson?: string;
+  contactPhone?: string;
+  whatsapp?: string;
+  taxId?: string;
+  paymentTerms?: string;
   status?: 'pending_approval' | 'active' | 'rejected' | 'deactivated';
 }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+
+  // Convert phone to WhatsApp format (+972)
+  const formatWhatsApp = (phone?: string) => {
+    if (!phone) return null;
+    const cleaned = phone.replace(/[^0-9]/g, '');
+    if (cleaned.startsWith('0')) {
+      return '+972' + cleaned.substring(1);
+    }
+    if (cleaned.startsWith('972')) {
+      return '+' + cleaned;
+    }
+    return '+972' + cleaned;
+  };
 
   const updateData: Record<string, unknown> = {};
   if (input.name !== undefined) updateData.name = input.name;
@@ -217,6 +272,11 @@ export async function updateSupplier(input: {
   if (input.phone !== undefined) updateData.phone = input.phone;
   if (input.companyName !== undefined) updateData.companyName = input.companyName;
   if (input.address !== undefined) updateData.address = input.address;
+  if (input.contactPerson !== undefined) updateData.contactPerson = input.contactPerson;
+  if (input.contactPhone !== undefined) updateData.contactPhone = input.contactPhone;
+  if (input.whatsapp !== undefined) updateData.whatsapp = formatWhatsApp(input.whatsapp);
+  if (input.taxId !== undefined) updateData.taxId = input.taxId;
+  if (input.paymentTerms !== undefined) updateData.paymentTerms = input.paymentTerms;
   if (input.status !== undefined) updateData.status = input.status;
 
   if (Object.keys(updateData).length === 0) {

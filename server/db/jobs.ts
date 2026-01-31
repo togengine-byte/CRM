@@ -442,10 +442,28 @@ export async function getSupplierScoreDetails(supplierId: number) {
 
   const totalScore = baseScore + priceScore + promiseScore + courierScore + earlyBonus - workloadPenalty + consistencyScore;
 
+  // Get total revenue
+  const revenueResult = await db.execute(sql`
+    SELECT COALESCE(SUM(CAST("pricePerUnit" AS DECIMAL) * quantity), 0) as total_revenue
+    FROM supplier_jobs
+    WHERE "supplierId" = ${supplierId}
+  `);
+  const totalRevenue = parseFloat((revenueResult.rows[0] as any)?.total_revenue) || 0;
+
+  // Get last job date
+  const lastJobResult = await db.execute(sql`
+    SELECT MAX("createdAt") as last_job_date
+    FROM supplier_jobs
+    WHERE "supplierId" = ${supplierId}
+  `);
+  const lastJobDate = (lastJobResult.rows[0] as any)?.last_job_date || null;
+
   return {
     supplierId,
     totalJobs,
     completedJobs: completedJobs.length,
+    totalRevenue: Math.round(totalRevenue),
+    lastJobDate,
     scores: {
       base: {
         value: baseScore,
