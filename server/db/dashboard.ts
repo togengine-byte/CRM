@@ -725,8 +725,8 @@ export async function getNewQuoteRequests(limit: number = 10): Promise<NewQuoteR
           ps.dimensions,
           bp.name as "productName"
         FROM size_quantities sq
-        LEFT JOIN product_sizes ps ON sq."sizeId" = ps.id
-        LEFT JOIN base_products bp ON ps."productId" = bp.id
+        LEFT JOIN product_sizes ps ON sq.size_id = ps.id
+        LEFT JOIN base_products bp ON ps.product_id = bp.id
         WHERE sq.id = ${sizeQuantityId}
       `);
       return result.rows[0] as any;
