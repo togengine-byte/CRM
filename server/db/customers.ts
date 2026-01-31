@@ -6,7 +6,7 @@
  */
 
 import { getDb, eq, and, desc, sql } from "./connection";
-import { users, quotes, pricelists, customerPricelists, customerSignupRequests } from "../../drizzle/schema";
+import { users, quotes, quoteItems, quoteAttachments, pricelists, customerPricelists, customerSignupRequests, activityLog } from "../../drizzle/schema";
 import { logActivity } from "./activity";
 import { CustomerFilters, SignupRequestFile } from "./types";
 
@@ -79,16 +79,100 @@ export async function getCustomerById(customerId: number) {
 }
 
 /**
- * Approve customer and activate their draft quotes
+ * Approve customer and create quote from pending request data
  */
 export async function approveCustomer(customerId: number, approvedBy: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
+  // Update customer status to active
   await db.update(users)
     .set({ status: 'active' })
     .where(eq(users.id, customerId));
 
+  // Get pending quote request data from activity_log
+  const pendingRequestResult = await db.select()
+    .from(activityLog)
+    .where(and(
+      eq(activityLog.actionType, 'pending_quote_request_data'),
+      eq(activityLog.userId, customerId)
+    ))
+    .orderBy(desc(activityLog.createdAt))
+    .limit(1);
+
+  const pendingRequest = pendingRequestResult[0];
+  
+  if (pendingRequest && pendingRequest.details) {
+    // Parse details
+    const details = typeof pendingRequest.details === 'string' 
+      ? JSON.parse(pendingRequest.details) 
+      : pendingRequest.details;
+    
+    const quoteItemsData = details.quoteItems || [];
+    const attachmentsData = details.attachments || [];
+    const notes = details.notes || null;
+
+    if (quoteItemsData.length > 0 || attachmentsData.length > 0) {
+      // Calculate total price from size_quantities
+      let totalPrice = 0;
+      for (const item of quoteItemsData) {
+        const priceResult = await db.execute(sql`
+          SELECT price FROM size_quantities WHERE id = ${item.sizeQuantityId}
+        `);
+        const price = priceResult.rows[0]?.price || 0;
+        totalPrice += Number(price) * (item.quantity || 1);
+      }
+
+      // Create the quote
+      const [newQuote] = await db.insert(quotes).values({
+        customerId,
+        employeeId: approvedBy,
+        status: 'draft',
+        version: 1,
+        finalValue: String(totalPrice),
+        notes,
+      }).returning();
+
+      // Create quote items
+      for (const item of quoteItemsData) {
+        const priceResult = await db.execute(sql`
+          SELECT price FROM size_quantities WHERE id = ${item.sizeQuantityId}
+        `);
+        const price = priceResult.rows[0]?.price || 0;
+
+        await db.insert(quoteItems).values({
+          quoteId: newQuote.id,
+          sizeQuantityId: item.sizeQuantityId,
+          quantity: item.quantity || 1,
+          priceAtTimeOfQuote: String(Number(price) * (item.quantity || 1)),
+          addonIds: item.addonIds || [],
+        });
+      }
+
+      // Create quote attachments
+      for (const att of attachmentsData) {
+        await db.insert(quoteAttachments).values({
+          quoteId: newQuote.id,
+          fileName: att.fileName,
+          fileUrl: att.fileUrl,
+          s3Key: att.s3Key || '',
+          fileSize: att.fileSize,
+          mimeType: att.mimeType,
+        });
+      }
+
+      await logActivity(approvedBy, "customer_approved", { 
+        customerId, 
+        quoteId: newQuote.id,
+        itemCount: quoteItemsData.length,
+        attachmentCount: attachmentsData.length 
+      });
+
+      return { success: true, quoteId: newQuote.id };
+    }
+  }
+
+  // If no pending request data, just activate existing draft quotes
   const customerQuotes = await db.select({ id: quotes.id })
     .from(quotes)
     .where(and(eq(quotes.customerId, customerId), eq(quotes.status, 'draft')));
