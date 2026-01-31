@@ -18,7 +18,7 @@ import {
   RefreshCw,
   User,
   Calendar,
-  DollarSign,
+  Coins,
   Truck,
   Package,
   Building2,
@@ -139,7 +139,7 @@ export default function ReadyForPickup() {
                   ₪{totalValue.toLocaleString()}
                 </p>
               </div>
-              <DollarSign className="h-8 w-8 text-blue-500/50" />
+              <Coins className="h-8 w-8 text-blue-500/50" />
             </div>
           </CardContent>
         </Card>

@@ -21,7 +21,7 @@ import {
   Building2,
   Search,
   CheckCircle,
-  DollarSign,
+  Coins,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -118,7 +118,7 @@ export default function Delivered() {
                   ₪{totalValue.toLocaleString()}
                 </p>
               </div>
-              <DollarSign className="h-8 w-8 text-green-500/50" />
+              <Coins className="h-8 w-8 text-green-500/50" />
             </div>
           </CardContent>
         </Card>

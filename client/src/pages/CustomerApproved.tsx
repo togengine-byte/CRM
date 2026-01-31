@@ -28,7 +28,7 @@ import {
   Package,
   User,
   Calendar,
-  DollarSign,
+  Coins,
   Clock,
   Send,
   Sparkles,
@@ -304,7 +304,7 @@ export default function CustomerApproved() {
                         </TableCell>
                         <TableCell className="font-bold">
                           <div className="flex items-center gap-1">
-                            <DollarSign className="h-4 w-4 text-green-600" />
+                            <Coins className="h-4 w-4 text-green-600" />
                             {quote.finalValue ? `₪${Number(quote.finalValue).toLocaleString()}` : "-"}
                           </div>
                         </TableCell>

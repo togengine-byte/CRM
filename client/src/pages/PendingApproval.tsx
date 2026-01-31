@@ -17,7 +17,7 @@ import {
   RefreshCw,
   User,
   Calendar,
-  DollarSign,
+  Coins,
   Send,
   Mail,
   FileText,
@@ -152,7 +152,7 @@ export default function PendingApproval() {
                   ₪{quotes?.reduce((sum, q) => sum + Number(q.finalValue || 0), 0).toLocaleString() || 0}
                 </p>
               </div>
-              <DollarSign className="h-8 w-8 text-green-500/50" />
+              <Coins className="h-8 w-8 text-green-500/50" />
             </div>
           </CardContent>
         </Card>
