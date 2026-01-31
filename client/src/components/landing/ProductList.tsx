@@ -12,7 +12,6 @@ import { ALLOWED_EXTENSIONS } from "./types";
 
 interface ProductListProps {
   products: SelectedProduct[];
-  totalPrice: number;
   onProductFileUpload: (productId: string, e: React.ChangeEvent<HTMLInputElement>) => void;
   onProductFileRemove: (productId: string) => void;
   onProductRemove: (productId: string) => void;
@@ -21,7 +20,6 @@ interface ProductListProps {
 
 export function ProductList({
   products,
-  totalPrice,
   onProductFileUpload,
   onProductFileRemove,
   onProductRemove,
@@ -56,9 +54,6 @@ export function ProductList({
                   <span className="text-xs text-slate-600">{product.sizeName}</span>
                   <span className="text-xs text-slate-500">•</span>
                   <span className="text-xs text-slate-600">{product.quantity} יח'</span>
-                  <span className="text-xs font-semibold text-blue-600 mr-auto">
-                    ₪{product.price.toLocaleString()}
-                  </span>
                 </div>
 
                 {/* File Upload for this Product */}
@@ -121,16 +116,14 @@ export function ProductList({
                             ❌ {err.message} {err.details && `- ${err.details}`}
                           </p>
                         ))}
-                        {product.graphicDesignPrice > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => onToggleGraphicDesign(product.id)}
-                            className="flex items-center gap-1 mt-2 px-3 py-1.5 bg-purple-100 text-purple-700 rounded text-[11px] hover:bg-purple-200"
-                          >
-                            <Palette className="h-3.5 w-3.5" />
-                            אנחנו נעשה לך גרפיקה (₪{product.graphicDesignPrice})
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => onToggleGraphicDesign(product.id)}
+                          className="flex items-center gap-1 mt-2 px-3 py-1.5 bg-purple-100 text-purple-700 rounded text-[11px] hover:bg-purple-200"
+                        >
+                          <Palette className="h-3.5 w-3.5" />
+                          אנחנו נעשה לך גרפיקה
+                        </button>
                       </div>
                     )}
 
@@ -150,7 +143,7 @@ export function ProductList({
                       <div className="mt-2 flex items-center justify-between">
                         <span className="text-purple-600 text-[11px] flex items-center gap-1">
                           <Palette className="h-3.5 w-3.5" />
-                          נבחר עיצוב גרפי (₪{product.graphicDesignPrice})
+                          נבחר עיצוב גרפי
                         </span>
                         <button
                           type="button"
@@ -177,13 +170,7 @@ export function ProductList({
           </div>
         ))}
 
-        {/* Total */}
-        <div className="bg-blue-50 rounded-xl p-3 border border-blue-200">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-slate-700">סה"כ משוער:</span>
-            <span className="text-lg font-bold text-blue-600">₪{totalPrice.toLocaleString()}</span>
-          </div>
-        </div>
+
       </div>
     </div>
   );

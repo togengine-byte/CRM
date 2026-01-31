@@ -71,7 +71,7 @@ export default function LandingPage() {
   // ============================================================================
   // API Queries
   // ============================================================================
-  const { data: categories } = trpc.categories.list.useQuery();
+  const { data: categories } = trpc.products.getCategories.useQuery();
   const { data: products } = trpc.products.list.useQuery(
     { categoryId: selectedCategoryId! },
     { enabled: !!selectedCategoryId }
@@ -80,7 +80,7 @@ export default function LandingPage() {
     { productId: selectedProductId! },
     { enabled: !!selectedProductId }
   );
-  const { data: quantities } = trpc.products.getQuantities.useQuery(
+  const { data: quantities } = trpc.products.getSizeQuantities.useQuery(
     { sizeId: selectedSizeId! },
     { enabled: !!selectedSizeId }
   );
@@ -484,7 +484,6 @@ export default function LandingPage() {
           {/* Product List */}
           <ProductList
             products={selectedProducts}
-            totalPrice={totalPrice}
             onProductFileUpload={handleProductFileUpload}
             onProductFileRemove={removeProductFile}
             onProductRemove={removeProduct}

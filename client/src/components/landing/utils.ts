@@ -4,7 +4,7 @@
  */
 
 import { toast } from "sonner";
-import type { ValidationIssue, Category, ALLOWED_EXTENSIONS, MAX_FILE_SIZE } from "./types";
+import type { ValidationIssue, Category } from "./types";
 
 // ============================================================================
 // Image Utilities

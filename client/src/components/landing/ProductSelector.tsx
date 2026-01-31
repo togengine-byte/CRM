@@ -109,7 +109,7 @@ export function ProductSelector({
           <option value="">כמות</option>
           {quantities?.map((qty) => (
             <option key={qty.id} value={qty.id}>
-              {qty.quantity} יח' - ₪{parseFloat(qty.price).toLocaleString()}
+              {qty.quantity} יח'
             </option>
           ))}
         </select>
