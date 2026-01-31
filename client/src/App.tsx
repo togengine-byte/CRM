@@ -18,7 +18,7 @@ import LandingPage from "./pages/LandingPage";
 import SupplierPortal from "./pages/SupplierPortal";
 import CustomerPortal from "./pages/CustomerPortal";
 import CourierPortal from "./pages/CourierPortal";
-import CustomerSignup from "./pages/CustomerSignup";
+// CustomerSignup removed - using LandingPage instead
 import AdminSetup from "./pages/AdminSetup";
 import CustomerApproved from "./pages/CustomerApproved";
 import PendingApproval from "./pages/PendingApproval";
@@ -41,7 +41,7 @@ function Router() {
     <Switch>
       {/* ========== Public routes - ללא צורך באימות ========== */}
       <Route path="/" component={LandingPage} />
-      <Route path="/signup" component={CustomerSignup} />
+      <Route path="/signup" component={LandingPage} />
       <Route path="/admin-setup" component={AdminSetup} />
       
       {/* ========== Admin & Employee routes - ניהול המערכת ========== */}
