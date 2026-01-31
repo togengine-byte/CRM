@@ -27,6 +27,7 @@ export interface ProductSize {
   name: string;
   dimensions: string | null;
   basePrice: string;
+  graphicDesignPrice: string | null; // מחיר עיצוב גרפי לגודל זה
   displayOrder: number | null;
   isActive: boolean | null;
   createdAt?: Date | null;
@@ -73,6 +74,7 @@ export interface ProductFormData {
 export interface SizeFormData {
   name: string;
   dimensions: string;
+  graphicDesignPrice: string; // מחיר עיצוב גרפי
 }
 
 export interface QuantityFormData {

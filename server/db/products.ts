@@ -657,6 +657,7 @@ export async function createProductSize(input: {
   name: string;
   dimensions?: string;
   basePrice: number;
+  graphicDesignPrice?: number;
   displayOrder?: number;
 }) {
   const db = await getDb();
@@ -667,6 +668,7 @@ export async function createProductSize(input: {
     name: input.name,
     dimensions: input.dimensions || null,
     basePrice: input.basePrice.toString(),
+    graphicDesignPrice: (input.graphicDesignPrice || 0).toString(),
     displayOrder: input.displayOrder || 0,
     isActive: true,
   });
@@ -679,6 +681,7 @@ export async function updateProductSize(input: {
   name?: string;
   dimensions?: string;
   basePrice?: number;
+  graphicDesignPrice?: number;
   displayOrder?: number;
   isActive?: boolean;
 }) {
@@ -689,6 +692,7 @@ export async function updateProductSize(input: {
   if (input.name !== undefined) updateData.name = input.name;
   if (input.dimensions !== undefined) updateData.dimensions = input.dimensions;
   if (input.basePrice !== undefined) updateData.basePrice = input.basePrice.toString();
+  if (input.graphicDesignPrice !== undefined) updateData.graphicDesignPrice = input.graphicDesignPrice.toString();
   if (input.displayOrder !== undefined) updateData.displayOrder = input.displayOrder;
   if (input.isActive !== undefined) updateData.isActive = input.isActive;
 

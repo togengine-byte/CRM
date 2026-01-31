@@ -100,6 +100,7 @@ export const productSizes = pgTable("product_sizes", {
   name: varchar("name", { length: 100 }).notNull(),
   dimensions: varchar("dimensions", { length: 50 }),
   basePrice: decimal("base_price", { precision: 10, scale: 2 }).notNull().default("0"),
+  graphicDesignPrice: decimal("graphic_design_price", { precision: 10, scale: 2 }).default("0"), // מחיר עיצוב גרפי לגודל זה
   displayOrder: integer("display_order").default(0),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),

@@ -24,6 +24,8 @@ import {
   Plus,
   Trash2,
   Image,
+  Palette,
+  AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -32,17 +34,27 @@ const ALLOWED_EXTENSIONS = ['.pdf', '.jpg', '.jpeg', '.png', '.tiff', '.tif', '.
 const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
 const MAX_FILES = 10;
 
+interface ValidationIssue {
+  type: string;
+  severity: 'error' | 'warning';
+  message: string;
+  details?: string;
+}
+
 interface UploadedFile {
   file: File;
   id: string;
   preview?: string;
   error?: string;
-  validationWarnings?: string[];
+  validationErrors?: ValidationIssue[];
+  validationWarnings?: ValidationIssue[];
   validationPassed?: boolean;
   uploading?: boolean;
   uploaded?: boolean;
   s3Key?: string;
   s3Url?: string;
+  needsGraphicDesign?: boolean;
+  imageDimensions?: { width: number; height: number };
 }
 
 interface Category {
@@ -61,6 +73,7 @@ interface Size {
   id: number;
   name: string;
   dimensions?: string;
+  graphicDesignPrice?: string;
 }
 
 interface Quantity {
@@ -77,6 +90,8 @@ interface SelectedProduct {
   quantityId: number;
   quantity: number;
   price: number;
+  needsGraphicDesign?: boolean;
+  graphicDesignPrice?: number;
 }
 
 export default function LandingPage() {
@@ -171,6 +186,112 @@ export default function LandingPage() {
     }
   }, [authLoading, isAuthenticated, setLocation]);
 
+  // Get image dimensions
+  const getImageDimensions = (file: File): Promise<{ width: number; height: number } | null> => {
+    return new Promise((resolve) => {
+      if (!file.type.startsWith('image/')) {
+        resolve(null);
+        return;
+      }
+      const img = new window.Image();
+      img.onload = () => {
+        resolve({ width: img.width, height: img.height });
+        URL.revokeObjectURL(img.src);
+      };
+      img.onerror = () => resolve(null);
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
+  // Parse dimensions string (e.g., "80x200" -> { width: 80, height: 200 })
+  const parseDimensions = (dimensions?: string): { widthMm: number; heightMm: number } | null => {
+    if (!dimensions) return null;
+    const match = dimensions.match(/(\d+(?:\.\d+)?)\s*[xX×]\s*(\d+(?:\.\d+)?)/);
+    if (!match) return null;
+    return {
+      widthMm: parseFloat(match[1]) * 10, // cm to mm
+      heightMm: parseFloat(match[2]) * 10,
+    };
+  };
+
+  // Validate file against product requirements
+  const validateFileForProduct = async (
+    file: File, 
+    imageDimensions: { width: number; height: number } | null,
+    categoryId: number | null,
+    sizeId: number | null,
+    sizeDimensions?: string
+  ): Promise<{ errors: ValidationIssue[]; warnings: ValidationIssue[] }> => {
+    const errors: ValidationIssue[] = [];
+    const warnings: ValidationIssue[] = [];
+
+    // Basic validation
+    const extension = '.' + file.name.split('.').pop()?.toLowerCase();
+    if (!ALLOWED_EXTENSIONS.includes(extension)) {
+      errors.push({
+        type: 'format',
+        severity: 'error',
+        message: 'פורמט קובץ לא נתמך',
+        details: `הפורמט ${extension.toUpperCase()} אינו מותר`,
+      });
+      return { errors, warnings };
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      errors.push({
+        type: 'filesize',
+        severity: 'error',
+        message: 'קובץ גדול מדי',
+        details: `גודל הקובץ ${(file.size / 1024 / 1024).toFixed(1)}MB חורג מהמקסימום`,
+      });
+      return { errors, warnings };
+    }
+
+    // If we have image dimensions and target dimensions, check DPI
+    if (imageDimensions && sizeDimensions) {
+      const targetDims = parseDimensions(sizeDimensions);
+      if (targetDims) {
+        // Calculate DPI
+        const dpiWidth = (imageDimensions.width / targetDims.widthMm) * 25.4;
+        const dpiHeight = (imageDimensions.height / targetDims.heightMm) * 25.4;
+        const avgDpi = Math.round((dpiWidth + dpiHeight) / 2);
+
+        // Check DPI (minimum 150 for acceptable, 300 for optimal)
+        if (avgDpi < 100) {
+          errors.push({
+            type: 'dpi',
+            severity: 'error',
+            message: 'רזולוציה נמוכה מדי',
+            details: `הרזולוציה ${avgDpi} DPI נמוכה מדי להדפסה איכותית (מינימום 150 DPI)`,
+          });
+        } else if (avgDpi < 150) {
+          warnings.push({
+            type: 'dpi',
+            severity: 'warning',
+            message: 'רזולוציה נמוכה',
+            details: `הרזולוציה ${avgDpi} DPI עשויה לגרום לתוצאה לא אופטימלית (מומלץ 300 DPI)`,
+          });
+        }
+
+        // Check aspect ratio
+        const fileRatio = imageDimensions.width / imageDimensions.height;
+        const targetRatio = targetDims.widthMm / targetDims.heightMm;
+        const ratioDiff = Math.abs(fileRatio - targetRatio) / targetRatio * 100;
+
+        if (ratioDiff > 10) {
+          warnings.push({
+            type: 'aspectratio',
+            severity: 'warning',
+            message: 'פרופורציה שונה',
+            details: `יחס הקובץ שונה מהגודל הנבחר - הספק יתאים את הקובץ`,
+          });
+        }
+      }
+    }
+
+    return { errors, warnings };
+  };
+
   // File validation
   const validateFileBasic = (file: File): string | null => {
     const extension = '.' + file.name.split('.').pop()?.toLowerCase();
@@ -199,12 +320,16 @@ export default function LandingPage() {
       if (basicError) {
         toast.error(`${file.name}: ${basicError}`);
       } else {
+        // Get image dimensions for validation
+        const imageDimensions = await getImageDimensions(file);
+        
         const newFile: UploadedFile = {
           file,
           id: Math.random().toString(36).substr(2, 9),
           preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined,
           uploading: true,
           uploaded: false,
+          imageDimensions: imageDimensions || undefined,
         };
         newFiles.push(newFile);
       }
@@ -212,15 +337,65 @@ export default function LandingPage() {
 
     setUploadedFiles(prev => [...prev, ...newFiles]);
 
-    // Upload files to S3
+    // Upload files to S3 and validate
     for (const uploadedFile of newFiles) {
       await uploadFileToS3(uploadedFile);
+      
+      // Validate after upload if we have a selected size
+      if (selectedSizeId && selectedSize) {
+        const { errors, warnings } = await validateFileForProduct(
+          uploadedFile.file,
+          uploadedFile.imageDimensions || null,
+          selectedCategoryId,
+          selectedSizeId,
+          selectedSize.dimensions
+        );
+        
+        setUploadedFiles(prev => prev.map(f => 
+          f.id === uploadedFile.id ? { 
+            ...f, 
+            validationErrors: errors,
+            validationWarnings: warnings,
+            validationPassed: errors.length === 0,
+          } : f
+        ));
+      }
     }
 
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
+
+  // Re-validate files when size changes
+  useEffect(() => {
+    if (selectedSizeId && selectedSize && uploadedFiles.length > 0) {
+      const revalidateFiles = async () => {
+        const updatedFiles = await Promise.all(
+          uploadedFiles.map(async (f) => {
+            if (!f.uploaded) return f;
+            
+            const { errors, warnings } = await validateFileForProduct(
+              f.file,
+              f.imageDimensions || null,
+              selectedCategoryId,
+              selectedSizeId,
+              selectedSize.dimensions
+            );
+            
+            return {
+              ...f,
+              validationErrors: errors,
+              validationWarnings: warnings,
+              validationPassed: errors.length === 0,
+            };
+          })
+        );
+        setUploadedFiles(updatedFiles);
+      };
+      revalidateFiles();
+    }
+  }, [selectedSizeId, selectedSize?.dimensions]);
 
   const uploadFileToS3 = async (uploadedFile: UploadedFile) => {
     try {
@@ -264,12 +439,30 @@ export default function LandingPage() {
     });
   };
 
+  // Toggle graphic design for a file
+  const toggleGraphicDesign = (id: string) => {
+    setUploadedFiles(prev => prev.map(f => 
+      f.id === id ? { ...f, needsGraphicDesign: !f.needsGraphicDesign } : f
+    ));
+  };
+
+  // Check if any file has critical errors
+  const hasFileErrors = uploadedFiles.some(f => 
+    f.validationErrors && f.validationErrors.length > 0 && !f.needsGraphicDesign
+  );
+
   // Add product to list
   const handleAddProduct = () => {
     if (!selectedProductId || !selectedSizeId || !selectedQuantityId) {
       toast.error("יש לבחור מוצר, גודל וכמות");
       return;
     }
+
+    // Check if any uploaded file needs graphic design
+    const filesNeedGraphic = uploadedFiles.some(f => f.needsGraphicDesign);
+    const graphicPrice = filesNeedGraphic && selectedSize?.graphicDesignPrice 
+      ? parseFloat(selectedSize.graphicDesignPrice) 
+      : 0;
 
     const newProduct: SelectedProduct = {
       productId: selectedProductId,
@@ -279,6 +472,8 @@ export default function LandingPage() {
       quantityId: selectedQuantityId,
       quantity: selectedQuantity?.quantity || 0,
       price: parseFloat(selectedQuantity?.price || "0"),
+      needsGraphicDesign: filesNeedGraphic,
+      graphicDesignPrice: graphicPrice,
     };
 
     setSelectedProducts(prev => [...prev, newProduct]);
@@ -327,6 +522,11 @@ export default function LandingPage() {
     if (!hasProducts && !hasFilesWithDescription) {
       errors.push("יש להוסיף מוצרים או להעלות קבצים עם תיאור");
     }
+
+    // Check for unresolved file errors
+    if (hasFileErrors) {
+      errors.push("יש קבצים עם שגיאות - יש להחליף אותם או לבחור 'צריך גרפיקה'");
+    }
     
     if (errors.length > 0) {
       setSubmitError("הבקשה לא נשלחה מהסיבות הבאות:");
@@ -337,7 +537,7 @@ export default function LandingPage() {
     setSubmitLoading(true);
 
     try {
-      // Get uploaded file info
+      // Get uploaded file info with validation warnings
       const fileAttachments = uploadedFiles
         .filter(f => f.uploaded && f.s3Key)
         .map(f => ({
@@ -346,7 +546,26 @@ export default function LandingPage() {
           s3Key: f.s3Key || '',
           fileSize: f.file.size,
           mimeType: f.file.type,
+          needsGraphicDesign: f.needsGraphicDesign,
+          validationWarnings: f.validationWarnings?.map(w => w.message),
         }));
+
+      // Build notes with validation warnings
+      let notes = description || "";
+      const warningNotes: string[] = [];
+      
+      uploadedFiles.forEach(f => {
+        if (f.validationWarnings && f.validationWarnings.length > 0) {
+          warningNotes.push(`${f.file.name}: ${f.validationWarnings.map(w => w.details || w.message).join(', ')}`);
+        }
+        if (f.needsGraphicDesign) {
+          warningNotes.push(`${f.file.name}: נדרש עיצוב גרפי`);
+        }
+      });
+
+      if (warningNotes.length > 0) {
+        notes += "\n\n--- הערות וולידציה ---\n" + warningNotes.join("\n");
+      }
 
       if (hasProducts) {
         // Submit with products via tRPC
@@ -360,8 +579,10 @@ export default function LandingPage() {
           quoteItems: selectedProducts.map(p => ({
             sizeQuantityId: p.quantityId,
             quantity: p.quantity,
+            needsGraphicDesign: p.needsGraphicDesign,
+            graphicDesignPrice: p.graphicDesignPrice,
           })),
-          notes: description || undefined,
+          notes: notes || undefined,
           attachments: fileAttachments.length > 0 ? fileAttachments : undefined,
         });
       } else {
@@ -373,7 +594,7 @@ export default function LandingPage() {
             phone: customerPhone.trim(),
             companyName: customerCompany.trim() || undefined,
           },
-          description: description,
+          description: notes,
           attachments: fileAttachments,
         });
       }
@@ -401,18 +622,17 @@ export default function LandingPage() {
       if (response.ok) {
         await refresh();
         setShowLoginModal(false);
-        setLocation('/dashboard');
+        setLocation("/dashboard");
       } else {
-        toast.error('שם משתמש או סיסמה שגויים');
+        toast.error("שם משתמש או סיסמה שגויים");
       }
-    } catch (err) {
-      toast.error('שגיאה בהתחברות');
+    } catch (error) {
+      toast.error("שגיאה בהתחברות");
     } finally {
       setLoginLoading(false);
     }
   };
 
-  // Reset form
   const handleReset = () => {
     setCustomerName("");
     setCustomerEmail("");
@@ -435,6 +655,11 @@ export default function LandingPage() {
     if (file.type === 'application/pdf') return <FileText className="h-4 w-4" />;
     return <File className="h-4 w-4" />;
   };
+
+  // Get graphic design price for current size
+  const currentGraphicPrice = selectedSize?.graphicDesignPrice 
+    ? parseFloat(selectedSize.graphicDesignPrice) 
+    : 0;
 
   // Success screen
   if (submitted) {
@@ -640,7 +865,14 @@ export default function LandingPage() {
                         <div key={index} className="flex items-center justify-between p-2 bg-blue-50 rounded-lg text-xs">
                           <div className="flex-1 min-w-0">
                             <p className="font-medium truncate">{prod.productName}</p>
-                            <p className="text-slate-500">{prod.sizeName} • {prod.quantity} יח' • ₪{prod.price.toLocaleString()}</p>
+                            <p className="text-slate-500">
+                              {prod.sizeName} • {prod.quantity} יח' • ₪{prod.price.toLocaleString()}
+                              {prod.needsGraphicDesign && prod.graphicDesignPrice && (
+                                <span className="text-purple-600 mr-1">
+                                  + גרפיקה ₪{prod.graphicDesignPrice}
+                                </span>
+                              )}
+                            </p>
                           </div>
                           <button
                             type="button"
@@ -684,24 +916,88 @@ export default function LandingPage() {
                   PDF, JPG, PNG, AI, EPS, PSD (עד 100MB)
                 </p>
 
-                {/* Uploaded Files */}
+                {/* Uploaded Files with Validation */}
                 {uploadedFiles.length > 0 && (
-                  <div className="mt-2 space-y-1 max-h-20 overflow-auto">
+                  <div className="mt-2 space-y-1.5 max-h-32 overflow-auto">
                     {uploadedFiles.map((f) => (
-                      <div key={f.id} className="flex items-center gap-2 p-1.5 bg-slate-50 rounded text-xs">
-                        {f.preview ? (
-                          <img src={f.preview} alt="" className="w-6 h-6 object-cover rounded" />
-                        ) : (
-                          <div className="w-6 h-6 bg-slate-200 rounded flex items-center justify-center">
-                            {getFileIcon(f.file)}
+                      <div key={f.id} className={`p-2 rounded-lg text-xs ${
+                        f.validationErrors && f.validationErrors.length > 0 && !f.needsGraphicDesign
+                          ? 'bg-red-50 border border-red-200'
+                          : f.validationWarnings && f.validationWarnings.length > 0
+                            ? 'bg-orange-50 border border-orange-200'
+                            : 'bg-slate-50'
+                      }`}>
+                        <div className="flex items-center gap-2">
+                          {f.preview ? (
+                            <img src={f.preview} alt="" className="w-6 h-6 object-cover rounded" />
+                          ) : (
+                            <div className="w-6 h-6 bg-slate-200 rounded flex items-center justify-center">
+                              {getFileIcon(f.file)}
+                            </div>
+                          )}
+                          <span className="flex-1 truncate">{f.file.name}</span>
+                          {f.uploading && <Loader2 className="h-3 w-3 animate-spin text-blue-500" />}
+                          {f.uploaded && !f.validationErrors?.length && <Check className="h-3 w-3 text-green-500" />}
+                          {f.validationErrors && f.validationErrors.length > 0 && !f.needsGraphicDesign && (
+                            <AlertCircle className="h-3 w-3 text-red-500" />
+                          )}
+                          {f.validationWarnings && f.validationWarnings.length > 0 && !f.validationErrors?.length && (
+                            <AlertTriangle className="h-3 w-3 text-orange-500" />
+                          )}
+                          <button type="button" onClick={() => removeFile(f.id)} className="p-0.5 hover:bg-slate-200 rounded">
+                            <X className="h-3 w-3 text-slate-500" />
+                          </button>
+                        </div>
+                        
+                        {/* Validation Errors */}
+                        {f.validationErrors && f.validationErrors.length > 0 && !f.needsGraphicDesign && (
+                          <div className="mt-1.5 space-y-1">
+                            {f.validationErrors.map((err, i) => (
+                              <p key={i} className="text-red-600 text-[10px]">
+                                ❌ {err.message} {err.details && `- ${err.details}`}
+                              </p>
+                            ))}
+                            {/* Graphic Design Option */}
+                            {currentGraphicPrice > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => toggleGraphicDesign(f.id)}
+                                className="flex items-center gap-1 mt-1 px-2 py-1 bg-purple-100 text-purple-700 rounded text-[10px] hover:bg-purple-200"
+                              >
+                                <Palette className="h-3 w-3" />
+                                אנחנו נעשה לך גרפיקה (₪{currentGraphicPrice})
+                              </button>
+                            )}
                           </div>
                         )}
-                        <span className="flex-1 truncate">{f.file.name}</span>
-                        {f.uploading && <Loader2 className="h-3 w-3 animate-spin text-blue-500" />}
-                        {f.uploaded && <Check className="h-3 w-3 text-green-500" />}
-                        <button type="button" onClick={() => removeFile(f.id)} className="p-0.5 hover:bg-slate-200 rounded">
-                          <X className="h-3 w-3 text-slate-500" />
-                        </button>
+
+                        {/* Validation Warnings */}
+                        {f.validationWarnings && f.validationWarnings.length > 0 && !f.validationErrors?.length && (
+                          <div className="mt-1.5">
+                            {f.validationWarnings.map((warn, i) => (
+                              <p key={i} className="text-orange-600 text-[10px]">
+                                ⚠️ {warn.message}
+                              </p>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Graphic Design Selected */}
+                        {f.needsGraphicDesign && (
+                          <div className="mt-1.5 flex items-center justify-between">
+                            <span className="text-purple-600 text-[10px] flex items-center gap-1">
+                              <Palette className="h-3 w-3" />
+                              נבחר עיצוב גרפי (₪{currentGraphicPrice})
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => toggleGraphicDesign(f.id)}
+                              className="text-[10px] text-slate-500 hover:text-red-500"
+                            >
+                              ביטול
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -741,7 +1037,7 @@ export default function LandingPage() {
                 {/* Submit Button */}
                 <Button 
                   type="submit"
-                  disabled={submitLoading || !customerName || !customerPhone || !customerEmail}
+                  disabled={submitLoading || !customerName || !customerPhone || !customerEmail || hasFileErrors}
                   className="mt-3 h-10 bg-gradient-to-l from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
                 >
                   {submitLoading ? (
@@ -759,11 +1055,13 @@ export default function LandingPage() {
 
                 {/* Help Text */}
                 <p className="text-[10px] text-slate-400 text-center mt-2">
-                  {selectedProducts.length > 0 
-                    ? `${selectedProducts.length} מוצרים נבחרו`
-                    : uploadedFiles.length > 0
-                      ? "ניתן לשלוח עם קבצים ותיאור בלבד"
-                      : "בחרו מוצרים או העלו קבצים"
+                  {hasFileErrors 
+                    ? "יש לתקן שגיאות בקבצים לפני שליחה"
+                    : selectedProducts.length > 0 
+                      ? `${selectedProducts.length} מוצרים נבחרו`
+                      : uploadedFiles.length > 0
+                        ? "ניתן לשלוח עם קבצים ותיאור בלבד"
+                        : "בחרו מוצרים או העלו קבצים"
                   }
                 </p>
               </div>

@@ -88,6 +88,7 @@ export default function Products() {
   const [sizeForm, setSizeForm] = useState<SizeFormData>({
     name: "",
     dimensions: "",
+    graphicDesignPrice: "",
   });
 
   const [quantityForm, setQuantityForm] = useState<QuantityFormData>({
@@ -270,7 +271,7 @@ export default function Products() {
   };
 
   const resetSizeForm = () => {
-    setSizeForm({ name: "", dimensions: "" });
+    setSizeForm({ name: "", dimensions: "", graphicDesignPrice: "" });
     setIsEditMode(false);
     setSelectedItemId(null);
   };
@@ -348,12 +349,15 @@ export default function Products() {
       return;
     }
 
+    const graphicPrice = sizeForm.graphicDesignPrice ? parseFloat(sizeForm.graphicDesignPrice) : 0;
+
     if (isEditMode && selectedItemId) {
       updateSizeMutation.mutate({
         id: selectedItemId,
         name: sizeForm.name,
         dimensions: sizeForm.dimensions || undefined,
         basePrice: 0,
+        graphicDesignPrice: graphicPrice,
       });
     } else if (selectedProductId) {
       createSizeMutation.mutate({
@@ -361,6 +365,7 @@ export default function Products() {
         name: sizeForm.name,
         dimensions: sizeForm.dimensions || undefined,
         basePrice: 0,
+        graphicDesignPrice: graphicPrice,
       });
     }
   };
@@ -430,6 +435,7 @@ export default function Products() {
     setSizeForm({
       name: size.name,
       dimensions: size.dimensions || "",
+      graphicDesignPrice: size.graphicDesignPrice || "",
     });
     setSelectedProductId(productId);
     setSelectedItemId(size.id);
