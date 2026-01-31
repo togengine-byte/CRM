@@ -688,7 +688,7 @@ export default function Suppliers() {
                                     <Input
                                       value={supplierDetails.name || ""}
                                       disabled
-                                      className="bg-muted/50"
+                                      className="bg-muted/50 text-foreground disabled:text-foreground disabled:opacity-100"
                                     />
                                   </div>
                                   <div className="space-y-1">
@@ -697,7 +697,7 @@ export default function Suppliers() {
                                       value={supplierDetails.email || ""}
                                       disabled
                                       dir="ltr"
-                                      className="bg-muted/50"
+                                      className="bg-muted/50 text-foreground disabled:text-foreground disabled:opacity-100"
                                     />
                                   </div>
                                   <div className="space-y-1">
@@ -706,7 +706,7 @@ export default function Suppliers() {
                                       value={supplierDetails.phone || ""}
                                       disabled
                                       dir="ltr"
-                                      className="bg-muted/50"
+                                      className="bg-muted/50 text-foreground disabled:text-foreground disabled:opacity-100"
                                     />
                                   </div>
                                   <div className="space-y-1">
@@ -714,7 +714,7 @@ export default function Suppliers() {
                                     <Input
                                       value={supplierDetails.companyName || ""}
                                       disabled
-                                      className="bg-muted/50"
+                                      className="bg-muted/50 text-foreground disabled:text-foreground disabled:opacity-100"
                                     />
                                   </div>
                                   <div className="space-y-1">
@@ -722,7 +722,7 @@ export default function Suppliers() {
                                     <Input
                                       value={supplierDetails.address || ""}
                                       disabled
-                                      className="bg-muted/50"
+                                      className="bg-muted/50 text-foreground disabled:text-foreground disabled:opacity-100"
                                     />
                                   </div>
                                   <div className="space-y-1">
@@ -732,7 +732,7 @@ export default function Suppliers() {
                                         value={supplierDetails.whatsapp || ""}
                                         disabled
                                         dir="ltr"
-                                        className="bg-muted/50 flex-1"
+                                        className="bg-muted/50 flex-1 text-foreground disabled:text-foreground disabled:opacity-100"
                                       />
                                       {supplierDetails.whatsapp && (
                                         <a 
@@ -751,7 +751,7 @@ export default function Suppliers() {
                                     <Input
                                       value={supplierDetails.contactPerson || ""}
                                       disabled
-                                      className="bg-muted/50"
+                                      className="bg-muted/50 text-foreground disabled:text-foreground disabled:opacity-100"
                                     />
                                   </div>
                                   <div className="space-y-1">
@@ -760,7 +760,7 @@ export default function Suppliers() {
                                       value={supplierDetails.contactPhone || ""}
                                       disabled
                                       dir="ltr"
-                                      className="bg-muted/50"
+                                      className="bg-muted/50 text-foreground disabled:text-foreground disabled:opacity-100"
                                     />
                                   </div>
                                   <div className="space-y-1">
@@ -769,7 +769,7 @@ export default function Suppliers() {
                                       value={supplierDetails.taxId || ""}
                                       disabled
                                       dir="ltr"
-                                      className="bg-muted/50"
+                                      className="bg-muted/50 text-foreground disabled:text-foreground disabled:opacity-100"
                                     />
                                   </div>
                                   <div className="space-y-1">
@@ -777,7 +777,7 @@ export default function Suppliers() {
                                     <Input
                                       value={supplierDetails.paymentTerms || ""}
                                       disabled
-                                      className="bg-muted/50"
+                                      className="bg-muted/50 text-foreground disabled:text-foreground disabled:opacity-100"
                                     />
                                   </div>
                                 </div>
