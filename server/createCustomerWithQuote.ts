@@ -42,9 +42,10 @@ interface CreateCustomerWithQuoteResult {
   success: boolean;
   customerId: number;
   customerNumber?: number;
-  quoteId: number;
-  quoteNumber: number;
+  quoteId?: number;
+  quoteNumber?: number;
   isExistingCustomer: boolean;
+  isPendingApproval: boolean;
   message: string;
 }
 
@@ -53,6 +54,7 @@ async function getOrCreateCustomer(db: any, customerInfo: CreateCustomerWithQuot
   customerId: number;
   customerNumber?: number;
   isExistingCustomer: boolean;
+  customerStatus: string;
 }> {
   // Validate email format
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -86,7 +88,7 @@ async function getOrCreateCustomer(db: any, customerInfo: CreateCustomerWithQuot
         customerEmail: normalizedEmail,
         customerName: existingCustomer.name,
         customerStatus: existingCustomer.status,
-        note: "Quote created for existing customer - skipping pending approvals",
+        note: "Quote request from existing customer",
       },
     });
 
@@ -94,6 +96,7 @@ async function getOrCreateCustomer(db: any, customerInfo: CreateCustomerWithQuot
       customerId: existingCustomer.id,
       customerNumber: existingCustomer.customerNumber ?? undefined,
       isExistingCustomer: true,
+      customerStatus: existingCustomer.status,
     };
   }
 
@@ -120,6 +123,7 @@ async function getOrCreateCustomer(db: any, customerInfo: CreateCustomerWithQuot
     customerId: customerResult[0].id,
     customerNumber,
     isExistingCustomer: false,
+    customerStatus: "pending_approval",
   };
 }
 
@@ -137,13 +141,64 @@ async function saveAttachments(db: any, quoteId: number, attachments: Attachment
   }
 }
 
+// Helper function to save pending request data to activity log (for new customers)
+async function savePendingRequestData(db: any, customerId: number, input: CreateCustomerWithQuoteInput | CreateCustomerWithFilesOnlyInput, isFilesOnly: boolean) {
+  await db.insert(activityLog).values({
+    userId: customerId,
+    actionType: "pending_quote_request_data",
+    details: {
+      customerId,
+      customerInfo: input.customerInfo,
+      quoteItems: isFilesOnly ? [] : (input as CreateCustomerWithQuoteInput).quoteItems,
+      notes: isFilesOnly ? (input as CreateCustomerWithFilesOnlyInput).description : (input as CreateCustomerWithQuoteInput).notes,
+      attachments: input.attachments || (input as CreateCustomerWithFilesOnlyInput).attachments,
+      isFilesOnly,
+      savedAt: new Date().toISOString(),
+    },
+  });
+}
+
 // Create customer with quote (with products)
 export async function createCustomerWithQuote(input: CreateCustomerWithQuoteInput): Promise<CreateCustomerWithQuoteResult> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  const { customerId, customerNumber, isExistingCustomer } = await getOrCreateCustomer(db, input.customerInfo);
+  const { customerId, customerNumber, isExistingCustomer, customerStatus } = await getOrCreateCustomer(db, input.customerInfo);
 
+  // If new customer (pending approval) - don't create quote yet, just save the request data
+  if (!isExistingCustomer) {
+    // Save the request data for later (when customer is approved)
+    await savePendingRequestData(db, customerId, input, false);
+
+    // Log activity
+    await db.insert(activityLog).values({
+      userId: null,
+      actionType: "new_customer_signup_pending",
+      details: {
+        customerId,
+        customerNumber,
+        customerName: input.customerInfo.name,
+        customerEmail: input.customerInfo.email.toLowerCase().trim(),
+        customerPhone: input.customerInfo.phone,
+        customerCompany: input.customerInfo.companyName,
+        itemCount: input.quoteItems.length,
+        attachmentCount: input.attachments?.length || 0,
+        notes: input.notes || null,
+        message: "New customer pending approval - quote will be created after approval",
+      },
+    });
+
+    return {
+      success: true,
+      customerId,
+      customerNumber,
+      isExistingCustomer: false,
+      isPendingApproval: true,
+      message: "בקשתך התקבלה בהצלחה! נבדוק את הפרטים ונחזור אליך בהקדם.",
+    };
+  }
+
+  // Existing customer - create quote directly
   // Get next quote number from sequence
   const quoteSeqResult = await db.execute(sql`SELECT nextval('quote_number_seq') as next_num`) as any;
   const quoteNumber = Number(quoteSeqResult.rows?.[0]?.next_num || quoteSeqResult[0]?.next_num || Date.now());
@@ -179,7 +234,7 @@ export async function createCustomerWithQuote(input: CreateCustomerWithQuoteInpu
   // Log activity
   await db.insert(activityLog).values({
     userId: null,
-    actionType: isExistingCustomer ? "existing_customer_new_quote" : "customer_signup_quote_request",
+    actionType: "existing_customer_new_quote",
     details: {
       customerId,
       customerNumber,
@@ -190,13 +245,9 @@ export async function createCustomerWithQuote(input: CreateCustomerWithQuoteInpu
       itemCount: input.quoteItems.length,
       attachmentCount: input.attachments?.length || 0,
       notes: input.notes || null,
-      isExistingCustomer,
+      isExistingCustomer: true,
     },
   });
-
-  const message = isExistingCustomer
-    ? "הצעת המחיר נוצרה בהצלחה! הלקוח כבר קיים במערכת - ההצעה נוספה לרשימת הצעות המחיר."
-    : "בקשתך התקבלה בהצלחה! נשלח לך מייל עם פרטים נוספים";
 
   return {
     success: true,
@@ -204,8 +255,9 @@ export async function createCustomerWithQuote(input: CreateCustomerWithQuoteInpu
     customerNumber,
     quoteId,
     quoteNumber,
-    isExistingCustomer,
-    message,
+    isExistingCustomer: true,
+    isPendingApproval: false,
+    message: "הצעת המחיר נוצרה בהצלחה! נחזור אליך בהקדם עם פרטים נוספים.",
   };
 }
 
@@ -214,8 +266,42 @@ export async function createCustomerWithFilesOnly(input: CreateCustomerWithFiles
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  const { customerId, customerNumber, isExistingCustomer } = await getOrCreateCustomer(db, input.customerInfo);
+  const { customerId, customerNumber, isExistingCustomer, customerStatus } = await getOrCreateCustomer(db, input.customerInfo);
 
+  // If new customer (pending approval) - don't create quote yet, just save the request data
+  if (!isExistingCustomer) {
+    // Save the request data for later (when customer is approved)
+    await savePendingRequestData(db, customerId, input, true);
+
+    // Log activity
+    await db.insert(activityLog).values({
+      userId: null,
+      actionType: "new_customer_files_only_pending",
+      details: {
+        customerId,
+        customerNumber,
+        customerName: input.customerInfo.name,
+        customerEmail: input.customerInfo.email.toLowerCase().trim(),
+        customerPhone: input.customerInfo.phone,
+        customerCompany: input.customerInfo.companyName,
+        description: input.description,
+        attachmentCount: input.attachments.length,
+        attachmentNames: input.attachments.map(a => a.fileName),
+        message: "New customer pending approval - quote will be created after approval",
+      },
+    });
+
+    return {
+      success: true,
+      customerId,
+      customerNumber,
+      isExistingCustomer: false,
+      isPendingApproval: true,
+      message: "בקשתך התקבלה בהצלחה! הקבצים נשמרו ונחזור אליך בהקדם.",
+    };
+  }
+
+  // Existing customer - create quote directly
   // Get next quote number from sequence
   const quoteSeqResult = await db.execute(sql`SELECT nextval('quote_number_seq') as next_num`) as any;
   const quoteNumber = Number(quoteSeqResult.rows?.[0]?.next_num || quoteSeqResult[0]?.next_num || Date.now());
@@ -239,7 +325,7 @@ export async function createCustomerWithFilesOnly(input: CreateCustomerWithFiles
   // Log activity with description
   await db.insert(activityLog).values({
     userId: null,
-    actionType: isExistingCustomer ? "existing_customer_files_only_quote" : "customer_files_only_quote_request",
+    actionType: "existing_customer_files_only_quote",
     details: {
       customerId,
       customerNumber,
@@ -250,14 +336,10 @@ export async function createCustomerWithFilesOnly(input: CreateCustomerWithFiles
       description: input.description,
       attachmentCount: input.attachments.length,
       attachmentNames: input.attachments.map(a => a.fileName),
-      isExistingCustomer,
+      isExistingCustomer: true,
       isFilesOnlyQuote: true,
     },
   });
-
-  const message = isExistingCustomer
-    ? "בקשתך התקבלה! הקבצים הועלו בהצלחה. ניצור איתך קשר בהקדם."
-    : "בקשתך התקבלה בהצלחה! הקבצים הועלו ונחזור אליך עם הצעת מחיר.";
 
   return {
     success: true,
@@ -265,7 +347,8 @@ export async function createCustomerWithFilesOnly(input: CreateCustomerWithFiles
     customerNumber,
     quoteId,
     quoteNumber,
-    isExistingCustomer,
-    message,
+    isExistingCustomer: true,
+    isPendingApproval: false,
+    message: "בקשתך התקבלה! הקבצים הועלו בהצלחה. ניצור איתך קשר בהקדם.",
   };
 }
