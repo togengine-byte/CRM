@@ -120,6 +120,12 @@ export interface CustomerFormData {
   email: string;
   phone: string;
   company: string;
+  // Optional fields
+  address?: string;
+  billingEmail?: string;
+  taxId?: string; // ח.פ / עוסק מורשה
+  contactPerson?: string;
+  contactPhone?: string;
 }
 
 export interface LoginFormData {

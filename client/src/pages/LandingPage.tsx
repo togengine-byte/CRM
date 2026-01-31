@@ -12,7 +12,7 @@ import {
   Send, Loader2, LogIn, Package, Upload, X, Check, 
   Trash2, AlertCircle, AlertTriangle, Palette, FileText,
   Image, File, Plus, Tag, ShoppingCart, User, Phone, Mail, Building,
-  ChevronDown
+  ChevronDown, ChevronUp, MapPin, Receipt, Hash, UserPlus
 } from "lucide-react";
 
 // Landing page components & utils
@@ -62,6 +62,7 @@ export default function LandingPage() {
   const [generalFiles, setGeneralFiles] = useState<ProductFile[]>([]);
   const [description, setDescription] = useState("");
   const [isDragging, setIsDragging] = useState(false);
+  const [showExpandedDetails, setShowExpandedDetails] = useState(false);
 
   // ============================================================================
   // Submission State
@@ -711,11 +712,31 @@ export default function LandingPage() {
 
               {/* Customer Details - At the End */}
               <div className="bg-white rounded-xl p-4 shadow-sm border border-slate-200/50">
-                <h2 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                  <User className="h-4 w-4 text-emerald-600" />
-                  פרטי התקשרות
-                </h2>
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                    <User className="h-4 w-4 text-emerald-600" />
+                    פרטי התקשרות
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => setShowExpandedDetails(!showExpandedDetails)}
+                    className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1 font-medium"
+                  >
+                    {showExpandedDetails ? (
+                      <>
+                        <ChevronUp className="h-3.5 w-3.5" />
+                        צמצם פרטים
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="h-3.5 w-3.5" />
+                        הרחב פרטים
+                      </>
+                    )}
+                  </button>
+                </div>
                 
+                {/* Required Fields */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
                   <div className="relative">
                     <User className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -750,6 +771,68 @@ export default function LandingPage() {
                     />
                   </div>
                 </div>
+
+                {/* Expanded Optional Fields */}
+                {showExpandedDetails && (
+                  <div className="mt-3 pt-3 border-t border-slate-100 space-y-3">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                      <div className="relative">
+                        <Building className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                        <input
+                          type="text"
+                          value={customerData.company}
+                          onChange={(e) => setCustomerData({ ...customerData, company: e.target.value })}
+                          className="w-full h-10 pr-9 pl-3 rounded-lg border border-slate-200 bg-white text-slate-900 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="שם חברה"
+                        />
+                      </div>
+                      <div className="relative">
+                        <Hash className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                        <input
+                          type="text"
+                          value={customerData.taxId || ""}
+                          onChange={(e) => setCustomerData({ ...customerData, taxId: e.target.value })}
+                          className="w-full h-10 pr-9 pl-3 rounded-lg border border-slate-200 bg-white text-slate-900 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="ח.פ / עוסק מורשה"
+                          dir="ltr"
+                        />
+                      </div>
+                    </div>
+                    <div className="relative">
+                      <MapPin className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                      <input
+                        type="text"
+                        value={customerData.address || ""}
+                        onChange={(e) => setCustomerData({ ...customerData, address: e.target.value })}
+                        className="w-full h-10 pr-9 pl-3 rounded-lg border border-slate-200 bg-white text-slate-900 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="כתובת"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                      <div className="relative">
+                        <Receipt className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                        <input
+                          type="email"
+                          value={customerData.billingEmail || ""}
+                          onChange={(e) => setCustomerData({ ...customerData, billingEmail: e.target.value })}
+                          className="w-full h-10 pr-9 pl-3 rounded-lg border border-slate-200 bg-white text-slate-900 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="מייל לחשבוניות"
+                          dir="ltr"
+                        />
+                      </div>
+                      <div className="relative">
+                        <UserPlus className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                        <input
+                          type="text"
+                          value={customerData.contactPerson || ""}
+                          onChange={(e) => setCustomerData({ ...customerData, contactPerson: e.target.value })}
+                          className="w-full h-10 pr-9 pl-3 rounded-lg border border-slate-200 bg-white text-slate-900 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="איש קשר נוסף"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
