@@ -278,14 +278,12 @@ export function UnifiedPipelineCard({ isLoading: parentLoading }: { isLoading: b
                       <Package className="h-3.5 w-3.5 text-blue-500 shrink-0" />
                     )}
                     <span className="text-xs font-medium text-slate-700 truncate">
-                      {item.type === 'job' ? item.productName : item.customerName}
+                      {item.productName || 'מוצר'}
                     </span>
                     <span className="text-[10px] text-slate-400">
-                      {item.type === 'job' ? `עבודה מס' ${item.id}` : `#${item.id}`}
+                      {item.type === 'job' ? `עבודה מס' ${item.id}` : `הצעה מס' ${item.id}`}
                     </span>
-                    {item.type === 'job' && (
-                      <span className="text-[10px] text-slate-500">| {item.customerName}</span>
-                    )}
+                    <span className="text-[10px] text-slate-500">| {item.customerName}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     {/* כפתור WhatsApp להצעות מחיר באיחור (נשלחו ולא אושרו תוך 24 שעות) */}
